@@ -1,0 +1,29 @@
+{
+  "name": "orbik",
+  "version": "0.1.0",
+  "license": "AGPL-3.0-only",
+  "private": true,
+  "description": "Orbik: crawl a site and keep a knowledge base and brand your own AI reads.",
+  "homepage": "https://github.com/Codalent/orbik#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Codalent/orbik.git"
+  },
+  "bugs": "https://github.com/Codalent/orbik/issues",
+  "packageManager": "pnpm@11.23.0",
+  "engines": {
+    "node": ">=24.14.0 <25",
+    "pnpm": ">=11.23.0 <12"
+  },
+  "scripts": {
+    "build": "corepack pnpm --recursive run build",
+    "dev": "corepack pnpm --parallel --filter ./frontend --filter ./backend --filter ./agents run dev",
+    "lint": "corepack pnpm --recursive run lint"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.5",
+    "eslint": "^9.39.5",
+    "globals": "^17.4.0",
+    "pm2": "^6.0.14"
+  }
+}

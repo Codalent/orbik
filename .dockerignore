@@ -1,0 +1,14 @@
+# What the Docker build may not see. Dependencies are installed inside the image from the
+# lockfile, and no secret or local configuration may end up in a layer.
+**/node_modules
+**/.next
+**/.env
+**/.env.*
+!**/.env.example
+.git
+.claude
+.devbar
+CLAUDE.local.md
+.pnpm-store
+**/*.log
+**/.DS_Store

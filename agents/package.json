@@ -1,0 +1,41 @@
+{
+  "name": "@orbik/agents",
+  "version": "0.1.0",
+  "license": "AGPL-3.0-only",
+  "private": true,
+  "description": "Orbik agent runtime: MongoDB-backed job queue, run ledger, and the agents that build the site dataset.",
+  "type": "module",
+  "engines": {
+    "node": ">=24.14.0 <25"
+  },
+  "scripts": {
+    "dev": "corepack pnpm --filter . run --parallel \"/^dev:/\"",
+    "dev:worker": "node --watch src/worker.js",
+    "dev:scheduler": "node --watch src/scheduler.js",
+    "start": "node src/worker.js",
+    "lint": "eslint src",
+    "agent:run": "node src/cli/runAgent.js"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.72.0",
+    "@orbik/agent-definitions": "workspace:*",
+    "@orbik/assets": "workspace:*",
+    "@orbik/core": "workspace:*",
+    "@orbik/crawl-budget": "workspace:*",
+    "@orbik/design-system": "workspace:*",
+    "@orbik/extensions": "workspace:*",
+    "@orbik/library": "workspace:*",
+    "@orbik/migrations": "workspace:*",
+    "@orbik/protocol": "workspace:*",
+    "@orbik/retrieval": "workspace:*",
+    "@orbik/tools": "workspace:*",
+    "cheerio": "^1.1.2",
+    "chrome-launcher": "1.2.1",
+    "dotenv": "^17.4.2",
+    "fast-xml-parser": "^5.3.1",
+    "mongodb": "^7.6.0",
+    "puppeteer-core": "25.10.0",
+    "turndown": "^7.2.4",
+    "turndown-plugin-gfm": "^1.0.2"
+  }
+}

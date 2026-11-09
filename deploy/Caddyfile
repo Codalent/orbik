@@ -1,0 +1,24 @@
+# One address for the whole install: the API's paths go to the API, everything else to the web
+# app. The web app calls the API on its own origin, so this is what lets one image of each serve
+# any hostname.
+#
+# ORBIK_SITE_ADDRESS is `:80` by default — plain HTTP on whatever port compose publishes. Set it to
+# a domain name (orbik.example.com) and publish 80 and 443, and Caddy gets and renews a certificate
+# for it on its own.
+{
+	admin off
+}
+
+{$ORBIK_SITE_ADDRESS::80} {
+	encode zstd gzip
+
+	# The API. /oauth/consent is the one /oauth path that is a page of the web app.
+	@api path /v1/* /mcp /mcp/* /.well-known/* /health /oauth/authorize /oauth/token /oauth/revoke /oauth/register
+	handle @api {
+		reverse_proxy api:4100
+	}
+
+	handle {
+		reverse_proxy web:3100
+	}
+}

@@ -1,0 +1,22 @@
+{
+  "name": "@orbik/extensions",
+  "version": "0.1.0",
+  "license": "AGPL-3.0-only",
+  "private": true,
+  "description": "The extension seam: the loader every process starts through, and the hooks an extension may attach to. With no extension loaded every hook has its open-source default and every limit is unlimited.",
+  "type": "module",
+  "engines": {
+    "node": ">=24.14.0 <25"
+  },
+  "exports": {
+    ".": "./src/index.js",
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "lint": "eslint src"
+  },
+  "dependencies": {
+    "@orbik/core": "workspace:*",
+    "mongodb": "^7.6.0"
+  }
+}

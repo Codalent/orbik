@@ -1,0 +1,24 @@
+{
+  "name": "@orbik/design-system",
+  "version": "0.1.0",
+  "license": "AGPL-3.0-only",
+  "private": true,
+  "description": "A workspace's design system as data: the colour arithmetic, the pins a person sets, the store both processes read, and the renderings (DTCG tokens, CSS variables, Tailwind, DESIGN.md, an image prompt) the API and the MCP server share.",
+  "type": "module",
+  "engines": {
+    "node": ">=24.14.0 <25"
+  },
+  "exports": {
+    ".": "./src/index.js",
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "lint": "eslint src"
+  },
+  "dependencies": {
+    "@orbik/core": "workspace:*",
+    "@orbik/library": "workspace:*",
+    "@orbik/protocol": "workspace:*",
+    "mongodb": "^7.6.0"
+  }
+}

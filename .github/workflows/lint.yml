@@ -1,0 +1,26 @@
+# Runs `pnpm lint` on every pull request and on main. The lint includes the boundary rule
+# (eslint.boundary.mjs): nothing in core may import from outside this repository.
+name: Lint
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .node-version
+      - name: Install dependencies
+        run: |
+          corepack enable
+          pnpm install --frozen-lockfile
+      - name: Lint
+        run: pnpm lint

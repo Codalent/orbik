@@ -1,0 +1,47 @@
+{
+  "name": "backend",
+  "version": "0.1.0",
+  "license": "AGPL-3.0-only",
+  "private": true,
+  "description": "Orbik Express API",
+  "type": "module",
+  "engines": {
+    "node": ">=24.14.0 <25"
+  },
+  "scripts": {
+    "dev": "node --watch src/server.js",
+    "start": "node src/server.js",
+    "lint": "eslint src",
+    "seed:user": "node src/cli/seedUser.js",
+    "grant:crawl-budget": "node src/cli/grantCrawlBudget.js",
+    "reset:password": "node src/cli/resetPassword.js"
+  },
+  "dependencies": {
+    "@codalent/devbar": "^0.3.0",
+    "@modelcontextprotocol/node": "^2.1.0",
+    "@modelcontextprotocol/server": "^2.1.0",
+    "@orbik/agent-definitions": "workspace:*",
+    "@orbik/assets": "workspace:*",
+    "@orbik/core": "workspace:*",
+    "@orbik/crawl-budget": "workspace:*",
+    "@orbik/design-system": "workspace:*",
+    "@orbik/extensions": "workspace:*",
+    "@orbik/library": "workspace:*",
+    "@orbik/migrations": "workspace:*",
+    "@orbik/protocol": "workspace:*",
+    "@orbik/retrieval": "workspace:*",
+    "@orbik/tools": "workspace:*",
+    "argon2": "^0.45.1",
+    "connect-mongo": "^6.0.0",
+    "cors": "^2.8.6",
+    "dotenv": "^17.4.2",
+    "express": "5.2.1",
+    "express-session": "^1.19.0",
+    "express-validator": "^7.3.2",
+    "fontkit": "^2.0.4",
+    "helmet": "^8.3.0",
+    "mongodb": "^7.6.0",
+    "nodemailer": "^7.0.13",
+    "unpdf": "^2.1.0"
+  }
+}

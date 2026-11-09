@@ -1,0 +1,244 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+/* Dark is the default; `data-theme` on <html> is set by src/lib/theme.jsx before first paint. */
+@custom-variant dark (&:is(:root:not([data-theme="light"]) *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+  --font-heading: var(--font-display);
+
+  /*
+   * The in-between steps of the type scale, named so pages stop writing them by hand. Each sets
+   * only the size, as the arbitrary values they replace did: the line height still comes from the
+   * element or a `leading-*` beside it. `2xs` is the smallest readable label (pills, counts),
+   * `compact` sits between xs and sm (status lines, dense rows), `title` is a page's h1.
+   */
+  --text-2xs: 0.6875rem;
+  --text-compact: 0.8125rem;
+  --text-title: 1.75rem;
+
+  /* Orbik brand ramp. Prefixed so it never collides with Tailwind's default color names. */
+  --color-orb-black: var(--orbik-black);
+  --color-orb-space: var(--deep-space);
+  --color-orb-raised: var(--surface-raised);
+  --color-orb-line: var(--orbit-line);
+  --color-orb-lime: var(--orbit-lime);
+  --color-orb-cyan: var(--signal-cyan);
+  --color-orb-orange: var(--solar-orange);
+  --color-orb-coral: var(--alert-coral);
+  --color-orb-white: var(--moon-white);
+  --color-orb-gray: var(--satellite-gray);
+  --color-orb-muted: var(--text-muted);
+
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+/* Orbik core palette. These raw values are the single source of truth for the brand. */
+:root {
+  /*
+   * The four darks are steps of one ramp, close enough together that a panel reads as lifted off
+   * the chrome without a bright edge to say so. The line is only a little above the surfaces it
+   * divides: in the workspace shell it separates halves of one panel, and a line that is easy to
+   * see there turns every divider into a box.
+   */
+  --orbik-black: #090A0C;
+  --deep-space: #111317;
+  --surface-raised: #1A1D22;
+  --orbit-line: #24282E;
+
+  --orbit-lime: #B9F227;
+  --signal-cyan: #50D9E8;
+  --solar-orange: #FF9C4A;
+  --alert-coral: #FF6262;
+
+  --moon-white: #F4F5F2;
+  --satellite-gray: #9BA3AA;
+  /*
+   * Raised from #626A71, which sat at 3.4:1 on the panel behind it — under the 4.5:1 body text
+   * needs, and the reason small print here read as unreadable rather than merely quiet. This is
+   * 5.3:1 and still clearly a step below satellite-gray, so the hierarchy it carries survives.
+   */
+  --text-muted: #838B93;
+}
+
+/*
+ * Light mode, chosen from the account menu: src/lib/theme.jsx sets `data-theme="light"` on <html>.
+ * The ramp keeps its names, so every `orb-*` class follows without change: the names say a role,
+ * not a colour — `orb-black` is the chrome behind the panels, `orb-white` the strongest text.
+ *
+ * Panels are white and lifted off a grey chrome, and the raised surface is a tint between them
+ * so hover states and badges still show on a panel. The accents are deeper shades of the same
+ * hues: the dark-mode values are meant to glow on black and are unreadable as text on white.
+ * Each one here is at least 4.5:1 on all three surfaces and carries the chrome colour as text
+ * when it is a fill, which is how a lime button reads.
+ */
+:root[data-theme="light"] {
+  --orbik-black: #ECEEE9;
+  --deep-space: #FFFFFF;
+  --surface-raised: #F2F4EF;
+  --orbit-line: #D9DCD5;
+
+  --orbit-lime: #437000;
+  --signal-cyan: #0A6E80;
+  --solar-orange: #A84D08;
+  --alert-coral: #C42F2F;
+
+  --moon-white: #121417;
+  --satellite-gray: #4B535A;
+  --text-muted: #5F676E;
+}
+
+/* The semantic shadcn tokens below are bound to the brand ramp above, in either mode. */
+:root {
+  color-scheme: dark;
+
+  --background: var(--orbik-black);
+  --foreground: var(--moon-white);
+  --card: var(--deep-space);
+  --card-foreground: var(--moon-white);
+  --popover: var(--surface-raised);
+  --popover-foreground: var(--moon-white);
+
+  --primary: var(--orbit-lime);
+  --primary-foreground: var(--orbik-black);
+  --secondary: var(--surface-raised);
+  --secondary-foreground: var(--moon-white);
+  --muted: var(--surface-raised);
+  --muted-foreground: var(--satellite-gray);
+  --accent: var(--surface-raised);
+  --accent-foreground: var(--moon-white);
+  --destructive: var(--alert-coral);
+
+  --border: var(--orbit-line);
+  --input: var(--orbit-line);
+  --ring: var(--orbit-lime);
+
+  --radius: 0.45rem;
+
+  /* Identity plate: the raised surface the active workspace is stamped on. */
+  --plate: var(--surface-raised);
+  --plate-border: var(--orbit-line);
+
+  --sidebar-foreground: var(--moon-white);
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+
+  /* A menu is a white sheet with a shadow, not a grey one: the raised tint is for things on a panel. */
+  --popover: var(--deep-space);
+  --primary-foreground: #FFFFFF;
+}
+
+/*
+ * A dot travelling the ring of an agent's glyph, taken from the ringed planet in the Orbik mark.
+ * It runs only while an agent is actually working, so stillness in the sidebar means nothing is
+ * happening — which is what makes the motion worth noticing when it appears.
+ */
+@keyframes orbik-orbit {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/*
+ * The beacon next to "Crawl in progress": a light that breathes rather than blinks.
+ *
+ * A crawl runs for minutes and this sits in the topbar the whole time, so a hard on/off flash
+ * would be an irritant to work beside. Fading to a floor rather than to nothing keeps the dot
+ * legible at every point in the cycle, and the halo carries the change at a size where opacity
+ * alone is barely perceptible.
+ */
+@keyframes orbik-beacon {
+  0%, 100% {
+    opacity: 1;
+    box-shadow: 0 0 0 0 color-mix(in oklab, var(--signal-cyan) 45%, transparent);
+  }
+  50% {
+    opacity: 0.4;
+    box-shadow: 0 0 0 4px color-mix(in oklab, var(--signal-cyan) 0%, transparent);
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+    /* Fixed orbital dot field: the panels float above it, so it reads as an endless backdrop. */
+    background-image: radial-gradient(circle at 1px 1px, color-mix(in oklab, var(--orbit-line) 65%, transparent) 1px, transparent 0);
+    background-size: 16px 16px;
+    background-attachment: fixed;
+  }
+  button:not(:disabled), [role="button"]:not(:disabled) {
+    cursor: pointer;
+  }
+  html {
+    @apply font-sans;
+  }
+  h1, h2, h3 {
+    font-family: var(--font-display);
+    letter-spacing: -0.035em;
+  }
+}
+
+/*
+ * Rendered Markdown in the library reader. Set once here rather than per element in JSX, because
+ * the elements come out of a renderer that does not take class names, and because a document
+ * should read like a document: a measure, a rhythm, quiet rules and code, links in the accent.
+ */
+.doc-prose { color: var(--color-orb-gray); font-size: 0.9375rem; line-height: 1.7; }
+.doc-prose > * + * { margin-top: 1em; }
+.doc-prose h1, .doc-prose h2, .doc-prose h3, .doc-prose h4 {
+  color: var(--color-orb-white); font-family: var(--font-display); font-weight: 700; letter-spacing: -0.015em; line-height: 1.25;
+}
+.doc-prose h1 { font-size: 1.75rem; margin-top: 1.6em; }
+.doc-prose h2 { font-size: 1.375rem; margin-top: 1.8em; }
+.doc-prose h3 { font-size: 1.125rem; margin-top: 1.5em; }
+.doc-prose h4 { font-size: 1rem; margin-top: 1.4em; }
+.doc-prose p strong { color: var(--color-orb-white); }
+.doc-prose a { color: var(--color-orb-cyan); text-decoration: underline; text-underline-offset: 3px; text-decoration-color: color-mix(in oklab, var(--color-orb-cyan) 40%, transparent); }
+.doc-prose a:hover { text-decoration-color: currentColor; }
+.doc-prose ul, .doc-prose ol { padding-left: 1.5rem; }
+.doc-prose ul { list-style: disc; }
+.doc-prose ol { list-style: decimal; }
+.doc-prose li + li { margin-top: 0.35em; }
+.doc-prose blockquote { border-left: 2px solid var(--color-orb-line); padding-left: 1rem; color: var(--color-orb-muted); font-style: italic; }
+.doc-prose hr { border: 0; border-top: 1px solid var(--color-orb-line); margin: 2em 0; }
+.doc-prose code { font-family: var(--font-mono); font-size: 0.85em; background: color-mix(in oklab, var(--color-orb-black) 40%, transparent); border: 1px solid var(--color-orb-line); border-radius: 0.3rem; padding: 0.1em 0.35em; color: var(--color-orb-white); }
+.doc-prose pre { background: color-mix(in oklab, var(--color-orb-black) 40%, transparent); border: 1px solid var(--color-orb-line); border-radius: 0.5rem; padding: 0.9rem 1rem; overflow-x: auto; font-size: 0.8rem; line-height: 1.55; }
+.doc-prose pre code { background: none; border: 0; padding: 0; font-size: inherit; }
+.doc-prose img { max-width: 100%; height: auto; border-radius: 0.5rem; border: 1px solid var(--color-orb-line); }
+.doc-prose table { width: 100%; border-collapse: collapse; font-size: 0.875rem; display: block; overflow-x: auto; }
+.doc-prose th, .doc-prose td { border: 1px solid var(--color-orb-line); padding: 0.45rem 0.65rem; text-align: left; vertical-align: top; }
+.doc-prose th { color: var(--color-orb-white); background: color-mix(in oklab, var(--color-orb-raised) 60%, transparent); font-weight: 600; }
+.doc-prose input[type="checkbox"] { margin-right: 0.4rem; accent-color: var(--color-orb-lime); }

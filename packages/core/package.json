@@ -1,0 +1,22 @@
+{
+  "name": "@orbik/core",
+  "version": "0.1.0",
+  "license": "AGPL-3.0-only",
+  "private": true,
+  "description": "Orbik's shared runtime primitives (environment parsing, MongoDB access and physical collection names, the redacting logger, the public-address check, the robots.txt rules) and the records more than one process shares: the AI call log, agent setups, the crawl schedule, the store of what agents suggest, and the constants of the agents more than one process names.",
+  "type": "module",
+  "engines": {
+    "node": ">=24.14.0 <25"
+  },
+  "exports": {
+    ".": "./src/index.js",
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "lint": "eslint src"
+  },
+  "dependencies": {
+    "ipaddr.js": "^2.5.0",
+    "mongodb": "^7.6.0"
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "name": "@orbik/web-extensions",
+  "version": "0.1.0",
+  "license": "AGPL-3.0-only",
+  "private": true,
+  "description": "The web app's extension slots, empty. A deployment that adds pages or panels to the web app resolves this package name to its own package with the same exports; see docs/extensions.md.",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.js",
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "lint": "eslint src"
+  }
+}

@@ -1,0 +1,24 @@
+{
+  "name": "@orbik/agent-definitions",
+  "version": "0.1.0",
+  "license": "AGPL-3.0-only",
+  "private": true,
+  "description": "Orbik agent definitions: the instructions, tool allow-list and schemas of every agent. Read by the API for its catalog and by the agent workers to execute a run.",
+  "type": "module",
+  "engines": {
+    "node": ">=24.14.0 <25"
+  },
+  "exports": {
+    ".": "./src/index.js",
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "lint": "eslint src"
+  },
+  "dependencies": {
+    "@orbik/core": "workspace:*",
+    "@orbik/library": "workspace:*",
+    "@orbik/protocol": "workspace:*",
+    "@orbik/tools": "workspace:*"
+  }
+}

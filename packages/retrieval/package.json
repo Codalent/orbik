@@ -1,0 +1,24 @@
+{
+  "name": "@orbik/retrieval",
+  "version": "0.1.0",
+  "license": "AGPL-3.0-only",
+  "private": true,
+  "description": "Orbik's retrieval index: the chunk store in MongoDB, the vectors in Qdrant, and the one embedding provider that turns text into them.",
+  "type": "module",
+  "engines": {
+    "node": ">=24.14.0 <25"
+  },
+  "exports": {
+    ".": "./src/index.js",
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "lint": "eslint src"
+  },
+  "dependencies": {
+    "@orbik/core": "workspace:*",
+    "@orbik/library": "workspace:*",
+    "@qdrant/js-client-rest": "^1.19.0",
+    "mongodb": "^7.6.0"
+  }
+}

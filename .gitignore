@@ -1,0 +1,33 @@
+# Dependencies and package-manager state
+node_modules/
+.pnpm-store/
+
+# Builds and runtime artifacts
+.next/
+dist/
+build/
+*.log
+*.pid
+
+# Secrets and local configuration
+.env
+.env.*
+!.env.example
+
+# Editor and operating-system files
+.DS_Store
+Thumbs.db
+*.tmp
+*.swp
+.vscode/
+.idea/
+
+# PM2 runtime state
+.pm2/
+
+# Git worktrees created by the coding assistant, and a checkout's own local instructions for it
+.claude/worktrees/
+CLAUDE.local.md
+
+# devbar's tasks, bugs and ideas: kept on this machine, not in the repository
+.devbar/
