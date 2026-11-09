@@ -46,7 +46,7 @@ const {
   agents: createAgents({ config, database, logger: log, extensions }),
 });
 
-// The anonymous daily usage ping, unless ORBIK_TELEMETRY=off; what it sends is said here, in the
+// The anonymous daily usage ping, only with ORBIK_TELEMETRY=on; what it sends is said here, in the
 // log, before anything is sent.
 const telemetry = createTelemetry({ database, config, extensions, logger: log });
 telemetry.announce();

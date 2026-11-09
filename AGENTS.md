@@ -217,8 +217,8 @@ which now live outside this repository; their collections are left in place (doc
 only while there is no account), the install's anonymous id for the usage ping (`install`) and
 generated secrets (`secrets`).
 
-The scheduler sends an anonymous usage ping once a day (`agents/src/telemetry.js`) unless
-`ORBIK_TELEMETRY=off`; docs/self-hosting.md lists exactly what it carries. It must never carry
+The scheduler sends an anonymous usage ping once a day (`agents/src/telemetry.js`) only when
+`ORBIK_TELEMETRY=on` (off by default); docs/self-hosting.md lists exactly what it carries. It must never carry
 content, an address, a name, an email or a key.
 
 `compose.yaml` and `deploy/` are the Docker install (docs/self-hosting.md): three images built
