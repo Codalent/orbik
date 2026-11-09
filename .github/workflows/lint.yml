@@ -18,6 +18,8 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version-file: .node-version
+          # Its pnpm cache needs pnpm before corepack has provided it.
+          package-manager-cache: false
       - name: Install dependencies
         run: |
           corepack enable
