@@ -17,6 +17,6 @@
   },
   "dependencies": {
     "ipaddr.js": "^2.5.0",
-    "mongodb": "^7.6.0"
+    "mongodb": "^7.8.0"
   }
 }

@@ -10,3 +10,10 @@ allowBuilds:
 
 minimumReleaseAgeExclude:
   - '@codalent/devbar@0.2.0 || 0.3.0'
+
+# Transitive dependencies held at patched releases of the same major until the packages that
+# bring them update (security advisories against the versions they resolve to).
+overrides:
+  undici@>=7.0.0 <7.30.1: ^7.30.2
+  ip-address@>=10.0.0 <10.7.4: ^10.7.6
+  fast-uri@>=3.0.0 <3.1.9: ^3.1.9

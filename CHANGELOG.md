@@ -3,6 +3,16 @@
 What changed in each release of Orbik. Releases are tagged `vX.Y.Z`; upgrading is in
 [docs/self-hosting.md](docs/self-hosting.md#upgrades).
 
+## Unreleased
+
+### Security
+
+- Next.js 16.3.2 → 16.4.5, which fixes the critical and high advisories against 16.3.2.
+- nodemailer 7 → 10, and the MCP server package to 2.4.0; every other dependency updated within
+  its range.
+- undici, ip-address and fast-uri, which other packages bring in, held at patched releases of the
+  same major with pnpm overrides.
+
 ## 0.1.0 — 2026-11-09
 
 The first public release.

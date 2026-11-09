@@ -17,7 +17,7 @@
     "agent:run": "node src/cli/runAgent.js"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.72.0",
+    "@anthropic-ai/sdk": "^0.72.1",
     "@orbik/agent-definitions": "workspace:*",
     "@orbik/assets": "workspace:*",
     "@orbik/core": "workspace:*",
@@ -29,13 +29,13 @@
     "@orbik/protocol": "workspace:*",
     "@orbik/retrieval": "workspace:*",
     "@orbik/tools": "workspace:*",
-    "cheerio": "^1.1.2",
+    "cheerio": "^1.2.0",
     "chrome-launcher": "1.2.1",
     "dotenv": "^17.4.2",
-    "fast-xml-parser": "^5.3.1",
-    "mongodb": "^7.6.0",
+    "fast-xml-parser": "^5.12.0",
+    "mongodb": "^7.8.0",
     "puppeteer-core": "25.10.0",
-    "turndown": "^7.2.4",
+    "turndown": "^7.2.5",
     "turndown-plugin-gfm": "^1.0.2"
   }
 }

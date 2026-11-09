@@ -18,6 +18,6 @@
   "dependencies": {
     "@orbik/core": "workspace:*",
     "@orbik/extensions": "workspace:*",
-    "mongodb": "^7.6.0"
+    "mongodb": "^7.8.0"
   }
 }
