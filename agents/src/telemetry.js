@@ -89,7 +89,7 @@ export function createTelemetry({ database, config, extensions, logger = log, fe
     /** Says what is sent and how to stop it, or that nothing is, in words, in this process's log. */
     announce() {
       if (!config.telemetryEnabled) {
-        console.log("Anonymous usage statistics are off: nothing is sent. ORBIK_TELEMETRY=on sends a daily anonymous ping (docs/self-hosting.md).");
+        console.log("Anonymous usage statistics are off: nothing is sent. ORBIK_TELEMETRY=on sends a daily anonymous ping (docs/self-hosting/usage-statistics.md).");
         return;
       }
       console.log([
@@ -118,7 +118,7 @@ export function createTelemetry({ database, config, extensions, logger = log, fe
 
 /**
  * The whole of what is sent. Counts and switches only: nothing here can name a person, a site or
- * a key, and each field is listed in docs/self-hosting.md.
+ * a key, and each field is listed in docs/self-hosting/usage-statistics.md.
  */
 export async function buildPing({ database, config, extensions, installId, now }) {
   const since = new Date(now.getTime() - 30 * DAY_MS);

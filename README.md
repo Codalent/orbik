@@ -18,11 +18,11 @@ Open <http://localhost:8080>, enter the setup code, and create the first account
 listens on this machine only until you open it up (`ORBIK_BIND_ADDRESS`). Add your
 Anthropic and OpenAI keys in `.env` (see `.env.example`) for everything that needs a model. A
 self-hosted Orbik has no limits: no page allowance, no seat count, every agent. A domain with
-HTTPS, email, backups and upgrades are in [docs/self-hosting.md](docs/self-hosting.md).
+HTTPS, email, backups and upgrades are in [docs/self-hosting](docs/self-hosting/README.md).
 
 **Usage statistics** are off by default. `ORBIK_TELEMETRY=on` sends one anonymous ping a day —
 counts of workspaces, pages fetched and agent runs, and which optional services are configured;
-never content, addresses, emails or keys. The exact payload is in [docs/self-hosting.md](docs/self-hosting.md#anonymous-usage-statistics).
+never content, addresses, emails or keys. The exact payload is in [docs/self-hosting/usage-statistics.md](docs/self-hosting/usage-statistics.md).
 
 ## Develop it
 
@@ -83,7 +83,7 @@ Supporting services:
   the second nothing is indexed.
 
 - **Google Chrome**, only if you use the Design system agent. See
-  [docs/design-system.md](docs/design-system.md).
+  [docs/architecture/design-system.md](docs/architecture/design-system.md).
 
 - **Qdrant** (optional), for the retrieval index. See [Qdrant](#qdrant-optional) below.
 
@@ -253,7 +253,7 @@ development processes. See [CONTRIBUTING.md](CONTRIBUTING.md) for how changes ar
 
 ## Production
 
-The simplest production install is Docker: [docs/self-hosting.md](docs/self-hosting.md). To run the
+The simplest production install is Docker: [docs/self-hosting](docs/self-hosting/README.md). To run the
 processes directly instead, `ecosystem.config.cjs` defines them for PM2 behind a reverse proxy
 that serves the web app and the API over HTTPS; `scripts/start.sh dev|prod` starts or restarts
 everything in one mode, and `scripts/frontend.sh`, `scripts/backend.sh` and `scripts/agents.sh`
@@ -263,17 +263,20 @@ switch one part at a time.
 
 A deployment adds plans, billing or pages of its own without changing this repository: server
 extensions are named by `ORBIK_EXTENSIONS`, and the web app renders the slots of the
-`@orbik/web-extensions` package. See [docs/extensions.md](docs/extensions.md).
+`@orbik/web-extensions` package. See [docs/architecture/extensions.md](docs/architecture/extensions.md).
 
 ## Further reading
 
-- [docs/self-hosting.md](docs/self-hosting.md) — Docker, configuration, HTTPS, backups, upgrades and usage statistics
-- [docs/extensions.md](docs/extensions.md) — the extension seam: plan limits, events, routes and web slots
+The documentation is in [docs/](docs/README.md) and published at <https://orbik.io/docs>.
 
-- [docs/ai-execution.md](docs/ai-execution.md) — how agents run and the one provider key
-- [docs/crawler.md](docs/crawler.md) — the crawler
-- [docs/library.md](docs/library.md) — the Library, its agents, and its API
-- [docs/design-system.md](docs/design-system.md) — the Design system agent, the Brand page, and the brand over MCP
+- [docs/self-hosting](docs/self-hosting/README.md) — Docker, configuration, HTTPS, backups, upgrades and usage statistics
+- [docs/connect-your-ai](docs/connect-your-ai/README.md) — Claude, ChatGPT, Claude Code and Cursor over MCP
+- [docs/architecture/extensions.md](docs/architecture/extensions.md) — the extension seam: plan limits, events, routes and web slots
+
+- [docs/architecture/ai-execution.md](docs/architecture/ai-execution.md) — how agents run and the one provider key
+- [docs/architecture/crawler.md](docs/architecture/crawler.md) — the crawler
+- [docs/architecture/library.md](docs/architecture/library.md) — the Library, its agents, and its API
+- [docs/architecture/design-system.md](docs/architecture/design-system.md) — the Design system agent, the Brand page, and the brand over MCP
 
 ## Troubleshooting
 

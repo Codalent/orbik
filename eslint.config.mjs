@@ -15,7 +15,7 @@ export default [
   },
   js.configs.recommended,
   {
-    files: ["backend/**/*.js", "packages/**/*.js", "agents/**/*.js", "scripts/**/*.js", "ecosystem.config.cjs"],
+    files: ["backend/**/*.js", "packages/**/*.js", "agents/**/*.js", "scripts/**/*.js", "scripts/**/*.mjs", "ecosystem.config.cjs"],
     languageOptions: {
       ecmaVersion: "latest",
       sourceType: "module",

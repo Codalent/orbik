@@ -206,7 +206,7 @@ function fromDraft(kind, draft) {
 }
 
 /**
- * The heading every section of the page opens with: the app's section heading (docs/ui.md), one
+ * The heading every section of the page opens with: the app's section heading (docs/architecture/ui.md), one
  * or two sentences under it on what the section is, and the section's own buttons on the right.
  *
  * @param {object} props

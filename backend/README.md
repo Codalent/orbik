@@ -7,7 +7,7 @@ verdicts, the Library, a workspace's design system with its pins and images (`/b
 conversations and the AI call log — and two surfaces that outside software talks to: the MCP
 endpoint (`POST /mcp`, bearer token) that a person's own AI reads a workspace through, and the
 OAuth 2.1 authorization server (`/oauth/*`, `/.well-known/*`) that issues the tokens Claude.ai and
-ChatGPT use. See `docs/library.md` § "Outside agents" before changing either.
+ChatGPT use. See `docs/architecture/library.md` § "Outside agents" before changing either.
 
 ## Structure
 

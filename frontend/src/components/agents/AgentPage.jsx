@@ -276,7 +276,7 @@ function interleave(items) {
 }
 
 /**
- * The headline figures under the head: two to four `StatTile`s in a grid (docs/ui.md).
+ * The headline figures under the head: two to four `StatTile`s in a grid (docs/architecture/ui.md).
  *
  * @param {object} props
  * @param {2|3|4} [props.columns] how many sit in a row on a wide screen

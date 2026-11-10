@@ -41,7 +41,7 @@ change is checked against the running processes instead:
 ## The boundary
 
 Orbik is complete on its own, and deployments add to it only through the extension seam
-([docs/extensions.md](docs/extensions.md)). Two rules follow:
+([docs/architecture/extensions.md](docs/architecture/extensions.md)). Two rules follow:
 
 - Core starts and serves every page with no extension loaded.
 - Nothing in `backend/`, `agents/`, `frontend/` or `packages/` imports from outside this repository.
@@ -59,6 +59,9 @@ after it is released. Indexes are not migrations; each process creates its own a
 ## Writing
 
 Comments and documentation say what something is for and why it is that way, in plain sentences.
+The documentation is `docs/`, published at <https://orbik.io/docs>: a change to what a page
+describes changes that page in the same pull request, and `pnpm lint` checks every link
+(AGENTS.md § "Documentation" has the conventions).
 Agent definitions are code (`packages/agent-definitions/src/`) and change like any other file.
 [AGENTS.md](AGENTS.md) is the longer guide to the codebase, written for people and coding agents
 alike.

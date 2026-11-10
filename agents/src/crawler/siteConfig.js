@@ -156,9 +156,11 @@ export const CRAWLER_PRODUCT_NAME = "OrbikBot";
 
 /**
  * The page the User-Agent names when the install's operator names none of their own
- * (`ORBIK_CRAWLER_CONTACT_URL`): what OrbikBot is and how to block it.
+ * (`ORBIK_CRAWLER_CONTACT_URL`): what OrbikBot is and how to block it. It is docs/orbikbot.md as
+ * the docs site publishes it. Release 0.1.0 named that file on GitHub instead, so the file keeps
+ * its path for as long as those crawlers are about.
  */
-export const DEFAULT_CRAWLER_CONTACT_URL = "https://github.com/Codalent/orbik/blob/main/docs/orbikbot.md";
+export const DEFAULT_CRAWLER_CONTACT_URL = "https://orbik.io/docs/orbikbot";
 
 /**
  * Builds the product token sent on every request for a site.
