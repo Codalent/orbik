@@ -108,7 +108,7 @@ The interval is measured from when the previous request to the host was actually
   (`PUT /crawl`), and nothing in the web app sets them. The resolved value is written onto each
   page whenever an input changes, so the crawler only compares two fields per page.
 - The route tree shows each page's frequency, and a folder's when everything under it shares one pattern. A page's detail panel lets it be pinned to its own frequency — including never — or returned to its pattern's, and has its own "Crawl now". A hand-triggered crawl marks the pages wanted and makes the site due; the request is satisfied by the next fetch, so it survives a run that ran out of budget before reaching the page.
-- The account's plan limits set its monthly page allowance (`monthlyCrawlPages`), as an extension answers them (docs/extensions.md). Without one — the open-source edition — every month is unlimited: `allowance` and `remaining` are null, `unlimited` is true, and `consumed` still counts every page fetched.
+- The account's plan limits set its monthly page allowance (`monthlyCrawlPages`), as an extension answers them (docs/architecture/extensions.md). Without one — the open-source edition — every month is unlimited: `allowance` and `remaining` are null, `unlimited` is true, and `consumed` still counts every page fetched.
 - The allowance is fixed when a UTC calendar month's budget is first opened. Plan allowance changes apply to the next month; the existing `grant:crawl-budget` command can top up the current month. Extra grants do not carry into the following month.
 
 ## Feedback

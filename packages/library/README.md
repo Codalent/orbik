@@ -31,7 +31,7 @@ mirrors a site into the source layer and the agents that maintain a Library in
 Consumers are the API, the agents process, `@orbik/tools` and `@orbik/retrieval`. The web app does
 not import it; `frontend/src/lib/library/library.js` repeats the few path rules a form needs.
 
-See [docs/library.md](../../docs/library.md) for the design.
+See [docs/architecture/library.md](../../docs/architecture/library.md) for the design.
 
 ```sh
 pnpm --dir packages/library lint

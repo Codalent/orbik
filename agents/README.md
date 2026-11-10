@@ -43,14 +43,14 @@ The three are different in kind:
   not an entry in the list. A run executes in the model runtime (`src/ai/model/`, Anthropic's
   Messages API) or in a plain-code runtime the definition names; the one such runtime is the
   Design system agent's (`src/ai/designSystem/`, a real Chrome and two structured model calls).
-  See [docs/ai-execution.md](../docs/ai-execution.md) and
-  [docs/design-system.md](../docs/design-system.md).
+  See [docs/architecture/ai-execution.md](../docs/architecture/ai-execution.md) and
+  [docs/architecture/design-system.md](../docs/architecture/design-system.md).
 - **`library`** is the two stages of the Library agent that are plain code: **mirror**
   (`sources.mirror`, a copy of every new or changed page in the Library's source layer, and the
   choice of which pages the knowledge base is written from; no model call) and **embed**
   (`index.embed`, the retrieval index over the pages and the Library's files). Which page moved is
   a hash comparison in both, so neither is a definition. The third stage, rewriting the subject tree, is a
-  run of the `business-knowledge-base` definition under `ai`. See [docs/library.md](../docs/library.md).
+  run of the `business-knowledge-base` definition under `ai`. See [docs/architecture/library.md](../docs/architecture/library.md).
 
 The retrieval index is built once in `createAgents` and shared by the embed stage, which fills it,
 and the `ai` agent's tools, which query it — `content.search` by meaning — so both are always
@@ -198,7 +198,7 @@ and merging them would mean one sitemap timeout re-runs everything. Discovery re
 the sitemaps; the pages nothing lists are found by following links, by the fetches themselves or,
 when the month's crawl budget might not cover the site, by a free pass over every page first. What
 a run costs, when that pass runs, how a run's phases appear in the web app and how crawl
-frequencies are chosen are in [docs/crawler.md](../docs/crawler.md).
+frequencies are chosen are in [docs/architecture/crawler.md](../docs/architecture/crawler.md).
 
 ### URL normalization is the load-bearing piece
 
@@ -296,7 +296,7 @@ Adding them means keeping edges per run and pruning on a schedule.
 ### Requests are polite by construction
 
 Per-host pacing lives inside the fetcher, so no caller can bypass it: four requests a second to
-one host for a crawl by default, and slower whenever the site asks ([docs/crawler.md](../docs/crawler.md) § "Pace"). HTTP status is data, not
+one host for a crawl by default, and slower whenever the site asks ([docs/architecture/crawler.md](../docs/architecture/crawler.md) § "Pace"). HTTP status is data, not
 failure: a 404 or a 500 is what the crawl exists to record, so only transport problems throw.
 Redirect chains are followed manually and kept, because hops, loops, and chains ending in errors
 are findings in themselves.
@@ -384,7 +384,7 @@ events with it.
 ## Writing an agent
 
 Most new agents are definitions run by `ai`, not code; see
-[docs/ai-execution.md](../docs/ai-execution.md). That includes an agent no model decides anything
+[docs/architecture/ai-execution.md](../docs/architecture/ai-execution.md). That includes an agent no model decides anything
 for: it is still a definition, whose `runtimeRequirements` name a plain-code runtime, and
 adding one is a requirement in `@orbik/protocol` and one entry in `PLAIN_CODE_RUNTIMES`
 (`src/ai/index.js`). It is then dispatched, leased, retried and recorded like every other run. A

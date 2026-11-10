@@ -13,9 +13,31 @@ page of the web app once with `?devbar=<key>` (`?devbar=off` forgets it); withou
 asks nothing. Changing the switch or the key needs an API restart. Screenshots make items a few MB,
 so a proxy in front of the API must allow that body size on `/v1/devbar/`.
 
+## Documentation
+
+`docs/` is the documentation, and the marketing site (Codalent/orbik-marketing) publishes it at
+`https://orbik.io/docs`: it fetches this folder from GitHub when it builds and renders each page in
+`docs/nav.json`. A page's address is its path (`docs/self-hosting/https.md` →
+`/docs/self-hosting/https`, a folder's `README.md` → the folder's address); its title is its one
+`# H1` and its description the paragraph after it. Write plain GitHub Markdown that reads well on
+GitHub too: relative `.md` links (the site rewrites them, and sends links to code to GitHub), GitHub
+alerts (`> [!NOTE]`), no raw HTML and no front matter. A file not in `nav.json` stays on GitHub
+only; a renamed page gets its old path in `redirects`. `pnpm lint:docs` (part of `pnpm lint`)
+checks nav.json and every link and anchor.
+
+- The user pages (`getting-started/`, `guides/`, `connect-your-ai/`, `self-hosting/`) are for
+  people who run or use an install. When a change alters what they describe — a setting, a label
+  on a page, a role, a tool — change the page in the same pull request.
+- `docs/architecture/` holds the design documents maintainers read before changing a part; the
+  paragraphs below name the one to read for each.
+- `docs/connect-your-ai/tools.md` is generated from the MCP tool surface: run `pnpm docs:tools`
+  after changing a tool's description or schema. The lint fails while it is stale.
+- `docs/orbikbot.md` must not move: release 0.1.0's crawler names its GitHub address in every
+  User-Agent. Later releases name `https://orbik.io/docs/orbikbot`.
+
 ## Web app UI
 
-Read [docs/ui.md](docs/ui.md) before building or restyling a page in `frontend/`: the colour
+Read [docs/architecture/ui.md](docs/architecture/ui.md) before building or restyling a page in `frontend/`: the colour
 meanings, the type scale and the shared pieces in `frontend/src/components/ui/` (`PageHeader`,
 `Panel`, `RowList`, `StatTile`, `Pill`, `Dialog`, `Select`, `Skeleton`). New pages use them rather
 than drawing their own boxes, badges or confirm prompts.
@@ -54,17 +76,17 @@ approves them — Orbik is also the authorization server for the second, under `
 `/.well-known/*`, with the consent screen at `/oauth/consent` in the web app. Either credential may
 cover several of the workspaces its holder can read (all of them, or a selection); its tools then take a
 `workspace` argument and it gets `workspace_list`, while one covering a single workspace sees the
-same surface as before (docs/library.md § "One credential, a set of workspaces").
+same surface as before (docs/architecture/library.md § "One credential, a set of workspaces").
 
 The endpoint also serves a workspace's design system: `brand_get`, `brand_tokens`, `brand_render`,
 `brand_assets` and `brand_asset`, with images as signed links that need no credential and expire in
 an hour. Those links are made with `ORBIK_ASSET_URL_SECRET` in `backend/.env`; without it every
 other tool still answers and the brand tools say `ASSET_LINKS_NOT_CONFIGURED` where a link would
-be. Read docs/design-system.md before changing those tools, the asset routes or the signing.
+be. Read docs/architecture/design-system.md before changing those tools, the asset routes or the signing.
 
 Verify the endpoint with `curl` against `127.0.0.1:4100/mcp`, or by pointing a real client at it:
 `claude mcp add --transport http orbik http://127.0.0.1:4100/mcp --header "Authorization: Bearer
-orbm_…"` for the pasted path. Read docs/library.md § "Outside agents" before changing the
+orbm_…"` for the pasted path. Read docs/architecture/library.md § "Outside agents" before changing the
 endpoint, the tool surface, the token routes or anything under `/oauth`.
 
 An install reached over HTTPS needs two settings in `backend/.env` to agree with the addresses
@@ -95,7 +117,7 @@ With Qdrant down, indexing and search report `INDEX_UNAVAILABLE` and record the 
 runs, the Library chat and the short texts and structured answers plain-code agents ask for — the
 route table (`DEFAULT_ROUTES` in `agents/src/ai/model/modelRouter.js`) sends all of them to Claude.
 `ORBIK_OPENAI_API_KEY` is the key the embeddings are made with; the OpenAI adapter is kept, and
-going back to it is pointing `DEFAULT_ROUTES` at `OPENAI_ROUTES` (docs/ai-execution.md). Without
+going back to it is pointing `DEFAULT_ROUTES` at `OPENAI_ROUTES` (docs/architecture/ai-execution.md). Without
 the Anthropic key, model runs fail saying no AI provider is configured and the Library's write run
 is not started; without the OpenAI key, indexing is skipped with a recorded reason and the Library
 and ask pages say the index is not configured. Every page is still copied into the Library's source
@@ -198,7 +220,7 @@ pnpm --dir backend run grant:crawl-budget -- --email user@example.com --pages 50
 This repository is the open-source, self-hostable Orbik, complete on its own: with no extension
 loaded every plan limit is unlimited, every agent runs, and `GET /v1/edition` says `community`. A
 deployment — Orbik's own cloud among them — adds plans, billing and pages only through the
-extension seam (docs/extensions.md): server extensions named by `ORBIK_EXTENSIONS`
+extension seam (docs/architecture/extensions.md): server extensions named by `ORBIK_EXTENSIONS`
 (`@orbik/extensions`, loaded by the API, the worker, the scheduler and `grant:crawl-budget`) and the
 web app's slot package `@orbik/web-extensions`, empty here. Plan limits are read through the
 loaded host (`limitsFor`, or `activeExtensions()` deep in the worker), never from a stored row.
@@ -212,16 +234,16 @@ Data that must change shape for new code to read it changes through a migration 
 `packages/migrations/src/migrations.js`, which the API, the worker and the scheduler run at start
 under a lock (`system_state`, `_id: "migrations"`), each recorded in `migrations`. The first,
 `2026-11-09-retire-seo-agents`, removed the schedules, setups and queued runs of the SEO agents,
-which now live outside this repository; their collections are left in place (docs/self-hosting.md
+which now live outside this repository; their collections are left in place (docs/self-hosting/backups-and-upgrades.md
 § "Collections left by earlier releases"). `system_state` also holds the setup code (`setup`,
 only while there is no account), the install's anonymous id for the usage ping (`install`) and
 generated secrets (`secrets`).
 
 The scheduler sends an anonymous usage ping once a day (`agents/src/telemetry.js`) only when
-`ORBIK_TELEMETRY=on` (off by default); docs/self-hosting.md lists exactly what it carries. It must never carry
+`ORBIK_TELEMETRY=on` (off by default); docs/self-hosting/usage-statistics.md lists exactly what it carries. It must never carry
 content, an address, a name, an email or a key.
 
-`compose.yaml` and `deploy/` are the Docker install (docs/self-hosting.md): three images built
+`compose.yaml` and `deploy/` are the Docker install (docs/self-hosting/): three images built
 from `deploy/Dockerfile` (`web`, `api`, `agents` with Chromium), MongoDB, Qdrant and Caddy, at
 one address — the web app calls the API on its own origin when `NEXT_PUBLIC_API_BASE_URL` is
 unset. Building the images is a production build: do it only when asked, and run the stack on
@@ -246,7 +268,7 @@ in `brand_changes` with what it replaced, and can be undone. Uploads are the one
 a raw body (20 MB), so nginx's `client_max_body_size` must allow it on `/v1/workspaces/*/brand/uploads`.
 An uploaded font is never served over MCP. It stores images in MongoDB GridFS
 (`brand_assets_files`), so inspect `brand_assets` for what a run kept. On a hosted Linux worker it
-also needs fallback fonts installed. Read docs/design-system.md before changing the agent, the
+also needs fallback fonts installed. Read docs/architecture/design-system.md before changing the agent, the
 `brand.*` tools or the Brand API.
 
 The Business Knowledge Base and llms.txt agents read the Markdown the crawler renders and write
@@ -271,6 +293,6 @@ write run, and a rebuild's, waits for that choice (`STRUCTURE_NOT_CHOSEN` from t
 agents may write nothing at the top level. The choice and the proposals are `structure` on the
 knowledge agent's `agent_setups` row; the overview and the index are found by `role` on their node,
 not at fixed paths, and a rename rewrites every link to what moved. `library_structures` held the
-sections the top level used to be shown under and is no longer read. Read docs/library.md before
+sections the top level used to be shown under and is no longer read. Read docs/architecture/library.md before
 changing either agent, the mirror, the selection, the `library.*`/`content.*` tools, or the
 Library API.

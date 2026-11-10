@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
  * step above every surface in both themes, quietly, and the small radius matches the text and
  * fields it stands in for rather than the panel around it.
  *
- * A placeholder is shaped like what is coming (see docs/ui.md), so the page does not jump when the
+ * A placeholder is shaped like what is coming (see docs/architecture/ui.md), so the page does not jump when the
  * read answers. Wrap a set of them in `SkeletonRegion`, which is what a screen reader hears: one
  * "Loading…" with a name, instead of a run of empty boxes.
  */

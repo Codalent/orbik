@@ -1,7 +1,16 @@
 # Changelog
 
 What changed in each release of Orbik. Releases are tagged `vX.Y.Z`; upgrading is in
-[docs/self-hosting.md](docs/self-hosting.md#upgrades).
+[docs/self-hosting/backups-and-upgrades.md](docs/self-hosting/backups-and-upgrades.md#upgrades).
+
+## Unreleased
+
+- **Docs.** `docs/` is the documentation published at <https://orbik.io/docs>: getting started,
+  guides, connecting your AI, self-hosting and a generated MCP tool reference, in the order
+  `docs/nav.json` gives. The maintainers' design documents moved to `docs/architecture/`, and
+  self-hosting is split into pages under `docs/self-hosting/`. `pnpm lint` checks every link.
+- **Crawler.** The User-Agent's default contact page is now <https://orbik.io/docs/orbikbot>
+  rather than the file on GitHub, which stays where it is for 0.1.0 crawlers.
 
 ## 0.1.0 — 2026-11-09
 
@@ -28,5 +37,5 @@ The first public release.
   HTTPS through Caddy for a domain, and every limit unlimited. Bring your own Anthropic and OpenAI
   keys; every model call is listed in the AI call log.
 - **Extensions.** Plans, pages and hooks are added through the extension seam
-  ([docs/extensions.md](docs/extensions.md)), never by changing core. Data migrations run at start.
+  ([docs/architecture/extensions.md](docs/architecture/extensions.md)), never by changing core. Data migrations run at start.
 - **Usage statistics** are off by default; `ORBIK_TELEMETRY=on` sends one anonymous ping a day.

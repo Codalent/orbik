@@ -57,7 +57,7 @@ export const MIGRATIONS = [
 /**
  * The agents that left the open-source release in November 2026, by slug, as their schedules,
  * setups and runs were stored. Their collections are not dropped (see `RETIRED_COLLECTIONS` in
- * `@orbik/core` and docs/self-hosting.md).
+ * `@orbik/core` and docs/self-hosting/backups-and-upgrades.md).
  */
 const RETIRED_AGENT_SLUGS = Object.freeze([
   "change-watch",
