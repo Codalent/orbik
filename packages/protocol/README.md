@@ -31,7 +31,7 @@ Two words have settled meanings across the repository, and this package keeps th
 A crawl of 50,000 URLs is one run and thousands of jobs. A run that finished with a result is
 `succeeded`, never `completed`, so runs and jobs share one vocabulary. See
 [agents/README.md](../../agents/README.md#runs-and-jobs) for how the two relate, and
-[docs/ai-execution.md](../../docs/ai-execution.md) for how a run executes.
+[docs/architecture/ai-execution.md](../../docs/architecture/ai-execution.md) for how a run executes.
 
 ## Validation style
 

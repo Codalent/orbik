@@ -18,12 +18,22 @@
   "scripts": {
     "build": "corepack pnpm --recursive run build",
     "dev": "corepack pnpm --parallel --filter ./frontend --filter ./backend --filter ./agents run dev",
-    "lint": "corepack pnpm --recursive run lint"
+    "lint": "corepack pnpm --recursive run lint && corepack pnpm run lint:docs",
+    "lint:docs": "node scripts/lint-docs.mjs && node scripts/generate-mcp-tool-docs.mjs --check",
+    "docs:tools": "node scripts/generate-mcp-tool-docs.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.5",
     "eslint": "^9.39.5",
+    "github-slugger": "^2.0.0",
     "globals": "^17.4.0",
-    "pm2": "^6.0.14"
+    "mdast-util-from-markdown": "^2.0.3",
+    "mdast-util-frontmatter": "^2.0.1",
+    "mdast-util-gfm": "^3.1.0",
+    "mdast-util-to-string": "^4.0.0",
+    "micromark-extension-frontmatter": "^2.0.0",
+    "micromark-extension-gfm": "^3.0.0",
+    "pm2": "^6.0.14",
+    "unist-util-visit": "^5.1.0"
   }
 }

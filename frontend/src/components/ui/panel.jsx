@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
  * Orbik's boxes: the panel content sits in, its small heading, and the divided list inside one.
  *
  * Every bordered box on a page is a Panel (or a Card, drawn the same), so a page never invents its
- * own border, radius or fill. See docs/ui.md.
+ * own border, radius or fill. See docs/architecture/ui.md.
  */
 
 /** The bordered box a section's content sits in. */

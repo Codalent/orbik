@@ -3,7 +3,7 @@
 /**
  * shadcn accessible select primitives and scroll controls, on Base UI's select.
  *
- * The app's dropdown: never a native `<select>` (docs/ui.md), which draws the browser's own menu
+ * The app's dropdown: never a native `<select>` (docs/architecture/ui.md), which draws the browser's own menu
  * outside the theme. The trigger is a button, so it is named the way a button is — `aria-label`,
  * or a `<label htmlFor>` pointing at an `id` put on `SelectTrigger`. Pass `items` (value to label)
  * to `Select` so `SelectValue` shows the label rather than the raw value. Three trigger sizes:

@@ -1,5 +1,7 @@
 # Runs `pnpm lint` on every pull request and on main. The lint includes the boundary rule
-# (eslint.boundary.mjs): nothing in core may import from outside this repository.
+# (eslint.boundary.mjs): nothing in core may import from outside this repository. It also checks
+# docs/ (scripts/lint-docs.mjs): nav.json, every link and anchor, and that the generated MCP tool
+# reference is current.
 name: Lint
 
 on:

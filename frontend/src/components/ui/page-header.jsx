@@ -2,7 +2,7 @@ import { cn } from "@/lib/utils";
 
 /**
  * A page's head: an optional icon tile, the h1, one line of what the page is for, status beside the
- * title, and actions on the right. Every page inside the workspace starts with one (docs/ui.md).
+ * title, and actions on the right. Every page inside the workspace starts with one (docs/architecture/ui.md).
  *
  * @param {object} props
  * @param {import("react").ComponentType<{className?: string}>} [props.icon]

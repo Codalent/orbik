@@ -1,0 +1,64 @@
+{
+  "$comment": "The docs site's sidebar, in order. A page is published at orbik.io/docs/<path without .md>, a folder's README.md at the folder's address. A Markdown file not listed here stays on GitHub only. A label replaces the page's H1 in the sidebar. When a page is renamed or moved, add its old path to redirects so links people already have keep working. Checked by `pnpm lint:docs`.",
+  "sections": [
+    {
+      "title": "Getting started",
+      "pages": [
+        { "path": "README.md", "label": "Introduction" },
+        "getting-started/quickstart.md",
+        "getting-started/concepts.md"
+      ]
+    },
+    {
+      "title": "Guides",
+      "pages": [
+        "guides/crawling.md",
+        "guides/library.md",
+        "guides/ask.md",
+        "guides/brand.md",
+        "guides/llms-txt.md",
+        "guides/workspaces-and-members.md",
+        "guides/accounts-and-admin.md"
+      ]
+    },
+    {
+      "title": "Connect your AI",
+      "pages": [
+        { "path": "connect-your-ai/README.md", "label": "Overview" },
+        "connect-your-ai/claude.md",
+        "connect-your-ai/chatgpt.md",
+        "connect-your-ai/claude-code.md",
+        "connect-your-ai/cursor-and-others.md",
+        "connect-your-ai/tools.md"
+      ]
+    },
+    {
+      "title": "Self-hosting",
+      "pages": [
+        { "path": "self-hosting/README.md", "label": "Install" },
+        "self-hosting/configuration.md",
+        "self-hosting/https.md",
+        "self-hosting/backups-and-upgrades.md",
+        "self-hosting/usage-statistics.md"
+      ]
+    },
+    {
+      "title": "Reference",
+      "pages": [
+        "orbikbot.md"
+      ]
+    },
+    {
+      "title": "Architecture",
+      "pages": [
+        { "path": "architecture/README.md", "label": "Overview" },
+        "architecture/library.md",
+        "architecture/crawler.md",
+        "architecture/ai-execution.md",
+        "architecture/design-system.md",
+        "architecture/extensions.md"
+      ]
+    }
+  ],
+  "redirects": {}
+}

@@ -3,7 +3,7 @@ import { cn } from "@/lib/utils";
 /**
  * Small marks of state: a pill (a word in a rounded outline) and a status dot.
  *
- * The tones carry fixed meanings across the app (docs/ui.md): lime is done, healthy or moving;
+ * The tones carry fixed meanings across the app (docs/architecture/ui.md): lime is done, healthy or moving;
  * cyan is information and admins; orange wants a look (a choice to make); coral
  * is failure; neutral and muted are kinds and labels with no judgement.
  */
