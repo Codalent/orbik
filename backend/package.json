@@ -41,7 +41,7 @@
     "fontkit": "^2.0.4",
     "helmet": "^8.3.0",
     "mongodb": "^7.6.0",
-    "nodemailer": "^7.0.13",
+    "nodemailer": "^10.1.4",
     "unpdf": "^2.1.0"
   }
 }
