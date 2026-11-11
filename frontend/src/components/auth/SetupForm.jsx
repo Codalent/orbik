@@ -24,12 +24,28 @@ const REFUSALS = Object.freeze({
   RATE_LIMITED: "Too many tries. Wait a few minutes and try again.",
 });
 
+/** The query parameter the API's setup link carries the code in: `/setup?key=ABCD-EFGH-JKMN`. */
+const CODE_PARAM = "key";
+
+/**
+ * Reads the setup code from the address, if the page was opened from the link the API printed.
+ *
+ * Read from `window.location` rather than `useSearchParams`, which would need a Suspense boundary
+ * for a value only the browser has; the form is not drawn until the edition has loaded, so the
+ * server's empty value is never shown.
+ */
+function codeFromAddress() {
+  if (typeof window === "undefined") return "";
+  return (new URLSearchParams(window.location.search).get(CODE_PARAM) ?? "").trim().slice(0, 64);
+}
+
 /**
  * The first page a new install shows: create its first account.
  *
  * It asks for the setup code the API printed to its log when it started, so that whoever opens a
- * fresh install on a public address first cannot claim it without access to the server. Once an
- * account exists this page sends everyone to sign in.
+ * fresh install on a public address first cannot claim it without access to the server. The link
+ * in that log fills the code in (`?key=`), and the code is then taken off the address so it does not
+ * stay in the browser's history. Once an account exists this page sends everyone to sign in.
  */
 export function SetupForm() {
   const router = useRouter();
@@ -37,11 +53,19 @@ export function SetupForm() {
   // Set once this page has claimed the install, so the edition it re-reads afterwards — which no
   // longer needs setting up — does not send the new account to the sign-in page.
   const [claimed, setClaimed] = useState(false);
+  const [linkedCode] = useState(codeFromAddress);
   const { register, handleSubmit, setError, formState: { errors, isSubmitting } } = useForm({
     resolver: zodResolver(setupSchema),
-    defaultValues: { code: "", email: "", password: "" },
+    defaultValues: { code: linkedCode, email: "", password: "" },
     shouldFocusError: true,
   });
+
+  useEffect(() => {
+    if (!linkedCode) return;
+    const url = new URL(window.location.href);
+    url.searchParams.delete(CODE_PARAM);
+    window.history.replaceState(window.history.state, "", url.pathname + url.search + url.hash);
+  }, [linkedCode]);
 
   useEffect(() => {
     if (edition && !edition.setupRequired && !claimed) router.replace("/login");
@@ -70,7 +94,8 @@ export function SetupForm() {
       title="Set up Orbik"
       description={
         <>
-          Create the first account. The setup code is in the API&apos;s log — with Docker, run{" "}
+          Create the first account. The API&apos;s log has a link that fills in the setup code, and the
+          code itself — with Docker, run{" "}
           <code className="whitespace-nowrap rounded border border-orb-line bg-orb-space/70 px-1.5 py-0.5 font-mono text-xs text-orb-white">docker compose logs api</code>.
         </>
       }

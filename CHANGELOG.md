@@ -9,6 +9,9 @@ What changed in each release of Orbik. Releases are tagged `vX.Y.Z`; upgrading i
   guides, connecting your AI, self-hosting and a generated MCP tool reference, in the order
   `docs/nav.json` gives. The maintainers' design documents moved to `docs/architecture/`, and
   self-hosting is split into pages under `docs/self-hosting/`. `pnpm lint` checks every link.
+- **Setup.** The API's first-run banner prints the setup page's address with the code in it,
+  `/setup?key=…`; opening it fills the code in and takes it off the address bar. Typing the code
+  still works.
 - **Crawler.** The User-Agent's default contact page is now <https://orbik.io/docs/orbikbot>
   rather than the file on GitHub, which stays where it is for 0.1.0 crawlers.
 

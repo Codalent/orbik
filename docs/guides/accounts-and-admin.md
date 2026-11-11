@@ -6,9 +6,10 @@ admins answer access requests and reset forgotten passwords.
 ## The first account
 
 A new install has no accounts. While it has none, the API prints a one-time **setup code** in its
-log; in the Docker install, `docker compose logs api` shows it. Open the web app and it asks for
-the code: enter it with your email and a password of at least eight characters, and choose
-**Create account**. The code works once. After that the install is claimed, and the setup page
+log, and a link to the setup page with the code in it (`/setup?key=…`); in the Docker install,
+`docker compose logs api` shows both. Open the link and the code is filled in (open the web app
+without it and it asks for the code): add your email and a password of at least eight characters,
+and choose **Create account**. The code works once. After that the install is claimed, and the setup page
 says to sign in instead.
 
 You can also make an account from a terminal. It asks for the password there:

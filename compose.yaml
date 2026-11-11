@@ -1,11 +1,12 @@
 # Orbik, self-hosted: `docker compose up` from a fresh clone, then open http://localhost:8080.
 #
 # The first start builds the three images (several minutes), creates the database and prints a
-# one-time setup code in the API's log:
+# one-time setup link in the API's log:
 #
 #   docker compose logs api
 #
-# Open the address it names, enter the code, and create the first account. See
+# Open the link it prints (http://localhost:8080/setup?key=…, the code already filled in) and
+# create the first account. See
 # docs/self-hosting/ for AI keys, a domain with HTTPS, email, backups and upgrades.
 #
 # Settings come from a `.env` file beside this one (copy .env.example). Every one is optional:
