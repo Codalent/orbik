@@ -9,6 +9,9 @@ What changed in each release of Orbik. Releases are tagged `vX.Y.Z`; upgrading i
   guides, connecting your AI, self-hosting and a generated MCP tool reference, in the order
   `docs/nav.json` gives. The maintainers' design documents moved to `docs/architecture/`, and
   self-hosting is split into pages under `docs/self-hosting/`. `pnpm lint` checks every link.
+- **Setup.** The API's first-run banner prints the setup page's address with the code in it,
+  `/setup?key=…`; opening it fills the code in and takes it off the address bar. Typing the code
+  still works.
 - **AI keys.** The OpenAI key is the required one: the embeddings behind search need it. The
   reasoning calls (the Library's knowledge base, Ask, llms.txt, the brand) run on Anthropic or
   OpenAI, chosen with `ORBIK_AI_PROVIDER`; unset, Anthropic when its key is set and OpenAI

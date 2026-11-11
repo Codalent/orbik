@@ -11,7 +11,7 @@ You need Docker with Compose and about 2 GB of free memory while the images buil
 git clone https://github.com/Codalent/orbik.git
 cd orbik
 docker compose up -d
-docker compose logs api        # shows the setup code
+docker compose logs api        # shows the setup link
 ```
 
 The first start builds three images, which takes several minutes. Everything runs on this machine
@@ -44,8 +44,10 @@ page word for word into the Library and serves it to your AI. Every call made wi
 
 ## 3. Claim the install
 
-Open <http://localhost:8080>. The **Set up Orbik** page asks for the **Setup code** from the API's
-log, your email and a password, and creates the first account. The code works once. After that,
+Open the link the API printed to its log, `http://localhost:8080/setup?key=…`. The **Set up Orbik**
+page opens with the **Setup code** filled in; add your email and a password, and it creates the
+first account. (Opening <http://localhost:8080> instead asks you to type the code, which the log
+also prints on its own.) The code works once. After that,
 people join by invite.
 
 ## 4. Create a workspace

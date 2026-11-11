@@ -116,12 +116,19 @@ export async function prepareFirstRun(database) {
   return document.code;
 }
 
-/** The banner the API prints while the install has no account. Plain text, for a terminal. */
+/**
+ * The banner the API prints while the install has no account. Plain text, for a terminal.
+ *
+ * The address carries the code as `?key=`, so opening it fills the setup page in; the code is also
+ * printed on its own for someone typing it.
+ */
 export function setupBanner({ code, url }) {
+  const link = new URL(url);
+  link.searchParams.set("key", code);
   const lines = [
     "Orbik has no account yet. Open this address and create the first one:",
     "",
-    `    ${url}`,
+    `    ${link.href}`,
     "",
     `Setup code:  ${code}`,
     "",
