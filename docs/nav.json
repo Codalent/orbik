@@ -51,8 +51,8 @@
     {
       "title": "Architecture",
       "pages": [
-        { "path": "architecture/README.md", "label": "Overview" },
-        "architecture/library.md",
+        { "path": "architecture/README.md", "label": "Architecture overview" },
+        { "path": "architecture/library.md", "label": "Library internals" },
         "architecture/crawler.md",
         "architecture/ai-execution.md",
         "architecture/design-system.md",
