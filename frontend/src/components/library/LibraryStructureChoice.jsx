@@ -116,10 +116,10 @@ export function LibraryStructureChoice({ structure, working, busy, onChoose, onS
           you can rename any of them later, and every link follows.
           {working
             ? " The agent starts writing within a few minutes of confirming."
-            : " The agent is paused: once you confirm, set it to work and it writes into these folders."}
+            : " The agent is paused: set it to work with the switch at the foot of the explorer, and it writes into these folders once you confirm."}
         </p>
 
-        <SuggestionStatus suggestion={suggestion} busy={busy} onSuggestAgain={onSuggestAgain} />
+        <SuggestionStatus suggestion={suggestion} working={working} busy={busy} onSuggestAgain={onSuggestAgain} />
 
         <div role="radiogroup" aria-label="Structures to choose from" className="mt-5 grid gap-2.5 md:grid-cols-2">
           {options.map((option) => {
@@ -226,8 +226,22 @@ export function LibraryStructureChoice({ structure, working, busy, onChoose, onS
   );
 }
 
-/** Where the proposals stand: being written, failed, or there. */
-function SuggestionStatus({ suggestion, busy, onSuggestAgain }) {
+/**
+ * Where the proposals stand: not asked for yet, being written, failed, or there.
+ *
+ * The scheduler asks a model for them only once the agent is set to work, so that a paused agent
+ * spends nothing; until then there is nothing being proposed, and saying so is what keeps a person
+ * from waiting on a spinner that never ends.
+ */
+function SuggestionStatus({ suggestion, working, busy, onSuggestAgain }) {
+  if (!suggestion && !working) {
+    return (
+      <p role="status" className="mt-4 rounded-2xl bg-orb-raised px-3 py-2.5 text-compact text-orb-gray">
+        Set the agent to work and it proposes two or three structures from your site within a few minutes. Or start from
+        the default below now.
+      </p>
+    );
+  }
   if (!suggestion || suggestion.status === "pending") {
     return (
       <p role="status" className="mt-4 flex items-center gap-2 rounded-2xl bg-orb-raised px-3 py-2.5 text-compact text-orb-gray">

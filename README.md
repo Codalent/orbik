@@ -302,6 +302,7 @@ The documentation is in [docs/](docs/README.md) and published at <https://orbik.
 | An MCP client's `brand_get` says `ASSET_LINKS_NOT_CONFIGURED` | Set `ORBIK_ASSET_URL_SECRET` in `backend/.env`. |
 | Browser requests to the API fail with CORS errors | Add the exact origin you open the app on to `FRONTEND_ORIGINS`. |
 | Signing in succeeds but you land back on the login page | The app and `NEXT_PUBLIC_API_BASE_URL` use different host names, so the browser withholds the session cookie. Open the app on `http://localhost:3100`, or point both at the same host. |
+| The same, on an HTTPS address behind nginx or a load balancer, and the API logs `session.request_not_https` | The API sees the requests as plain HTTP, so it cannot set its `Secure` session cookie. Docker install: set `ORBIK_TRUSTED_PROXIES` ([Behind another proxy](docs/self-hosting/https.md#behind-another-proxy)). Direct install: have the proxy send `X-Forwarded-Proto`, and make `TRUST_PROXY` in `backend/.env` cover it. |
 
 ## License
 

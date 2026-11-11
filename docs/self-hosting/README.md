@@ -41,7 +41,8 @@ Run `docker compose up -d` again after changing `.env`. Every other setting is i
 ## Next steps
 
 - [Configuration](configuration.md) — every setting in `.env`.
-- [A domain with HTTPS](https.md) — needed before Claude.ai, Claude Desktop or ChatGPT can sign in.
+- [A domain with HTTPS](https.md) — needed before Claude.ai, Claude Desktop or ChatGPT can sign in;
+  on its own, or behind nginx or a load balancer you already run.
 - [Backups and upgrades](backups-and-upgrades.md) — what to back up and how to move to a new release.
 - [Usage statistics](usage-statistics.md) — the anonymous daily ping, off unless you turn it on.
 - [Connect your AI](../connect-your-ai/README.md) — point Claude, ChatGPT or Cursor at the install.
