@@ -26,20 +26,76 @@ insecure; use it only on a network you trust.
 
 ## Behind another proxy
 
-If something else sits in front of the published port — a load balancer, nginx on the host — every
-request reaches Caddy from that one address, and the sign-in, setup and signup rate limits are then
-shared by everyone. Tell Caddy to trust that proxy's `X-Forwarded-For` in the global options block
-at the top of [`deploy/Caddyfile`](../../deploy/Caddyfile), with the address ranges your proxy is
-in:
+When something else already answers on ports 80 and 443 of the server — nginx serving other sites,
+a load balancer — let it handle HTTPS, and keep Orbik's own proxy on plain HTTP on a loopback port.
+In `.env`:
 
+```sh
+ORBIK_URL=https://orbik.example.com
+ORBIK_TRUSTED_PROXIES=private_ranges
 ```
-{
-	admin off
-	servers {
-		trusted_proxies static 10.0.0.0/8 172.16.0.0/12 192.168.0.0/16
-	}
+
+Leave `ORBIK_SITE_ADDRESS`, `ORBIK_BIND_ADDRESS` and the ports at their defaults: Orbik then
+listens on `http://127.0.0.1:8080`, reachable from this machine only, and the proxy in front
+forwards to it.
+
+`ORBIK_TRUSTED_PROXIES` tells Caddy to believe what the proxy in front says about each request:
+that it arrived over HTTPS (`X-Forwarded-Proto`) and who sent it (`X-Forwarded-For`).
+`private_ranges` covers a proxy on the same machine, which reaches the published port from the
+Docker network's gateway; for a proxy on another machine, name its address or range instead, and
+set `ORBIK_BIND_ADDRESS` to an address of this server that it can reach.
+
+> [!IMPORTANT]
+> Without `ORBIK_TRUSTED_PROXIES`, every request reaches the API as plain HTTP. On an HTTPS address
+> the session cookie is `Secure`, so it is never set: signing in seems to work and lands back on
+> the sign-in page, and the API's log says `session.request_not_https`. The sign-in, setup and
+> signup rate limits would also count everyone as the one proxy address.
+
+### nginx on the same server
+
+A server block for the domain, forwarding everything to Orbik:
+
+```nginx
+server {
+    listen 80;
+    listen [::]:80;
+    server_name orbik.example.com;
+
+    # Brand uploads are up to 20 MB.
+    client_max_body_size 25m;
+
+    location / {
+        proxy_pass http://127.0.0.1:8080;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        # MCP clients may hold a response open as a stream.
+        proxy_buffering off;
+        proxy_read_timeout 300s;
+    }
 }
 ```
 
-Brand uploads are up to 20 MB, so a proxy in front must also allow request bodies that large on
+Enable it, then get a certificate with [Certbot](https://certbot.eff.org), which adds the HTTPS
+listener and the redirect from HTTP to the same block:
+
+```sh
+sudo nginx -t && sudo systemctl reload nginx
+sudo certbot --nginx -d orbik.example.com --redirect
+```
+
+Run `docker compose up -d` after changing `.env`, then check from anywhere:
+
+```sh
+curl https://orbik.example.com/health
+curl https://orbik.example.com/.well-known/oauth-authorization-server   # every address starts with ORBIK_URL
+curl -sD - -o /dev/null https://orbik.example.com/v1/auth/session | grep -i set-cookie
+```
+
+The last one must print a `__Host-seo_session` cookie marked `Secure`. If it prints nothing,
+`ORBIK_TRUSTED_PROXIES` is missing or does not cover the proxy.
+
+Other proxies need the same three things: forward to the published port with the original `Host`,
+send `X-Forwarded-Proto` and `X-Forwarded-For`, and allow request bodies of 20 MB on
 `/v1/workspaces/*/brand/uploads`.

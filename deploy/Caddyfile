@@ -5,8 +5,18 @@
 # ORBIK_SITE_ADDRESS is `:80` by default — plain HTTP on whatever port compose publishes. Set it to
 # a domain name (orbik.example.com) and publish 80 and 443, and Caddy gets and renews a certificate
 # for it on its own.
+#
+# ORBIK_TRUSTED_PROXIES names the proxy in front of this one, when there is one (nginx on the host,
+# a load balancer): Caddy then passes on what it says about the request, its scheme
+# (X-Forwarded-Proto) and the client's address (X-Forwarded-For). Without it, a request that
+# reached that proxy over HTTPS arrives here as plain HTTP, the API refuses to set its Secure
+# session cookie, and nobody can sign in. `private_ranges` covers a proxy on the host, which
+# reaches the published port from the Docker network's gateway. The default trusts nobody.
 {
 	admin off
+	servers {
+		trusted_proxies static {$ORBIK_TRUSTED_PROXIES:127.0.0.1/32}
+	}
 }
 
 {$ORBIK_SITE_ADDRESS::80} {

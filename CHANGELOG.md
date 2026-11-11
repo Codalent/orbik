@@ -19,6 +19,14 @@ What changed in each release of Orbik. Releases are tagged `vX.Y.Z`; upgrading i
   chat can read an uploaded PDF brand guide too.
 - **Crawler.** The User-Agent's default contact page is now <https://orbik.io/docs/orbikbot>
   rather than the file on GitHub, which stays where it is for 0.1.0 crawlers.
+- **Docker install behind another proxy.** `ORBIK_TRUSTED_PROXIES` in `.env` tells the install's
+  proxy to trust the one in front of it (nginx on the same server: `private_ranges`). Without it
+  an HTTPS install behind nginx could not keep anyone signed in: every request reached the API as
+  plain HTTP, so its `Secure` session cookie was never set. The API now says so in its log
+  (`session.request_not_https`), and [docs/self-hosting/https.md](docs/self-hosting/https.md#behind-another-proxy)
+  walks through nginx and Certbot. Editing `deploy/Caddyfile` is no longer needed.
+- **Library.** While the Knowledge base agent is paused, the structure step says that proposals
+  come once it is set to work, rather than showing a spinner that never ended.
 
 ## 0.1.0 — 2026-11-09
 

@@ -37,6 +37,9 @@ services:
       - "${ORBIK_BIND_ADDRESS:-127.0.0.1}:${ORBIK_HTTPS_PORT:-8443}:443"
     environment:
       ORBIK_SITE_ADDRESS: ${ORBIK_SITE_ADDRESS:-:80}
+      # A proxy in front of this one, trusted to say the request's scheme and client address
+      # (docs/self-hosting/https.md § "Behind another proxy"). Unset: none.
+      ORBIK_TRUSTED_PROXIES: ${ORBIK_TRUSTED_PROXIES:-127.0.0.1/32}
     volumes:
       - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy-data:/data

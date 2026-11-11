@@ -16,6 +16,7 @@ Copy `.env.example` to `.env` to start from the commented list. After changing i
 | `ORBIK_HTTP_PORT`, `ORBIK_HTTPS_PORT` | Ports published on the host. Default 8080 and 8443. |
 | `ORBIK_BIND_ADDRESS` | The host address those ports are published on. Default `127.0.0.1`: only this machine reaches the install. `0.0.0.0` opens it to the network, as a server needs. |
 | `ORBIK_SITE_ADDRESS` | A domain name, for HTTPS ([A domain with HTTPS](https.md)). Default `:80`, plain HTTP. |
+| `ORBIK_TRUSTED_PROXIES` | The proxy in front of the install, when something else handles HTTPS — nginx on the same server, a load balancer ([Behind another proxy](https.md#behind-another-proxy)). `private_ranges` for nginx on the same server, or that proxy's addresses. Required there: without it nobody can stay signed in on an HTTPS address. Default: none. |
 | `ORBIK_SIGNUP` | `closed` (default): people join by invite from a workspace's settings. `open`: anyone who reaches the sign-in page can create an account. |
 | `ORBIK_ADMIN_EMAILS` | Comma-separated addresses of the install's admins, who answer access requests and make password reset links on the Admin page (`/admin`). Unset: the install's first account. |
 | `SMTP_URL`, `EMAIL_FROM` | Email invites, approved access requests and password reset links as well as showing them, and tell admins about a new access request. Without it, a forgotten password is reset by a link the admin makes (Admin page, or `docker compose exec api node src/cli/resetPassword.js --email …`). `smtp://user:pass@host:587` or `smtps://…:465`. |

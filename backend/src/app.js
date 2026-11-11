@@ -302,7 +302,7 @@ export function createApp({ config, database, readiness, extensions = createExte
   // devbar, the development toolbar, when ORBIK_DEVBAR is on: no session, the API's CORS only.
   if (devbar) app.use(DEVBAR_PATH, devbar.handle);
   app.use(createEditionRouter({ extensions, config, setupRequired: () => setupService.required(), passwordReset: passwordResetService.selfService ? "email" : "admin" }));
-  app.use(createSessionMiddleware(config));
+  app.use(createSessionMiddleware(config, log));
   app.use(createAuthRouter({
     config,
     authService,
