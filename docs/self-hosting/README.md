@@ -12,12 +12,13 @@ call is listed in the AI call log.
 git clone https://github.com/Codalent/orbik.git
 cd orbik
 docker compose up -d
-docker compose logs api        # shows the setup code
+docker compose logs api        # shows the setup link
 ```
 
 The first start builds three images, which takes several minutes and about 2 GB of memory while the
-web app compiles. Then open <http://localhost:8080>: it asks for the setup code the API printed and
-creates the first account. The code works once; after that the install is claimed, and people join
+web app compiles. Then open the link the API printed, `http://localhost:8080/setup?key=…`: the setup
+code is filled in, and the page creates the first account. Opening <http://localhost:8080> instead
+asks for the code, which the log also prints on its own. The code works once; after that the install is claimed, and people join
 by invite (or by signing up, if you open signup). [Accounts and admin](../guides/accounts-and-admin.md)
 covers both.
 
@@ -56,6 +57,6 @@ docker compose exec api node src/cli/resetPassword.js --email you@example.com
 ## Without Docker
 
 The processes run directly on a machine with Node 24, pnpm, MongoDB and (optionally) Qdrant and
-Chrome; see the [README](../../README.md). On a fresh database the API prints the same setup code,
+Chrome; see the [README](../../README.md). On a fresh database the API prints the same setup link and code,
 and `pnpm --dir backend run seed:user -- --email you@example.com` creates an account from a terminal
 instead.

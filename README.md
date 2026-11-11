@@ -11,10 +11,11 @@ Your own AI reads all of it over MCP.
 git clone https://github.com/Codalent/orbik.git
 cd orbik
 docker compose up -d
-docker compose logs api        # the one-time setup code
+docker compose logs api        # the one-time setup link
 ```
 
-Open <http://localhost:8080>, enter the setup code, and create the first account. The install
+Open the link it prints (`http://localhost:8080/setup?key=…`, the setup code filled in) and create
+the first account. The install
 listens on this machine only until you open it up (`ORBIK_BIND_ADDRESS`). Add your
 Anthropic and OpenAI keys in `.env` (see `.env.example`) for everything that needs a model. A
 self-hosted Orbik has no limits: no page allowance, no seat count, every agent. A domain with
@@ -173,9 +174,9 @@ open http://localhost:3100
 
 ## 5. First-time data setup
 
-On a database with no account, the API prints a one-time **setup code** when it starts. Open
-<http://localhost:3100>: it sends you to the setup page, which takes the code and creates the first
-account. To do it from a terminal instead (you are asked for the password, so it stays out of
+On a database with no account, the API prints a one-time **setup code** when it starts, and a link
+to the setup page with it filled in (`http://localhost:3100/setup?key=…`). Open the link and create
+the first account. To do it from a terminal instead (you are asked for the password, so it stays out of
 your shell history):
 
 ```sh
