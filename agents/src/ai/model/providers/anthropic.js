@@ -49,7 +49,9 @@ const MAX_UNION_PARAMETERS = 16;
  * Nothing above this file knows Anthropic exists. The adapter takes Orbik's own request shape —
  * instructions, messages, a tool list from Orbik's registry — and returns Orbik's own response
  * shape, so the runtime, the model router, and every agent definition are unchanged by a decision
- * to route work here rather than somewhere else. It is paid for with `ORBIK_ANTHROPIC_API_KEY`;
+ * to route work here rather than somewhere else. It serves the reasoning calls when
+ * `ORBIK_AI_PROVIDER` chooses Anthropic (the default whenever its key is set), and is paid for
+ * with `ORBIK_ANTHROPIC_API_KEY`;
  * the embeddings stay on OpenAI, which has an embeddings endpoint where Anthropic has none.
  *
  * A turn may carry pictures and may ask for its answer in a fixed shape, as it may on the OpenAI

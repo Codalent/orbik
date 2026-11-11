@@ -1,15 +1,17 @@
 # Configuration
 
-Every setting of the Docker install, in the `.env` file beside `compose.yaml`. All of them are
-optional.
+Every setting of the Docker install, in the `.env` file beside `compose.yaml`. Only
+`ORBIK_OPENAI_API_KEY` is required for the full product; without any of them the install still
+starts and crawls.
 
 Copy `.env.example` to `.env` to start from the commented list. After changing it, run
 `docker compose up -d` again.
 
 | Setting | What it does |
 |---|---|
-| `ORBIK_ANTHROPIC_API_KEY` | Every reasoning call: agent runs, the Library's knowledge base, Ask. Without it the install still crawls, keeps a word-for-word copy of every page in the Library and runs the agents that need no model. |
-| `ORBIK_OPENAI_API_KEY` | Embeddings for search, Ask and `content_search` over MCP. Without it nothing is indexed. |
+| `ORBIK_OPENAI_API_KEY` | **Required.** Embeddings for search, Ask and `content_search` over MCP; without it nothing is indexed. With no Anthropic key, it also makes every reasoning call: agent runs, the Library's knowledge base, Ask. |
+| `ORBIK_ANTHROPIC_API_KEY` | Optional. With it set, Claude makes every reasoning call instead of OpenAI. With neither key, the install still crawls, keeps a word-for-word copy of every page in the Library and runs the agents that need no model. |
+| `ORBIK_AI_PROVIDER` | Which provider makes the reasoning calls: `anthropic` or `openai`. Unset: Anthropic when its key is set, otherwise OpenAI. Embeddings use OpenAI either way. |
 | `ORBIK_URL` | The address people and AI clients reach the install at, exactly as in the address bar. Default `http://localhost:8080`. |
 | `ORBIK_HTTP_PORT`, `ORBIK_HTTPS_PORT` | Ports published on the host. Default 8080 and 8443. |
 | `ORBIK_BIND_ADDRESS` | The host address those ports are published on. Default `127.0.0.1`: only this machine reaches the install. `0.0.0.0` opens it to the network, as a server needs. |

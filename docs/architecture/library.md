@@ -1148,7 +1148,7 @@ outside the Library, linking into it.
 ## What a run costs before it starts
 
 The agents worker calls the model provider's API directly
-(`agents/src/ai/model/providers/anthropic.js`), so a run starts with exactly two things in its
+(`agents/src/ai/model/providers/anthropic.js` or `openai.js`), so a run starts with exactly two things in its
 context besides the task: the definition's instructions, and the tools on its allow-list. Nothing
 on the machine the worker runs on can add to that — no settings file, no locally configured MCP
 server, no instruction file. It is a boundary as much as a budget: a workspace's agent is handed

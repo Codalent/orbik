@@ -17,7 +17,8 @@ docker compose logs api        # the one-time setup link
 Open the link it prints (`http://localhost:8080/setup?key=…`, the setup code filled in) and create
 the first account. The install
 listens on this machine only until you open it up (`ORBIK_BIND_ADDRESS`). Add your
-Anthropic and OpenAI keys in `.env` (see `.env.example`) for everything that needs a model. A
+OpenAI key (required, for search) and optionally an Anthropic key in `.env` (see `.env.example`)
+for everything that needs a model. A
 self-hosted Orbik has no limits: no page allowance, no seat count, every agent. A domain with
 HTTPS, email, backups and upgrades are in [docs/self-hosting](docs/self-hosting/README.md).
 
@@ -77,11 +78,12 @@ Supporting services:
   brew services start mongodb-community
   ```
 
-- **An Anthropic API key and an OpenAI API key**, for the agents worker. Every reasoning call —
-  agent runs and the Library chat — is made with `ORBIK_ANTHROPIC_API_KEY`, and the embeddings
-  behind the retrieval index with `ORBIK_OPENAI_API_KEY`, both in `agents/.env`. Without the first
-  the worker still starts and crawls, but AI runs fail saying no AI provider is configured; without
-  the second nothing is indexed.
+- **An OpenAI API key (required), and optionally an Anthropic API key**, for the agents worker.
+  The embeddings behind the retrieval index are made with `ORBIK_OPENAI_API_KEY`. Every reasoning
+  call — agent runs and the Library chat — is made with `ORBIK_ANTHROPIC_API_KEY` when it is set,
+  and with the OpenAI key otherwise; `ORBIK_AI_PROVIDER` (`anthropic` or `openai`) chooses when
+  both are set. All in `agents/.env`. Without a reasoning key the worker still starts and crawls,
+  but AI runs fail saying no AI provider is configured; without the OpenAI key nothing is indexed.
 
 - **Google Chrome**, only if you use the Design system agent. See
   [docs/architecture/design-system.md](docs/architecture/design-system.md).
@@ -129,12 +131,17 @@ Settings to check:
 
 - `MONGODB_URI` — **must be the same database as the backend**. Both example files name
   `orbik`; if you change one, change the other.
-- `ORBIK_ANTHROPIC_API_KEY` — Orbik's own Anthropic key, commented out in the example. The worker
-  makes every reasoning call with it: agent runs, the Library chat and the short texts plain-code
-  agents ask for. Without it AI runs fail with "no AI provider is configured" and the Library's
-  knowledge base is not written. The API does not read it.
-- `ORBIK_OPENAI_API_KEY` — Orbik's own OpenAI key, commented out in the example. The worker makes
-  the embeddings with it. Without it indexing is skipped, and the Library and ask pages say the
+- `ORBIK_AI_PROVIDER` — `anthropic` or `openai`: which provider makes every reasoning call (agent
+  runs, the Library chat and the short texts plain-code agents ask for). Unset, it is Anthropic
+  when `ORBIK_ANTHROPIC_API_KEY` is set and OpenAI otherwise. The worker logs its choice at start
+  (`ai.provider`). Without the chosen provider's key AI runs fail with "no AI provider is
+  configured" and the Library's knowledge base is not written. The API reads neither it nor the
+  Anthropic key.
+- `ORBIK_ANTHROPIC_API_KEY` — Orbik's own Anthropic key, commented out in the example. Optional:
+  with it the reasoning calls go to Claude.
+- `ORBIK_OPENAI_API_KEY` — Orbik's own OpenAI key, commented out in the example, and required for
+  search. The worker makes the embeddings with it, and the reasoning calls too when OpenAI is the
+  reasoning provider. Without it indexing is skipped, and the Library and ask pages say the
   index is not configured. Crawling and the copy of every page in the Library work without either
   key. If you set it, set the same key in `backend/.env` too: the API reads it there
   to search the index for AI clients connected over MCP, and for nothing else. `QDRANT_URL`,
@@ -287,7 +294,7 @@ The documentation is in [docs/](docs/README.md) and published at <https://orbik.
 | `pnpm` warns about the engine, or `node -v` is not 24 | Another `node` comes first on your `PATH`. Run `nvm use 24.14.0`, then check `which -a node`. |
 | API exits with `SESSION_SECRET must contain at least 32 non-placeholder characters` | Replace the placeholder in `backend/.env`. |
 | `MONGODB_URI must include a database name` | Add a database to the URI path, e.g. `/orbik`. |
-| Agent runs report that no AI provider is configured | Set `ORBIK_ANTHROPIC_API_KEY` in `agents/.env`. |
+| Agent runs report that no AI provider is configured | Set `ORBIK_ANTHROPIC_API_KEY` or `ORBIK_OPENAI_API_KEY` in `agents/.env`; if `ORBIK_AI_PROVIDER` is set, the key of the provider it names. |
 | Library or ask page says the index is not configured | Set `ORBIK_OPENAI_API_KEY` in `agents/.env` and start Qdrant. |
 | An MCP client's `content_search` says the index is unavailable | Set the same `ORBIK_OPENAI_API_KEY` (and the same Qdrant and embedding-model settings) in `backend/.env`. |
 | A Design system run fails with `CHROME_UNAVAILABLE` | Install Google Chrome on the machine running the agents worker. |

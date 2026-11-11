@@ -354,7 +354,8 @@ worker it also needs **fallback fonts** (`fonts-liberation`, `fonts-noto`,
 machine has, and a bare host has nothing, which would corrupt the specimen and the font detection.
 Allow 300–600 MB of memory for the browser.
 
-**No model.** A worker without `ORBIK_ANTHROPIC_API_KEY` still renders, observes and stores the
+**No model.** A worker without the reasoning provider's key (`ORBIK_AI_PROVIDER`; see
+[ai-execution.md](ai-execution.md)) still renders, observes and stores the
 assets; the run ends as `state: "observed"` with the proposal skipped (`PROVIDER_NOT_CONFIGURED`),
 and a system already stored is left exactly as it was.
 

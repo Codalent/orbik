@@ -18,14 +18,16 @@ const KEY_LIKE = /\bsk-[A-Za-z0-9_*-]+/g;
  * Nothing above this file knows OpenAI exists. The adapter takes Orbik's own request shape —
  * instructions, messages, a tool list from Orbik's registry — and returns Orbik's own response
  * shape, so the runtime, the model router, and every agent definition are unchanged by a decision
- * to route work here rather than somewhere else. It is paid for with the same key the embeddings
- * use, `ORBIK_OPENAI_API_KEY`, which is the one credential every model call in Orbik is made with.
+ * to route work here rather than somewhere else. It serves the reasoning calls when
+ * `ORBIK_AI_PROVIDER` names OpenAI (or only `ORBIK_OPENAI_API_KEY` is set), and is paid for with
+ * the same key the embeddings use.
  *
- * A turn may carry pictures and may ask for its answer in a fixed shape. A message part
+ * A turn may carry pictures and PDFs and may ask for its answer in a fixed shape. A message part
  * `{type: "image", mimeType, data}` — base64 bytes — is sent as an image the model sees, which is
- * how the Design system agent shows it a screenshot; and `format: {name, schema}` asks for a reply
- * that is JSON matching that schema, which the provider then guarantees rather than merely
- * attempts. Neither is used by the tool loop, which is unchanged.
+ * how the Design system agent shows it a screenshot; `{type: "document", …}` is sent as a file the
+ * model reads, which is how the brand chat reads an uploaded brand guide, in a message or in a
+ * tool's output; and `format: {name, schema}` asks for a reply that is JSON matching that schema,
+ * which the provider then guarantees rather than merely attempts.
  *
  * Three translations happen here and nowhere else:
  *
@@ -265,23 +267,46 @@ function toInput(messages) {
       if (block.type === "text") {
         text.push({ type: "input_text", text: block.text });
       } else if (block.type === "image") {
-        text.push({ type: "input_image", image_url: `data:${block.mimeType};base64,${block.data}`, detail: block.detail ?? "auto" });
+        text.push(toInputImage(block));
+      } else if (block.type === "document") {
+        text.push(toInputFile(block));
       } else if (block.type === "tool_result") {
         flush();
-        // There is no error flag on a function's output, so a failed call says so in words.
-        // A file a tool handed back to look at cannot travel in a function's output here; its
-        // facts do, and the model is told the file itself was not shown.
-        const output = typeof block.content === "string"
-          ? block.content
-          : Array.isArray(block.content)
-            ? block.content.map((part) => (part.type === "text" ? part.text : `[A ${part.type} was returned that this model cannot be shown.]`)).join("\n")
-            : JSON.stringify(block.content ?? "");
-        input.push({ type: "function_call_output", call_id: block.tool_use_id, output: block.is_error ? `Error: ${output}` : output });
+        input.push({ type: "function_call_output", call_id: block.tool_use_id, output: toFunctionOutput(block) });
       }
     }
     flush();
   }
   return input;
+}
+
+/** A picture the model sees. */
+function toInputImage(block) {
+  return { type: "input_image", image_url: `data:${block.mimeType};base64,${block.data}`, detail: block.detail ?? "auto" };
+}
+
+/** A PDF the model reads, such as a brand guide somebody uploaded. */
+function toInputFile(block) {
+  const filename = String(block.label ?? "").trim().slice(0, 200) || "document.pdf";
+  return { type: "input_file", filename, file_data: `data:${block.mimeType};base64,${block.data}` };
+}
+
+/**
+ * A function's output: text as it is, or — when a tool handed back a file to look at — text, a
+ * picture and a PDF as the parts they are. There is no error flag on a function's output, so a
+ * failed call says so in words.
+ */
+function toFunctionOutput(block) {
+  const prefix = block.is_error ? "Error: " : "";
+  if (typeof block.content === "string") return `${prefix}${block.content}`;
+  if (!Array.isArray(block.content)) return `${prefix}${JSON.stringify(block.content ?? "")}`;
+  const parts = block.content.map((part) => {
+    if (part.type === "image" && typeof part.data === "string") return toInputImage(part);
+    if (part.type === "document" && typeof part.data === "string") return toInputFile(part);
+    return { type: "input_text", text: typeof part.text === "string" ? part.text : JSON.stringify(part) };
+  });
+  if (prefix) parts.unshift({ type: "input_text", text: prefix.trim() });
+  return parts;
 }
 
 /**

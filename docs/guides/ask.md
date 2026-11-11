@@ -53,8 +53,9 @@ fonts or design tokens, or say what to change. See [Brand](brand.md).
   sections from 60 pages and 18 Library files, updated …" — or that nothing is indexed yet, or why
   the index cannot be searched. Ask says which, rather than answering as though the site said
   nothing.
-- **A model for the answer.** Each question is an agent run, made with `ORBIK_ANTHROPIC_API_KEY`.
-  Without the key, questions fail saying no AI provider is configured. Every call is listed under
+- **A model for the answer.** Each question is an agent run, made with the reasoning provider's
+  key: `ORBIK_ANTHROPIC_API_KEY`, or `ORBIK_OPENAI_API_KEY` when that is the only one set (or
+  `ORBIK_AI_PROVIDER=openai`). Without it, questions fail saying no AI provider is configured. Every call is listed under
   **Settings** → **AI calls**.
 
 Both keys are set as described in [Configuration](../self-hosting/configuration.md).

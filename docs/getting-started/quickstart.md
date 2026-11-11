@@ -24,17 +24,22 @@ Orbik calls models with your own keys, and you pay your provider directly. Copy 
 `.env` beside `compose.yaml`, set the keys, and run `docker compose up -d` again:
 
 ```sh
-ORBIK_ANTHROPIC_API_KEY=sk-ant-...
-ORBIK_OPENAI_API_KEY=sk-proj-...
+ORBIK_OPENAI_API_KEY=sk-proj-...      # required
+ORBIK_ANTHROPIC_API_KEY=sk-ant-...    # optional
 ```
 
-| Key | What needs it |
-|---|---|
-| `ORBIK_ANTHROPIC_API_KEY` | Writing the Library's knowledge base, proposing its folders, Ask, the llms.txt agent and the brand proposal. |
-| `ORBIK_OPENAI_API_KEY` | Embeddings: the search index behind Ask and your AI's `content_search`. |
+> [!IMPORTANT]
+> The OpenAI key is required. It makes the embeddings behind search, and Anthropic has no
+> embeddings, so there is no other way to get them.
 
-Without either key Orbik still crawls your site, copies every page word for word into the
-Library and serves it to your AI. Every call made with a key is listed under
+| Key | Required | What needs it |
+|---|---|---|
+| `ORBIK_OPENAI_API_KEY` | **Yes** | Embeddings: the search index behind Ask and your AI's `content_search`. With only this key set, it also does all the writing: the Library's knowledge base, proposing its folders, Ask, the llms.txt agent and the brand proposal. |
+| `ORBIK_ANTHROPIC_API_KEY` | No | With it set, Claude does the writing instead of OpenAI. |
+| `ORBIK_AI_PROVIDER` | No | With both keys set, which one does the writing: `anthropic` (the default) or `openai`. |
+
+Search uses the OpenAI key either way. Without any key, Orbik still crawls your site, copies every
+page word for word into the Library and serves it to your AI. Every call made with a key is listed under
 **Settings → AI calls**.
 
 ## 3. Claim the install
@@ -69,7 +74,7 @@ folders.
 
 1. At the foot of the Library's explorer is the Library agent. It starts paused: set it to work
    with its play button. It then rewrites the Library whenever a crawl finds a change.
-2. With the agent at work and the Anthropic key set, Orbik reads your site and, within a few
+2. With the agent at work and your keys set, Orbik reads your site and, within a few
    minutes, proposes two or three structures, each with a sentence on why it fits. Orbik's
    default — `00 Start Here`, `01 Company`, `02 Offer`, … — is always offered too.
 3. Pick one, rename, add, remove or reorder folders if you like, and press

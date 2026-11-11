@@ -12,13 +12,13 @@ import { AgentError } from "../../runtime/errors.js";
  *
  * It is also what keeps Orbik from committing to a single provider. The router returns a provider
  * *name* alongside a model, so moving work to another provider is an adapter plus a row in a
- * table — which is how every capability came to be served by OpenAI, and then by Anthropic: the
- * adapter was there, and `DEFAULT_ROUTES` below was pointed at its table.
+ * table. Which table a deployment uses is configuration, not code: `ORBIK_AI_PROVIDER` chooses
+ * Anthropic or OpenAI (`routesFor` below), and the agents' config hands that table in here.
  *
  * @param {object} options router configuration
  * @param {Record<string, object>} options.providers adapters keyed by provider name
  * @param {Record<string, object>} [options.routes] capability to `{provider, model, effort,
- *   maxTokens}`, overridable so an operator can re-route without a code change
+ *   maxTokens}`: the table of the provider `ORBIK_AI_PROVIDER` chose (`config.routes`)
  */
 export function createModelRouter({ providers, routes = DEFAULT_ROUTES }) {
   return {
@@ -56,12 +56,13 @@ export function createModelRouter({ providers, routes = DEFAULT_ROUTES }) {
 }
 
 /**
- * The capability-to-model table for Anthropic, which serves every model call but the embeddings.
+ * The capability-to-model table for Anthropic, chosen with `ORBIK_AI_PROVIDER=anthropic` — or by
+ * default whenever `ORBIK_ANTHROPIC_API_KEY` is set.
  *
  * Every row names Anthropic, so every reasoning call Orbik makes — agent runs, the Library chat,
  * the short summaries plain-code agents ask for — is paid for with `ORBIK_ANTHROPIC_API_KEY`. The
- * embeddings are not routed here and stay on OpenAI, paid for with `ORBIK_OPENAI_API_KEY`. Careful
- * work and long-context work go to the same model. What sets them apart is how hard each is asked
+ * embeddings are not routed here and stay on OpenAI, paid for with `ORBIK_OPENAI_API_KEY`, whichever
+ * table is chosen. Careful work and long-context work go to the same model. What sets them apart is how hard each is asked
  * to think.
  *
  * `effort` is the lever that matters most for cost here, and it is set per capability rather than
@@ -95,10 +96,9 @@ export const ANTHROPIC_ROUTES = Object.freeze({
 });
 
 /**
- * The capability-to-model table for OpenAI, which served every call until Anthropic took over.
- *
- * Kept so that going back is pointing `DEFAULT_ROUTES` at it: the adapter is still registered
- * whenever `ORBIK_OPENAI_API_KEY` is set, which it is for the embeddings anyway.
+ * The capability-to-model table for OpenAI, chosen with `ORBIK_AI_PROVIDER=openai` — or by default
+ * when `ORBIK_OPENAI_API_KEY` is the only key set. Then one key, the one the embeddings need anyway,
+ * pays for everything.
  */
 export const OPENAI_ROUTES = Object.freeze({
   [AGENT_CAPABILITIES.fast]: Object.freeze({
@@ -121,5 +121,16 @@ export const OPENAI_ROUTES = Object.freeze({
   }),
 });
 
-/** The table the router uses unless it is handed another: Anthropic, for now. */
+/** The reasoning providers `ORBIK_AI_PROVIDER` may name, each with its table. */
+export const ROUTES_BY_PROVIDER = Object.freeze({
+  anthropic: ANTHROPIC_ROUTES,
+  openai: OPENAI_ROUTES,
+});
+
+/** The table the router uses unless it is handed another: Anthropic's. */
 export const DEFAULT_ROUTES = ANTHROPIC_ROUTES;
+
+/** The route table for a provider `ORBIK_AI_PROVIDER` names. */
+export function routesFor(provider) {
+  return ROUTES_BY_PROVIDER[provider] ?? DEFAULT_ROUTES;
+}

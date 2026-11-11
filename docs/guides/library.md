@@ -110,8 +110,10 @@ While a run is in flight, **This run** shows it and **Stop** ends it. **What cha
 past runs changed. A run that fails is tried again when the site next changes, or when the agent
 is paused and set to work again.
 
-Writing needs `ORBIK_ANTHROPIC_API_KEY` (see [Configuration](../self-hosting/configuration.md));
-without it the copies and the search index are still made. Every model call is listed under
+Writing needs a reasoning key: `ORBIK_ANTHROPIC_API_KEY`, or `ORBIK_OPENAI_API_KEY` on its own
+(`ORBIK_AI_PROVIDER` picks one when both are set; see
+[Configuration](../self-hosting/configuration.md)). Without one the copies and the search index are
+still made. Every model call is listed under
 **Settings** → **AI calls**. On a development site of about seventy pages, a first build or a
 rebuild came to between $0.25 and $0.50, an ordinary update about $0.20, and a structure proposal
 about $0.10.

@@ -9,9 +9,10 @@
 # create the first account. See
 # docs/self-hosting/ for AI keys, a domain with HTTPS, email, backups and upgrades.
 #
-# Settings come from a `.env` file beside this one (copy .env.example). Every one is optional:
-# without AI keys the app crawls, keeps a word-for-word copy of every page and runs the agents that
-# need no model; with them it writes the knowledge base, answers questions and searches.
+# Settings come from a `.env` file beside this one (copy .env.example). The OpenAI key is needed
+# for search (the embeddings); with it, and optionally an Anthropic key, the app writes the
+# knowledge base and answers questions. Without any key it still crawls, keeps a word-for-word copy
+# of every page and runs the agents that need no model.
 
 name: orbik
 
@@ -21,6 +22,7 @@ x-server-environment: &server-environment
   QDRANT_URL: http://qdrant:6333
   ORBIK_ANTHROPIC_API_KEY: ${ORBIK_ANTHROPIC_API_KEY:-}
   ORBIK_OPENAI_API_KEY: ${ORBIK_OPENAI_API_KEY:-}
+  ORBIK_AI_PROVIDER: ${ORBIK_AI_PROVIDER:-}
   ORBIK_TELEMETRY: ${ORBIK_TELEMETRY:-off}
   ORBIK_CRAWLER_CONTACT_URL: ${ORBIK_CRAWLER_CONTACT_URL:-}
   ORBIK_EXTENSIONS: ${ORBIK_EXTENSIONS:-}

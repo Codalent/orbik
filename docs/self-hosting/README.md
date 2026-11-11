@@ -27,11 +27,13 @@ To run it, allow about 1.5 GB of memory, more while the Design system agent has 
 
 ## AI keys
 
-Orbik runs without any key: it crawls, keeps a word-for-word copy of every page in the Library and
-runs the agents that need no model. Two keys, in `.env` beside `compose.yaml`, turn on the rest:
+Orbik starts without any key: it crawls, keeps a word-for-word copy of every page in the Library
+and runs the agents that need no model. Keys in `.env` beside `compose.yaml` turn on the rest:
 
-- `ORBIK_ANTHROPIC_API_KEY` — every reasoning call: agent runs, the Library's knowledge base, Ask.
-- `ORBIK_OPENAI_API_KEY` — embeddings for search, Ask and `content_search` over MCP.
+- `ORBIK_OPENAI_API_KEY` — **required**: embeddings for search, Ask and `content_search` over MCP.
+  On its own it also makes every reasoning call: agent runs, the Library's knowledge base, Ask.
+- `ORBIK_ANTHROPIC_API_KEY` — optional: with it set, Claude makes the reasoning calls instead.
+  `ORBIK_AI_PROVIDER` (`anthropic` or `openai`) picks one when both keys are set.
 
 Run `docker compose up -d` again after changing `.env`. Every other setting is in
 [Configuration](configuration.md).

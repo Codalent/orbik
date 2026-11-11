@@ -80,7 +80,7 @@ const PLAIN_CODE_RUNTIMES = Object.freeze({
  * it sit the plain-code runtimes, each chosen by the requirement a definition names.
  */
 function buildRuntimes({ config, database, logger, callLog, retrieval, retrievalReason }) {
-  const modelRouter = createModelRouter({ providers: createProviders({ config, callLog }) });
+  const modelRouter = createModelRouter({ providers: createProviders({ config, callLog }), routes: config.routes });
   const collaborators = {
     config,
     database,

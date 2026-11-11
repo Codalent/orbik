@@ -3,7 +3,7 @@ import { AGENT_CAPABILITIES } from "@orbik/protocol";
 import { parseRetrievalEnvironment } from "@orbik/retrieval";
 import { hostname } from "node:os";
 
-import { DEFAULT_ROUTES } from "../ai/model/modelRouter.js";
+import { ROUTES_BY_PROVIDER } from "../ai/model/modelRouter.js";
 import { DEFAULT_CRAWLER_CONTACT_URL } from "../crawler/siteConfig.js";
 
 /**
@@ -36,8 +36,8 @@ export function parseAgentEnvironment(source) {
   const schedulerIntervalMs = parseBoundedInteger(source.AGENT_SCHEDULER_INTERVAL_MS, 60_000, 1000, 3_600_000, "AGENT_SCHEDULER_INTERVAL_MS", errors);
   const dispatcherIntervalMs = parseBoundedInteger(source.AGENT_DISPATCHER_INTERVAL_MS, 2000, 250, 60_000, "AGENT_DISPATCHER_INTERVAL_MS", errors);
 
-  // The credential of Anthropic, which the route table (`DEFAULT_ROUTES`) sends every reasoning
-  // call to: agent runs, the Library chat and the summaries plain-code agents ask for. The
+  // The credential of Anthropic, which serves every reasoning call — agent runs, the Library chat
+  // and the summaries plain-code agents ask for — when `ORBIK_AI_PROVIDER` (below) chooses it. The
   // embeddings stay on `ORBIK_OPENAI_API_KEY`, parsed below with the retrieval settings. Optional,
   // like that one: a worker without it still starts, and says what it cannot do.
   //
@@ -51,14 +51,28 @@ export function parseAgentEnvironment(source) {
 
   // ---------------------------------------------------------------------------------------------
   // The retrieval index — the vector database beside MongoDB — and `ORBIK_OPENAI_API_KEY`, which
-  // the embeddings are made with. It also serves the reasoning calls when the route table is
-  // pointed back at OpenAI (`OPENAI_ROUTES`).
+  // the embeddings are made with. It also serves the reasoning calls when `ORBIK_AI_PROVIDER`
+  // chooses OpenAI (`OPENAI_ROUTES`).
   //
   // All optional, and parsed by `parseRetrievalEnvironment`, the one parser the API uses too. A
   // worker without the key still starts, crawls, mirrors each site into its Library and derives
   // the brand; it indexes nothing, rather than refusing to start over a credential a
   // crawler-only deployment never uses.
   const { qdrantUrl, qdrantCollection, qdrantApiKey, openaiApiKey, embeddingModel } = parseRetrievalEnvironment(source, errors);
+
+  // Which provider serves the reasoning calls: `anthropic` or `openai`. Unset (or `auto`), it is
+  // the one whose key is set — Anthropic when both are — so an install with only the OpenAI key,
+  // which the embeddings need anyway, runs everything on that one key. Naming a provider whose key
+  // is missing is not an error at start: the worker says no AI provider is configured, as it does
+  // with no key at all.
+  const providerSetting = (source.ORBIK_AI_PROVIDER ?? "").trim().toLowerCase();
+  if (providerSetting && providerSetting !== "auto" && !Object.hasOwn(ROUTES_BY_PROVIDER, providerSetting)) {
+    errors.push("ORBIK_AI_PROVIDER must be anthropic, openai or auto.");
+  }
+  const providerKeys = { anthropic: anthropicApiKey, openai: openaiApiKey };
+  const aiProvider = Object.hasOwn(ROUTES_BY_PROVIDER, providerSetting)
+    ? providerSetting
+    : (!anthropicApiKey && openaiApiKey ? "openai" : "anthropic");
 
   // How often the index scheduler looks for a workspace whose documents have moved since they were
   // embedded. A minute: a person editing a Library file should be able to ask about it shortly
@@ -104,6 +118,10 @@ export function parseAgentEnvironment(source) {
     schedulerIntervalMs,
     dispatcherIntervalMs,
     anthropicApiKey,
+    /** The provider every reasoning call goes to, and its capability-to-model table. */
+    aiProvider,
+    aiProviderConfigured: Boolean(providerKeys[aiProvider]),
+    routes: ROUTES_BY_PROVIDER[aiProvider],
     qdrantUrl,
     qdrantCollection,
     qdrantApiKey,
@@ -117,10 +135,10 @@ export function parseAgentEnvironment(source) {
      * Whether a write run of the Library agent could be served at all. The scheduler starts those
      * runs on its own, and without a key every one would fail saying no provider is configured —
      * so on a crawler-only deployment it starts none, and says that is why. The run is
-     * long-context work, so the key that matters is the one of the provider the route table sends
-     * that to.
+     * long-context work, so the key that matters is the one of the provider the chosen route
+     * table sends that to.
      */
-    synthesisEnabled: Boolean({ anthropic: anthropicApiKey, openai: openaiApiKey }[DEFAULT_ROUTES[AGENT_CAPABILITIES.longContext].provider]),
+    synthesisEnabled: Boolean(providerKeys[ROUTES_BY_PROVIDER[aiProvider][AGENT_CAPABILITIES.longContext].provider]),
     telemetryEnabled,
     telemetryUrl,
   });

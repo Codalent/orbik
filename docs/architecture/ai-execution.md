@@ -1,8 +1,9 @@
 # How Orbik runs agents
 
 There is exactly **one** way an agent runs: the agents worker executes it, and the reasoning goes
-to Anthropic with Orbik's own key, `ORBIK_ANTHROPIC_API_KEY`. The embeddings behind the retrieval
-index go to OpenAI with `ORBIK_OPENAI_API_KEY`, because Anthropic has no embeddings endpoint.
+to the install's reasoning provider — Anthropic with `ORBIK_ANTHROPIC_API_KEY`, or OpenAI with
+`ORBIK_OPENAI_API_KEY`, as `ORBIK_AI_PROVIDER` chooses. The embeddings behind the retrieval index go
+to OpenAI with `ORBIK_OPENAI_API_KEY` either way, because Anthropic has no embeddings endpoint.
 
 A user never picks a provider, a model, or a temperature, and never supplies a key or a login of
 their own. Those are Orbik's problem. What a user sees is a **Run** button.
@@ -26,8 +27,8 @@ their own. Those are Orbik's problem. What a user sees is a **Run** button.
           │                      │
           ▼                ┌─────┴─────┐
     plain-code job         ▼           ▼
-   (no model decides)  Anthropic   (OpenAI: an adapter
-                                    no route uses today)
+   (no model decides)  Anthropic     OpenAI
+                      (one of the two, as ORBIK_AI_PROVIDER says)
 ```
 
 A run is created by the API (`POST /runs`) or by the scheduler, queued, picked up by the run
@@ -64,7 +65,7 @@ keyed by the requirement, and adding a plain-code agent is one entry in it; the 
 (`chooseRuntime` in `agents/src/ai/executeRun.js`) has no agent's name in it. Every definition that
 names none of them goes to the model runtime (`agents/src/ai/model/modelRuntime.js`), which asks
 the model router for a route and calls the provider adapter
-(`agents/src/ai/model/providers/anthropic.js`). See [design-system.md](design-system.md).
+(`agents/src/ai/model/providers/anthropic.js` or `openai.js`). See [design-system.md](design-system.md).
 
 An agent can also be started by an event rather than by a person or a schedule: the scheduler's
 outbox loop (`agents/src/ai/outboxScheduler.js`) reads the crawler's event outbox (`agent_events`)
@@ -102,30 +103,40 @@ question may carry pictures. It returns `{value, model, usage}`, `{skipped: true
 derivation — the visual system from the observed record and screenshots, the graphics language
 from a sheet of the site's imagery — and stores what it observed whether or not either answers.
 
-## Two keys
+## Two keys, one reasoning provider
 
-`ORBIK_ANTHROPIC_API_KEY` pays for every reasoning call — agent runs, the Library chat, and the
-short texts and structured answers plain-code agents ask for. `ORBIK_OPENAI_API_KEY` pays for the
-embeddings behind the retrieval index, and for nothing else while the route table names Anthropic.
-Both are read from `agents/.env`. In `backend/.env` only the OpenAI key matters, and it pays for one
-thing: the embedding an MCP `content_search` needs. The API never calls a reasoning model. Every
-reasoning call goes through the worker.
+`ORBIK_OPENAI_API_KEY` is the one key the docs call required: it pays for the embeddings behind the
+retrieval index. Every reasoning call — agent runs, the Library chat, and the short texts and
+structured answers plain-code agents ask for — goes to one provider, chosen by `ORBIK_AI_PROVIDER`:
 
-The route table (`DEFAULT_ROUTES` in `agents/src/ai/model/modelRouter.js`) decides which model
-serves which kind of work. It points at `ANTHROPIC_ROUTES`, and every row names Anthropic:
+| `ORBIK_AI_PROVIDER` | Reasoning provider |
+|---|---|
+| `anthropic` | Anthropic, with `ORBIK_ANTHROPIC_API_KEY` |
+| `openai` | OpenAI, with `ORBIK_OPENAI_API_KEY` — the embeddings' key pays for everything |
+| unset or `auto` | Anthropic when `ORBIK_ANTHROPIC_API_KEY` is set, otherwise OpenAI |
 
-| Capability | Model | Effort | Used for |
-|---|---|---|---|
-| `fast` | `claude-haiku-5-5` | low | short rewrites: the summaries plain-code agents ask for (none in this release) |
-| `reasoning` | `claude-opus-5-5` | high | careful multi-step work with tools: llms.txt, the Library chat, the brand chat; and the Design system agent's two structured answers |
-| `long-context` | `claude-opus-5-5` | low | work that needs room more than depth: the Library's write run |
+So an install with only the OpenAI key runs every feature on it, and one with both keys keeps
+reasoning on Claude unless told otherwise. A provider named without its key is not a start-up
+error: the worker starts and says no AI provider is configured, as it does with no key at all. The
+worker logs the choice at start (`ai.provider`, with the provider and whether its key is set, never
+the key). The keys and the setting are read from `agents/.env`. In `backend/.env` only the OpenAI
+key matters, and it pays for one thing: the embedding an MCP `content_search` needs. The API never
+calls a reasoning model. Every reasoning call goes through the worker.
 
-`OPENAI_ROUTES` beside it is the table that served every call until 2026-10-15 — `gpt-6-luna`
-for `fast`, `gpt-6.1-sol` for the other two. Going back to OpenAI is pointing `DEFAULT_ROUTES` at
-it and restarting the worker and the scheduler; the OpenAI adapter is registered whenever its key
-is set, which it is for the embeddings anyway. `synthesisEnabled` (`agents/src/config/env.js`),
-which decides whether the Library scheduler starts write runs, follows the provider the
-`long-context` row names, so it moves with the table.
+Each provider has a route table in `agents/src/ai/model/modelRouter.js` that decides which model
+serves which kind of work; `parseAgentEnvironment` (`agents/src/config/env.js`) puts the chosen one
+on the config as `routes`, and every model router the worker builds is handed it:
+
+| Capability | `ANTHROPIC_ROUTES` | `OPENAI_ROUTES` | Effort | Used for |
+|---|---|---|---|---|
+| `fast` | `claude-haiku-5-5` | `gpt-6-luna` | low | short rewrites: the summaries plain-code agents ask for (none in this release) |
+| `reasoning` | `claude-opus-5-5` | `gpt-6.1-sol` | high | careful multi-step work with tools: llms.txt, the Library chat, the brand chat; and the Design system agent's two structured answers |
+| `long-context` | `claude-opus-5-5` | `gpt-6.1-sol` | low | work that needs room more than depth: the Library's write run |
+
+`OPENAI_ROUTES` is the table that served every call until 2026-10-15. Changing the provider is
+changing `ORBIK_AI_PROVIDER` and restarting the worker and the scheduler. `synthesisEnabled`
+(`agents/src/config/env.js`), which decides whether the Library scheduler starts write runs,
+follows the provider the chosen table's `long-context` row names, so it moves with the setting.
 
 A model run is stopped after 30 round trips, and a long-context run after 60
 (`agents/src/ai/model/modelRuntime.js`): the Library's write run rewrites the subject tree file by
@@ -160,14 +171,16 @@ An image part may also say how closely the provider should look (`detail`) and w
 setting; the reference is what the call log keeps in place of the bytes, so a call that showed a
 model an image names which image it was.
 
-The OpenAI adapter (`providers/openai.js`) is still in the tree, unchanged. It calls the Responses
-API with `fetch`, stores nothing at the provider, and hands the model's encrypted reasoning back
-between turns; with `detail` it is told how closely to look (`low` fits the image into 512 pixels
-a side, `high` into at most 2,500 patches of 32 pixels).
+The OpenAI adapter (`providers/openai.js`) calls the Responses API with `fetch`, stores nothing at
+the provider, and hands the model's encrypted reasoning back between turns; with `detail` it is
+told how closely to look (`low` fits the image into 512 pixels a side, `high` into at most 2,500
+patches of 32 pixels). A PDF (`{type: "document"}`, the brand guide the brand chat reads) is sent
+as an `input_file`, and a tool that hands back a picture or a PDF has it sent in the function's
+output as the part it is, so the brand chat reads an uploaded file on either provider.
 
 Both keys are optional at start-up, on purpose: a worker without them still starts, crawls and
 copies every page into the Library. Without the OpenAI key nothing is indexed, and search and chat say the index is
-not configured. Without the Anthropic key, what it cannot do, it says —
+not configured. Without the reasoning provider's key, what it cannot do, it says —
 
 - the AI agents still register, and a run fails the first time one is tried, reporting that no AI
   provider is configured;
@@ -217,11 +230,12 @@ Every model call is written to `ai_calls`, by whichever process made it:
 
 | Purpose | Backend | Made by |
 |---|---|---|
-| `agent-run` | `anthropic-api` | an agent run's reasoning, including the Library chat; each turn of the tool loop is one call. Also the short text or structured answer a plain-code run asks for, such as the two structured answers a design-system derivation asks for, whose prompts name each image by its kind and size and never hold its bytes: one call each, carrying the run and the agent |
+| `agent-run` | `anthropic-api` or `openai-api`, the reasoning provider's | an agent run's reasoning, including the Library chat; each turn of the tool loop is one call. Also the short text or structured answer a plain-code run asks for, such as the two structured answers a design-system derivation asks for, whose prompts name each image by its kind and size and never hold its bytes: one call each, carrying the run and the agent |
 | `source-note` | `openai-api` | no longer made. Rows from before the Library's source layer copied pages: one per note a model wrote for a page |
 | `embedding` | `openai-api` | an index pass (one call per batch of up to 100 passages), a `content.search` query inside a run, or — written by the API — an MCP `content_search` |
 
-`agent-run` rows written between the move to OpenAI and 2026-10-15 say `openai-api`. Rows written
+`agent-run` rows written between the move to OpenAI and 2026-10-15, or on an install whose
+reasoning provider is OpenAI, say `openai-api`. Rows written
 before OpenAI served every call may say `claude-agent-sdk` in `backend`, and older rows may carry
 the purpose `crawl-schedule`, from a crawl-frequency planner that no longer exists; nothing writes
 either value any more.
@@ -276,10 +290,12 @@ filters and totals.
 ## Running it locally
 
 ```sh
-# agents/.env
-ORBIK_ANTHROPIC_API_KEY=sk-ant-...
 # agents/.env, and backend/.env for MCP search
 ORBIK_OPENAI_API_KEY=sk-...
+# agents/.env, optional: reasoning on Claude rather than OpenAI
+ORBIK_ANTHROPIC_API_KEY=sk-ant-...
+# agents/.env, optional: anthropic or openai, when both keys are set
+# ORBIK_AI_PROVIDER=
 ```
 
 Then, with the three processes running (`pnpm dev`):
@@ -291,13 +307,12 @@ pnpm --dir backend run seed:user -- --email you@example.com
 Then configure a crawl. Without either key, the crawl still copies every page into the Library's
 source layer; with both, the Library's write run builds the knowledge base once its top-level
 folders are chosen, and the Ask panel answers from it. The **Design system** agent needs Google
-Chrome on the worker's machine, and without the Anthropic key it stores what it observed and
+Chrome on the worker's machine, and without a reasoning key it stores what it observed and
 leaves the proposal out.
 
 ## What is not finished
 
-- **Routing by configuration.** The model router returns a provider *name* and reads a route
-  table, and two adapters exist, but the table is code: sending a capability to another model or
-  back to OpenAI is an edit to `DEFAULT_ROUTES`, not an environment variable.
+- **Routing per capability.** `ORBIK_AI_PROVIDER` chooses a whole table; sending one capability
+  to another model, or mixing providers, is still an edit to the tables in `modelRouter.js`.
 - **Credits and billing.** Runs are not metered or charged for. What each model call cost at list
   price is in the AI call log; a unit a user pays in comes with billing.

@@ -18,6 +18,8 @@ import { createRuntime } from "./runtime/index.js";
  * without port coordination.
  */
 const config = parseAgentEnvironment(process.env);
+// Which provider the reasoning calls go to, and whether its key is set: never the key itself.
+log(config.aiProviderConfigured ? "info" : "warn", "ai.provider", { provider: config.aiProvider, configured: config.aiProviderConfigured });
 const database = await connectMongo(config);
 await ensureAgentIndexes(database);
 // Before the first job is claimed; the API and the scheduler run the same list.
