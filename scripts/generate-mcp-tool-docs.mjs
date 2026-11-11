@@ -180,9 +180,30 @@ function argumentRows(schema, { prefix = "", skip = [], other = null } = {}) {
   return rows;
 }
 
-/** One tool's section: its description as the model gets it, then its arguments. */
+/**
+ * A description cut after its first sentence: the summary a reader scans, and the rest. A sentence
+ * ends at `.`, `!` or `?` followed by a space and a capital letter, outside code spans, so "e.g. "
+ * and a path inside backticks do not end one.
+ */
+function firstSentence(text) {
+  const spans = [...text.matchAll(/`[^`]*`/g)].map((match) => [match.index, match.index + match[0].length]);
+  for (const end of text.matchAll(/[.!?](?=\s+[A-Z`])/g)) {
+    if (spans.some(([from, to]) => end.index >= from && end.index < to)) continue;
+    return [text.slice(0, end.index + 1), text.slice(end.index + 1).trim()];
+  }
+  return [text, ""];
+}
+
+/**
+ * One tool's section: its name, whether it reads or writes, its description as the model gets it
+ * — the first sentence on its own as the summary — then its arguments. The docs site draws each as
+ * a card, from the heading that is only the name in code and the bold label opening the summary.
+ */
 function toolSection(tool, { other = null } = {}) {
-  const lines = [`### ${tool.name}`, "", inline(tool.description), ""];
+  const kind = tool.annotations?.readOnlyHint === false ? "Write" : "Read";
+  const [summary, rest] = firstSentence(inline(tool.description));
+  const lines = [`### ${code(tool.name)}`, "", `**${kind}** · ${summary}`, ""];
+  if (rest) lines.push(rest, "");
   if (other && other.description !== tool.description) {
     lines.push(`On a connection that reads several workspaces: ${inline(other.description)}`, "");
   }
@@ -275,7 +296,7 @@ export function renderToolDocs(surfaces) {
     "Every connection has these. They only read.",
     "",
     ...readTools.flatMap((tool) => toolSection(tool)),
-    "## search and fetch",
+    "## Search and fetch",
     "",
     "The two tools in the shape ChatGPT's deep research and company knowledge require. They read",
     "the same knowledge as the tools above: `search` finds sources by meaning and `fetch` opens one.",
