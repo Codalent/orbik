@@ -113,16 +113,17 @@ neither.
 
 With Qdrant down, indexing and search report `INDEX_UNAVAILABLE` and record the reason on the
 `index_state` rows they could not finish; nothing crashes, and the next scheduler tick retries.
-`ORBIK_ANTHROPIC_API_KEY` in `agents/.env` is the key every reasoning call is made with: agent
-runs, the Library chat and the short texts and structured answers plain-code agents ask for — the
-route table (`DEFAULT_ROUTES` in `agents/src/ai/model/modelRouter.js`) sends all of them to Claude.
-`ORBIK_OPENAI_API_KEY` is the key the embeddings are made with; the OpenAI adapter is kept, and
-going back to it is pointing `DEFAULT_ROUTES` at `OPENAI_ROUTES` (docs/architecture/ai-execution.md). Without
-the Anthropic key, model runs fail saying no AI provider is configured and the Library's write run
-is not started; without the OpenAI key, indexing is skipped with a recorded reason and the Library
-and ask pages say the index is not configured. Every page is still copied into the Library's source
-layer: that step calls no model. The API reads `ORBIK_OPENAI_API_KEY` from
-`backend/.env` — it searches the index for MCP clients, and without the key `content_search`
+`ORBIK_OPENAI_API_KEY` in `agents/.env` is the key the embeddings are made with, and the one key
+the docs call required. Every reasoning call — agent runs, the Library chat and the short texts
+and structured answers plain-code agents ask for — goes to one provider, `ORBIK_AI_PROVIDER`
+(`anthropic` or `openai`; unset, Anthropic when `ORBIK_ANTHROPIC_API_KEY` is set and OpenAI
+otherwise), through that provider's table in `agents/src/ai/model/modelRouter.js`
+(`ANTHROPIC_ROUTES`, `OPENAI_ROUTES`; docs/architecture/ai-execution.md). The worker logs the choice
+at start (`ai.provider`). Without the chosen provider's key, model runs fail saying no AI provider
+is configured and the Library's write run is not started; without the OpenAI key, indexing is
+skipped with a recorded reason and the Library and ask pages say the index is not configured.
+Every page is still copied into the Library's source layer: that step calls no model. The API
+reads `ORBIK_OPENAI_API_KEY` from `backend/.env` — it searches the index for MCP clients, and without the key `content_search`
 refuses with the reason while every other MCP tool still answers. The two must agree on
 `QDRANT_URL`, `QDRANT_COLLECTION` and `ORBIK_EMBEDDING_MODEL` or the API would search an index
 nothing wrote.

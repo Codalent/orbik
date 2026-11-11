@@ -52,7 +52,7 @@ export function createAgents({ config, database, logger, extensions = activeExte
       // The one model question the Library's plain-code stages ask: which folders to propose.
       // Through the same router and call log as every other call, so it is recorded in `ai_calls`.
       writeStructured: createStructuredWriter({
-        modelRouter: createModelRouter({ providers: createProviders({ config, callLog }) }),
+        modelRouter: createModelRouter({ providers: createProviders({ config, callLog }), routes: config.routes }),
         logger,
       }),
       logger,

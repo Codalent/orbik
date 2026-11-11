@@ -9,11 +9,9 @@ import { createOpenAiProvider } from "./openai.js";
  * has one answer. A provider is here when its credential is configured, and only then: a worker
  * with none still starts, and says what it cannot do on the first call rather than at start-up.
  *
- * Being here does not mean being used. The route table in `../modelRouter.js` decides which
- * provider serves each kind of work, and it sends all of it to Anthropic, paid for with
- * `ORBIK_ANTHROPIC_API_KEY`. The OpenAI adapter is still registered whenever
- * `ORBIK_OPENAI_API_KEY` is set — which it is, for the embeddings — and is reachable again by
- * pointing the router back at `OPENAI_ROUTES`; nothing points at it today.
+ * Being here does not mean being used. The route table in `../modelRouter.js` that
+ * `ORBIK_AI_PROVIDER` chose decides which provider serves each kind of work: all of it goes to
+ * Anthropic or all of it to OpenAI. Both adapters are registered whenever their keys are set.
  *
  * @param {object} options
  * @param {object} options.config validated agent environment
