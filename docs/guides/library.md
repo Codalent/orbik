@@ -35,9 +35,11 @@ knowledge base**.
 
 ## Choosing the top-level folders
 
-The top level of the Library is yours. After the first crawl, Orbik reads the site map and the
-most linked-to pages and proposes two or three ways to organise it, each with a line on why it
-fits, beside its default:
+The top level of the Library is yours. After the first crawl, once the **Knowledge base agent** is
+set to work (the switch at the foot of the explorer), Orbik reads the site map and the most
+linked-to pages and proposes two or three ways to organise it, each with a line on why it fits,
+beside its default. While the agent is paused nothing is proposed, since a proposal is a model
+call; the default is there either way:
 
 ```
 00 Start Here   overview · index · open-questions
@@ -114,9 +116,9 @@ Writing needs a reasoning key: `ORBIK_ANTHROPIC_API_KEY`, or `ORBIK_OPENAI_API_K
 (`ORBIK_AI_PROVIDER` picks one when both are set; see
 [Configuration](../self-hosting/configuration.md)). Without one the copies and the search index are
 still made. Every model call is listed under
-**Settings** → **AI calls**. On a development site of about seventy pages, a first build or a
-rebuild came to between $0.25 and $0.50, an ordinary update about $0.20, and a structure proposal
-about $0.10.
+**Settings** → **AI calls**. On a site of about seventy pages, with Claude making the reasoning
+calls, a first build came to about $0.90 and a structure proposal about $0.10; an ordinary
+update, which reads only the pages that changed, costs a fraction of a first build.
 
 ## Finding things
 

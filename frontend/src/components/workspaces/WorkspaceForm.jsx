@@ -68,7 +68,7 @@ export function WorkspaceForm({ onCreated, canCancel = false, onCancel }) {
         </div>
       }
       title="Create a workspace"
-      description={step === 1 ? "Name the space where this site's SEO work will live." : "Which site should this workspace work on?"}
+      description={step === 1 ? "Name the space where everything Orbik knows about this site will live." : "Which site should this workspace work on?"}
     >
       <form onSubmit={step === 1 ? continueToUrl : handleSubmit(complete)} noValidate className="space-y-6">
         {errors.root && <AuthError>{errors.root.message}</AuthError>}
