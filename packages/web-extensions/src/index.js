@@ -3,7 +3,8 @@
  * exactly as it would without them.
  *
  * A deployment that adds to the web app — billing pages, an upgrade prompt — publishes a package
- * under this same name with the same four exports, and points the web app's dependency at it (in
+ * under this same name with these exports, any of which it may leave out, and points the web app's
+ * dependency at it (in
  * a pnpm workspace that includes this repository, by leaving this package out of the workspace and
  * putting its own in). Next bundles whichever package the name resolves to, so no file of the web
  * app changes.
@@ -52,3 +53,35 @@ export const settingsSections = [];
  *   Component: import("react").ComponentType<{workspaceId: string, api: object}>}>}
  */
 export const banners = [];
+
+/**
+ * Agents a deployment's server extension added (`host.addAgentDefinitions`), given a place in the
+ * web app: a row in the Agents overview and the workspace's agent lists, with this name and icon,
+ * linking to `/workspaces/:id/agents/<slug>`. With a `Component`, that page is the extension's;
+ * without one it is the generic agent page. A slug core already has a page for keeps core's.
+ *
+ * @type {Record<string, {name: string, icon?: import("react").ComponentType<{className?: string}>,
+ *   feature?: string, Component?: import("react").ComponentType<{workspaceId: string,
+ *   agentSlug: string, api: object}>}>}
+ */
+export const agentPages = {};
+
+/**
+ * Pages about the signed-in account rather than one workspace — a plan, invoices — at
+ * `/account/<path>`, for anyone signed in, including a person with no workspace yet. The component
+ * draws the page, heading included, inside the frame the Admin page uses.
+ *
+ * @type {Record<string, {feature?: string,
+ *   Component: import("react").ComponentType<{path: string[], api: object}>}>}
+ */
+export const accountPages = {};
+
+/**
+ * Items added to the account menu (the avatar at the top right), after Admin and before Source
+ * code. `href` is a path in the web app (`/account/billing`) or an `https://` address, which opens
+ * in a new tab.
+ *
+ * @type {Array<{id: string, label: string, href: string, feature?: string,
+ *   icon?: import("react").ComponentType<{className?: string}>}>}
+ */
+export const userMenuItems = [];

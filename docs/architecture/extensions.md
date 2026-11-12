@@ -11,7 +11,7 @@ There are two halves, one for the server processes and one for the web app:
 | | Where | What it can do |
 |---|---|---|
 | Server extensions | `ORBIK_EXTENSIONS`, loaded by the API, the worker, the scheduler and `grant:crawl-budget` | plan limits, events, the edition and its features, API routes, scheduler loops, worker agents, the email sender, signup checks |
-| Web extensions | the `@orbik/web-extensions` package the web app imports | rail items, pages, settings sections, banners |
+| Web extensions | the `@orbik/web-extensions` package the web app imports | rail items, pages, settings sections, banners, agents' pages, account pages, account menu items |
 
 The rule that keeps the two repositories honest: **core starts and serves every page with no
 extension loaded**, and core never imports an extension. ESLint enforces the second
@@ -109,9 +109,9 @@ extension never fails the action it is told about.
 
 ## Web extensions
 
-The web app imports `@orbik/web-extensions` and renders four exports from it. In this repository
-the package (`packages/web-extensions`) exports four empty lists, and the app renders exactly as it
-would without them.
+The web app imports `@orbik/web-extensions` and renders its exports. In this repository the package
+(`packages/web-extensions`) exports them all empty, and the app renders exactly as it would without
+them. A deployment's package may leave any of them out.
 
 | Export | Rendered |
 |---|---|
@@ -119,8 +119,11 @@ would without them.
 | `pages: { [path]: { title, Component, feature? } }` | at `/workspaces/:id/<path>` by the app's one catch-all route; a core page at the same address always wins |
 | `settingsSections: [{ id, title, description?, Component, feature? }]` | at the end of a workspace's Settings navigation, each its own page at `/workspaces/:id/settings/extensions/<id>` |
 | `banners: [{ id, Component, feature? }]` | above every page of a workspace |
+| `agentPages: { [slug]: { name, icon?, Component?, feature? } }` | an agent a server extension added to the catalog, in the Agents overview and the workspace's agent lists, linking to `/workspaces/:id/agents/<slug>`; with a `Component` that page is the extension's (it gets `agentSlug` too), without one the generic agent page. A slug core has a page for keeps core's |
+| `accountPages: { [path]: { Component, feature? } }` | at `/account/<path>`, about the signed-in account rather than a workspace, for anyone signed in (a person with no workspace yet included), in the Admin page's frame; the component draws the page, heading included, and gets `path` and `api` |
+| `userMenuItems: [{ id, label, href, icon?, feature? }]` | in the account menu, after Admin and before Source code; `href` is a path in the app (`/account/billing`) or an `https://` address, opened in a new tab |
 
-Components are client components and receive `workspaceId` and `api` — the app's own client
+Components are client components and receive `workspaceId` (on a workspace's pages) and `api` — the app's own client
 (`api.fetch(path, init)`), so requests carry the session, the CSRF token and the error envelope as
 a core page's do. An entry naming a `feature` is shown only when `GET /v1/edition` lists it.
 
@@ -168,5 +171,7 @@ any process; upgrading core is a submodule bump.
 There are no automated tests in this repository. To see an extension work, write a throwaway one
 outside the repository and name it by its absolute path in `ORBIK_EXTENSIONS` for a scratch API,
 worker and scheduler. To see web slots, point `frontend/node_modules/@orbik/web-extensions` at a
-throwaway package for a dev server, and put the link back afterwards. Both were done for idea 030
+throwaway package for a dev server, and put the link back afterwards. Keep the package inside this
+repository, in a git-ignored place such as `frontend/node_modules/.throwaway/`: the dev server
+compiles nothing outside it, and from there `react` and `lucide-react` resolve as the app's do. Both were done for idea 030
 (`.devbar/open/030-open-source-core-and-cloud-layer.md`).
