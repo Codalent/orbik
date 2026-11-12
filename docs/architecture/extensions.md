@@ -10,7 +10,7 @@ There are two halves, one for the server processes and one for the web app:
 
 | | Where | What it can do |
 |---|---|---|
-| Server extensions | `ORBIK_EXTENSIONS`, loaded by the API, the worker, the scheduler and `grant:crawl-budget` | plan limits, events, the edition and its features, API routes, scheduler loops, worker agents, the email sender, signup checks |
+| Server extensions | `ORBIK_EXTENSIONS`, loaded by the API, the worker, the scheduler and `grant:crawl-budget` | plan limits, events, the edition and its features, API routes, scheduler loops, worker agents, agents in the catalog with their tools and runtimes, the email sender, signup checks |
 | Web extensions | the `@orbik/web-extensions` package the web app imports | rail items, pages, settings sections, banners, agents' pages, account pages, account menu items |
 
 The rule that keeps the two repositories honest: **core starts and serves every page with no
@@ -110,7 +110,77 @@ extension never fails the action it is told about.
 
 - `host.addLoop({ start, stop })` — started and stopped with the scheduler's own loops.
 - `host.addAgent({ name, version, handlers })` — validated as a core agent is; its job types are
-  queued and claimed like any other. A name already taken is refused.
+  queued and claimed like any other. A name already taken is refused. This is a queue agent, a set
+  of job handlers; an agent a person sees in the catalog, runs and schedules is the next section's.
+
+### Agents
+
+An extension can add agents to the catalog: listed by `GET /v1/agents`, started from the API,
+put to work on a schedule, executed by the worker, refused outside a plan's `agents` exactly as a
+core agent is, and recorded in `agent_runs`, `agent_run_events` and `ai_calls` like one.
+
+- `host.addAgentDefinitions(...definitions)` — every process. A definition has the shape
+  `parseAgentDefinition` in `@orbik/protocol` accepts, the shape of core's own in
+  `packages/agent-definitions/src/`.
+- `host.addTools(...tools)` — every process (definitions are checked against them wherever the
+  catalog is read; only the worker calls them). A tool is `{ name, description, inputSchema,
+  parseInput(input, errors), handler(input, context) }`: `name` is namespaced (`acme.listIssues`),
+  `parseInput` pushes a message onto `errors` for anything it refuses and returns the parsed input,
+  and `handler` gets `{ database, retrieval, scope, signal, readingBudget }`, where `scope` is the
+  run's own (`workspaceId`, `siteId`, `agentSlug`, `runId`) and never something the model wrote.
+  Throw `ToolError` from `@orbik/tools` to refuse with a code. An extension's tools are given only
+  to the definitions that name them, and are not served over MCP.
+- `host.addRuntime(requirement, build)` — worker only. A **plain-code runtime**: code that
+  executes a definition itself, chosen for any definition whose `runtimeRequirements` names
+  `requirement`; a definition that names no plain-code runtime is executed by the model, with its
+  tools. `build(collaborators)` is called once when the worker starts, with what core's own
+  plain-code runtimes get: `config`, `database`, `logger`, `retrieval` (the index, or null with
+  `retrievalReason` saying why), `writeText` and `writeStructured` (a short text, or one object of
+  a fixed shape, from the model; recorded in `ai_calls` with the run they belong to, and never
+  throwing: they answer `{ skipped, reason }` or `{ failed, reason }` instead) and `AgentError`.
+  It returns `{ run(request) }`.
+
+`run({ definition, input, tools, signal, isCancelled, trace })` is an async generator. It yields
+the run's events (`AGENT_EVENT_TYPES` in `@orbik/protocol`: `started`, `progress` with a `message`,
+`tool-started` and `tool-completed` with a `tool`, `completed` with the `result`) and returns
+`{ result, usage }`. `tools` is the run's registry (`tools.invoke(name, input, signal)`), holding
+the tools the definition names. Pass `trace`, with `agentSlug` and `agentVersion` added, to
+`writeText` and `writeStructured`, so the call log names the run. To fail the run with a code and a
+message a person can act on, throw `new AgentError({ code, message, retryable: false })`; anything
+else is recorded as `UNEXPECTED_ERROR`.
+
+The API, the worker and the scheduler add these to their catalog right after loading extensions
+(`extendAgentCatalog` in `@orbik/agent-definitions`), each definition checked as a core one is. A
+malformed definition, a slug or tool name core already has, a tool no one provides, or a runtime
+requirement core already runs stops the process, as a failed extension does. In the web app such
+an agent has the generic agent page at `/workspaces/:id/agents/<slug>` (its summary, a Run button
+and its runs). An `agentPages` entry in the web extension lists it in the Agents overview and may
+give it a page of its own ([Web extensions](#web-extensions)). Remove an agent a schedule names and the scheduler disables that schedule
+(`AGENT_NOT_AVAILABLE`) rather than fail it every week.
+
+```js
+host.addAgentDefinitions({
+  slug: "acme-page-count", version: 1, name: "Page count", summary: "Counts the crawled pages.",
+  instructions: "Plain code.", tools: ["acme.pageCount"], capability: "fast",
+  inputSchema: { type: "object" }, outputSchema: { type: "object" },
+  runtimeRequirements: ["acme-page-count", "crawl-dataset"],
+});
+host.addTools(pageCountTool);
+if (host.process === "worker") {
+  host.addRuntime("acme-page-count", ({ writeText, AgentError }) => ({
+    async *run({ definition, tools, signal, trace }) {
+      yield { type: "started" };
+      const { pages } = await tools.invoke("acme.pageCount", {}, signal);
+      if (!pages) throw new AgentError({ code: "NOT_CRAWLED", message: "Crawl the site first.", retryable: false });
+      const summary = await writeText({ system: "…", prompt: `Pages: ${pages}`, signal,
+        trace: { ...trace, agentSlug: definition.slug, agentVersion: definition.version } });
+      const result = { pages, summary: summary.text ?? null };
+      yield { type: "completed", result };
+      return { result, usage: null };
+    },
+  }));
+}
+```
 
 ## Web extensions
 
@@ -124,7 +194,7 @@ them. A deployment's package may leave any of them out.
 | `pages: { [path]: { title, Component, feature? } }` | at `/workspaces/:id/<path>` by the app's one catch-all route; a core page at the same address always wins |
 | `settingsSections: [{ id, title, description?, Component, feature? }]` | at the end of a workspace's Settings navigation, each its own page at `/workspaces/:id/settings/extensions/<id>` |
 | `banners: [{ id, Component, feature? }]` | above every page of a workspace |
-| `agentPages: { [slug]: { name, icon?, Component?, feature? } }` | an agent a server extension added to the catalog, in the Agents overview and the workspace's agent lists, linking to `/workspaces/:id/agents/<slug>`; with a `Component` that page is the extension's (it gets `agentSlug` too), without one the generic agent page. A slug core has a page for keeps core's |
+| `agentPages: { [slug]: { name, icon?, Component?, feature? } }` | an agent a server extension added to the catalog ([Agents](#agents)), in the Agents overview and the workspace's agent lists, linking to `/workspaces/:id/agents/<slug>`; with a `Component` that page is the extension's (it gets `agentSlug` too), without one the generic agent page. A slug core has a page for keeps core's |
 | `accountPages: { [path]: { Component, feature? } }` | at `/account/<path>`, about the signed-in account rather than a workspace, for anyone signed in (a person with no workspace yet included), in the Admin page's frame; the component draws the page, heading included, and gets `path` and `api` |
 | `signupFields: [{ id, Component, feature? }]` | in the signup form, above its button. The component gets `onChange(value)`, to set the field's text (or `null` to drop it), and `attempt`, which counts the times the form was sent, so a one-use token such as a captcha's can be renewed after a refusal. The values travel with the signup as `extensions` and reach the API's `checkSignup` as `fields` (`id`: lowercase letters, digits and dashes; at most 10 fields of 4096 characters) |
 | `userMenuItems: [{ id, label, href, icon?, feature? }]` | in the account menu, after Admin and before Source code; `href` is a path in the app (`/account/billing`) or an `https://` address, opened in a new tab |

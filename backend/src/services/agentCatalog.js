@@ -1,4 +1,4 @@
-import { AGENT_DEFINITIONS, findAgentDefinition } from "@orbik/agent-definitions";
+import { agentDefinitions, findAgentDefinition } from "@orbik/agent-definitions";
 
 /**
  * Converts an agent definition to the summary the catalog exposes.
@@ -27,20 +27,17 @@ export function toAgentSummary(definition) {
  */
 const UNLISTED = new Set(["library-chat-read", "brand-chat", "brand-chat-read"]);
 
-/** Every listed agent in name order, which is the order the catalog is shown in. */
-const BY_NAME = Object.freeze(
-  AGENT_DEFINITIONS.filter((definition) => !UNLISTED.has(definition.slug))
-    .sort((a, b) => a.name.localeCompare(b.name)),
-);
-
 /**
- * Lists every agent a user can run.
+ * Lists every agent a user can run, in name order, which is the order the catalog is shown in.
  *
- * The catalog is the definitions that ship with this release (`@orbik/agent-definitions`), read
- * from code: nothing about an agent is stored, so there is nothing here to query.
+ * The catalog is the definitions that ship with this release (`@orbik/agent-definitions`) and any
+ * the API's extensions added, read from code: nothing about an agent is stored, so there is
+ * nothing here to query. Read on each call, because extensions add theirs after this module loads.
  */
 export function listAgentDefinitions() {
-  return BY_NAME;
+  return agentDefinitions()
+    .filter((definition) => !UNLISTED.has(definition.slug))
+    .sort((a, b) => a.name.localeCompare(b.name));
 }
 
 /** Finds one agent by its slug, or null when there is none. */
