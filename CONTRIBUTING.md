@@ -62,7 +62,10 @@ Comments and documentation say what something is for and why it is that way, in 
 The documentation is `docs/`, published at <https://orbik.io/docs>: a change to what a page
 describes changes that page in the same pull request, and `pnpm lint` checks every link
 (AGENTS.md § "Documentation" has the conventions).
-Agent definitions are code (`packages/agent-definitions/src/`) and change like any other file.
+Agent definitions are code (`packages/agent-definitions/src/`) and change like any other file. A
+deployment's own agents come from its extensions
+([docs/architecture/extensions.md § "Agents"](docs/architecture/extensions.md#agents)), never from
+this repository.
 [AGENTS.md](AGENTS.md) is the longer guide to the codebase, written for people and coding agents
 alike.
 
