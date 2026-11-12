@@ -141,6 +141,13 @@ packages:
 
 Next compiles the package with the app (`transpilePackages` names it), so it may be JSX.
 
+In such a workspace the dependencies are installed at its root, above this repository, so set
+`NEXT_WORKSPACE_ROOT` to that root (an absolute path, or one relative to `frontend/`) for every
+`next` command the web app runs there. It becomes the app's `outputFileTracingRoot`, which is the
+root Turbopack resolves modules from and the most it compiles: left at this repository, `next dev`
+cannot find `next` itself, nor a deployment's package beside `orbik/`. Unset, it is this
+repository, as before.
+
 ## A private repository around this one
 
 The shape Orbik's own cloud uses, and the one this seam was built for:
