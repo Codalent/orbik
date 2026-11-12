@@ -97,14 +97,21 @@ export function createApp({ config, database, readiness, extensions = createExte
   const workspaceRepository = createWorkspaceRepository(collections.workspaces, collections.workspaceMembers);
   // The install's own admins (ORBIK_ADMIN_EMAILS, or its first account): the Admin page's people.
   const admins = createInstallAdmins({ users: collections.users, adminEmails: config.adminEmails ?? [] });
+  const sendEmail = createEmailSender({ config, extensionSender: extensions.emailSender });
+  // Signup that waits for the address to be confirmed can only work if the link can be sent.
+  if (config.signup === "open" && config.signupVerifyEmail && !sendEmail) {
+    throw new Error("ORBIK_SIGNUP_VERIFY_EMAIL needs email: set SMTP_URL and EMAIL_FROM, or load an extension that sends email.");
+  }
   const authService = createAuthService({
     userRepository,
     workspaceRepository,
     signup: { open: config.signup === "open", check: (attempt) => extensions.checkSignup(attempt), events: extensions },
     admins,
+    verification: config.signup === "open" && config.signupVerifyEmail
+      ? { collection: collections.signupVerifications, sendEmail, origin: config.frontendOrigins[0], logger: log }
+      : null,
   });
   const setupService = createSetupService({ database, userRepository, events: extensions });
-  const sendEmail = createEmailSender({ config, extensionSender: extensions.emailSender });
   // Getting in when signup is closed (an access request an admin approves), and back in without
   // the password (a reset link).
   const accessRequestService = createAccessRequestService({ database, userRepository, admins, config, sendEmail, events: extensions, logger: log });

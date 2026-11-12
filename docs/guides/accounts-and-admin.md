@@ -35,7 +35,10 @@ email address and puts it on the Admin page for an admin to approve. The form an
 whoever asks, so it never tells anyone whether an address already has an account.
 
 **By signing up.** With `ORBIK_SIGNUP=open`, anyone who can reach the sign-in page can create an
-account there. Leave it `closed` unless the install is only reachable by people you trust.
+account there. Leave it `closed` unless the install is only reachable by people you trust. With
+`ORBIK_SIGNUP_VERIFY_EMAIL=true` as well, signing up sends a link to the address instead, and the
+account is made when that link is opened and confirmed, so every account's address is known to
+reach its owner. That needs email to be set up (`SMTP_URL`).
 
 Settings like these are listed in [Configuration](../self-hosting/configuration.md).
 

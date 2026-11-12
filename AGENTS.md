@@ -168,7 +168,11 @@ only an extension sets (below); core has no limit.
 An invite link from the settings page is the way to add a person. The first account of an install
 is made on the setup page (`/setup`), with the one-time code the API prints to its log while no
 account exists, or by `seed:user`; `ORBIK_SIGNUP=open` in `backend/.env` lets anyone sign up
-(`/signup`).
+(`/signup`). With `ORBIK_SIGNUP_VERIFY_EMAIL=true` too, signup makes no account: it keeps the
+address and the password's hash in `signup_verifications` (one row per address, a day) and emails a
+`/verify-email/<token>` link; confirming it (`POST /v1/auth/signup-verifications/:token/confirm`)
+makes the account, signs the browser in and only then tells extensions `account.created`. It needs
+email (SMTP or an extension's sender), or the API refuses to start.
 
 While signup is closed, `/signup` is a **Request access** form: the address goes to
 `access_requests` (one row per address; `POST /v1/access-requests`, the same 202 whoever asks) and

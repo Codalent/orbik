@@ -85,3 +85,15 @@ export const accountPages = {};
  *   icon?: import("react").ComponentType<{className?: string}>}>}
  */
 export const userMenuItems = [];
+
+/**
+ * Fields added to the signup form, above its button — a captcha, a consent to terms. Each is a
+ * component that sets its field's text with `onChange(value)` (`null` drops it); `attempt` counts
+ * the times the form was sent, so a one-use token can be renewed after a refusal. The values are
+ * sent with the signup as `extensions`, by `id`, and reach the server extension's `checkSignup` as
+ * `fields`, where it accepts or refuses them.
+ *
+ * @type {Array<{id: string, feature?: string,
+ *   Component: import("react").ComponentType<{onChange: (value: string|null) => void, attempt: number}>}>}
+ */
+export const signupFields = [];
