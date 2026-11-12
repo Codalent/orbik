@@ -51,6 +51,9 @@ export function createExtensionHost({ processName = null, logger = defaultLog, n
   const routes = [];
   const loops = [];
   const agents = [];
+  const agentDefinitions = [];
+  const tools = [];
+  const runtimes = new Map();
   const limitsCache = new Map();
 
   /** One extension's view: the same registry, with its name attached to what it registers. */
@@ -163,6 +166,60 @@ export function createExtensionHost({ processName = null, logger = defaultLog, n
         only("worker", "addAgent");
         agents.push({ extension: extensionName, agent });
       },
+
+      /**
+       * Adds agents to the catalog, in every process: the API lists them and starts their runs,
+       * the scheduler runs their schedules, the worker executes them. Each is a definition in the
+       * shape `@orbik/protocol` validates (`parseAgentDefinition`), checked as a core one is when
+       * the process assembles its catalog after every extension has registered; a slug that is
+       * already taken, or a tool no one provides, stops the process.
+       *
+       * A definition is executed by a model unless one of its `runtimeRequirements` names a
+       * plain-code runtime, which an extension adds with {@link addRuntime}.
+       */
+      addAgentDefinitions(...definitions) {
+        for (const definition of definitions.flat()) {
+          if (!definition || typeof definition !== "object" || Array.isArray(definition)) {
+            throw new TypeError("addAgentDefinitions takes agent definitions (objects).");
+          }
+          agentDefinitions.push({ extension: extensionName, definition });
+        }
+      },
+
+      /**
+       * Adds tools an agent definition may be granted, in every process (definitions are checked
+       * against them wherever the catalog is read; only the worker calls them). A tool is
+       * `{ name, description, inputSchema, parseInput(input, errors), handler(input, context) }`,
+       * checked when the process assembles its catalog. They are not served over MCP.
+       */
+      addTools(...added) {
+        for (const tool of added.flat()) {
+          if (!tool || typeof tool !== "object" || typeof tool.name !== "string") {
+            throw new TypeError("addTools takes tools: objects with a name, description, inputSchema, parseInput and handler.");
+          }
+          tools.push({ extension: extensionName, tool });
+        }
+      },
+
+      /**
+       * Adds a plain-code runtime to the worker: code that executes a definition itself, chosen
+       * for any definition whose `runtimeRequirements` names `requirement`. `build(collaborators)`
+       * is called once when the worker starts, with what core's own plain-code runtimes are given,
+       * and returns `{ run(request) }`; see docs/architecture/extensions.md § "Agents".
+       *
+       * @param {string} requirement lowercase words joined by hyphens, not one core already runs
+       * @param {(collaborators: object) => {run: Function}} build
+       */
+      addRuntime(requirement, build) {
+        only("worker", "addRuntime");
+        if (typeof requirement !== "string" || !/^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/.test(requirement) || requirement.length > 64) {
+          throw new TypeError("A runtime requirement is lowercase words joined by hyphens, at most 64 characters.");
+        }
+        if (typeof build !== "function") throw new TypeError("addRuntime takes a requirement and a function that builds the runtime.");
+        const taken = runtimes.get(requirement);
+        if (taken) throw new Error(`The ${requirement} runtime is already provided by the ${taken.extension} extension; only one may.`);
+        runtimes.set(requirement, { extension: extensionName, build });
+      },
     });
   }
 
@@ -219,6 +276,12 @@ export function createExtensionHost({ processName = null, logger = defaultLog, n
     get routes() { return routes.map((entry) => entry.factory); },
     get loops() { return loops.map((entry) => entry.loop); },
     get agents() { return agents.map((entry) => entry.agent); },
+    /** Agent definitions extensions added, for the process to put in its catalog. */
+    get agentDefinitions() { return agentDefinitions.map((entry) => entry.definition); },
+    /** Tools extensions added, for the catalog and the worker's tool registry. */
+    get tools() { return tools.map((entry) => entry.tool); },
+    /** Plain-code runtimes extensions added, by requirement: `{ [requirement]: build }`. */
+    get runtimes() { return Object.fromEntries([...runtimes].map(([requirement, entry]) => [requirement, entry.build])); },
 
     /** Runs one extension's `register` against this host. Used by the loader. */
     async register(extension, { database = null, config = null } = {}) {

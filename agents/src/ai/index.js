@@ -1,6 +1,7 @@
 import { RUNTIME_REQUIREMENTS } from "@orbik/protocol";
 
 import { AI_AGENT, AI_JOBS } from "../jobs.js";
+import { AgentError } from "../runtime/errors.js";
 import { defineAgent } from "../runtime/registry.js";
 import { createDesignSystemRuntime } from "./designSystem/runtime.js";
 import { createModelRuntime } from "./model/modelRuntime.js";
@@ -33,14 +34,16 @@ import { createExecuteRunHandler } from "./executeRun.js";
  *   without one still runs every agent, and the search tool refuses with a reason
  * @param {{code: string, message: string}|null} [options.retrievalReason] why there is no index,
  *   for a plain-code runtime that cannot work without it and has to say why
+ * @param {Record<string, Function>} [options.extensionRuntimes] plain-code runtimes the worker's
+ *   extensions added (`host.addRuntime`), by requirement, built beside core's
  */
-export function createAiAgent({ config, database, logger, runtimes, callLog = null, retrieval = null, retrievalReason = null }) {
+export function createAiAgent({ config, database, logger, runtimes, callLog = null, retrieval = null, retrievalReason = null, extensionRuntimes = {} }) {
   return defineAgent({
     name: AI_AGENT,
     version: 1,
     handlers: {
       [AI_JOBS.execute]: createExecuteRunHandler({
-        runtimes: runtimes ?? buildRuntimes({ config, database, logger, callLog, retrieval, retrievalReason }),
+        runtimes: runtimes ?? buildRuntimes({ config, database, logger, callLog, retrieval, retrievalReason, extensionRuntimes }),
         retrieval,
       }),
     },
@@ -65,7 +68,11 @@ export function createAiAgent({ config, database, logger, runtimes, callLog = nu
  * saying why), and the two ways plain code asks a model for something —
  * `writeText` for a short piece of prose (`./model/shortText.js`) and `writeStructured` for one
  * object in a fixed shape, optionally from pictures (`./model/structured.js`). Both say why there
- * is no answer rather than failing.
+ * is no answer rather than failing. `AgentError` is handed over too, for an extension's runtime,
+ * which cannot import it, to fail a run with a code and a message a person can act on.
+ *
+ * A deployment's extensions add entries beside these (`host.addRuntime`), built with the same
+ * collaborators; one cannot take a requirement this table already has.
  */
 const PLAIN_CODE_RUNTIMES = Object.freeze({
   // Chrome and a handful of pages, sampled into a design system. See `./designSystem/runtime.js`.
@@ -79,7 +86,12 @@ const PLAIN_CODE_RUNTIMES = Object.freeze({
  * `model` reasons through whichever provider the route table names, with Orbik's own key. Beside
  * it sit the plain-code runtimes, each chosen by the requirement a definition names.
  */
-function buildRuntimes({ config, database, logger, callLog, retrieval, retrievalReason }) {
+function buildRuntimes({ config, database, logger, callLog, retrieval, retrievalReason, extensionRuntimes = {} }) {
+  for (const requirement of Object.keys(extensionRuntimes)) {
+    if (Object.hasOwn(PLAIN_CODE_RUNTIMES, requirement)) {
+      throw new Error(`An extension adds a ${requirement} runtime, which this worker already has.`);
+    }
+  }
   const modelRouter = createModelRouter({ providers: createProviders({ config, callLog }), routes: config.routes });
   const collaborators = {
     config,
@@ -89,12 +101,17 @@ function buildRuntimes({ config, database, logger, callLog, retrieval, retrieval
     retrievalReason,
     writeText: createShortTextWriter({ modelRouter, logger }),
     writeStructured: createStructuredWriter({ modelRouter, logger }),
+    AgentError,
   };
 
   return {
     model: createModelRuntime({ modelRouter, logger }),
     plain: Object.fromEntries(
-      Object.entries(PLAIN_CODE_RUNTIMES).map(([requirement, build]) => [requirement, build(collaborators)]),
+      Object.entries({ ...PLAIN_CODE_RUNTIMES, ...extensionRuntimes }).map(([requirement, build]) => {
+        const runtime = build(collaborators);
+        if (typeof runtime?.run !== "function") throw new Error(`The ${requirement} runtime has no run().`);
+        return [requirement, runtime];
+      }),
     ),
   };
 }

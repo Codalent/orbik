@@ -7,7 +7,7 @@ import { ObjectId } from "mongodb";
 
 import { AgentError, classifyFailure } from "../runtime/errors.js";
 import { createRunEventLog } from "../runtime/runEventLog.js";
-import { TOOLS, createToolRegistry } from "@orbik/tools";
+import { allTools, createToolRegistry } from "@orbik/tools";
 
 /**
  * Creates the single job handler that executes any agent definition.
@@ -81,7 +81,8 @@ export function createExecuteRunHandler({ runtimes, retrieval = null }) {
       ? await personActor(database, run)
       : null;
     const tools = createToolRegistry({
-      tools: TOOLS,
+      // Core's tools and any the worker's extensions added; a definition gets only the ones it names.
+      tools: allTools(),
       allowed: definition.tools,
       // The scope is the run's, taken from the run document rather than from the job payload or
       // the agent's input. A tool therefore cannot be pointed at another workspace by anything the

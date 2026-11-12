@@ -1,6 +1,7 @@
 import "dotenv/config";
 
 import { closeMongo, connectMongo, log } from "@orbik/core";
+import { extendAgentCatalog } from "@orbik/agent-definitions";
 import { loadExtensions } from "@orbik/extensions";
 import { runMigrations } from "@orbik/migrations";
 
@@ -37,6 +38,9 @@ const extensions = await loadExtensions({
   config,
   logger: log,
 });
+// The agents and tools extensions added join the catalog before anything reads it; a definition
+// that does not check out stops the process here, as a failed extension does.
+extendAgentCatalog({ definitions: extensions.agentDefinitions, tools: extensions.tools });
 
 const {
   crawlScheduler, agentScheduler, dispatcher, libraryScheduler, outboxScheduler,
