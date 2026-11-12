@@ -149,8 +149,8 @@ The API, the worker and the scheduler add these to their catalog right after loa
 malformed definition, a slug or tool name core already has, a tool no one provides, or a runtime
 requirement core already runs stops the process, as a failed extension does. In the web app such
 an agent has the generic agent page at `/workspaces/:id/agents/<slug>` (its summary, a Run button
-and its runs); the Agents overview lists only the agents the web app knows, so an extension links
-to it from its own slots. Remove an agent a schedule names and the scheduler disables that schedule
+and its runs). An `agentPages` entry in the web extension lists it in the Agents overview and may
+give it a page of its own ([Web extensions](#web-extensions)). Remove an agent a schedule names and the scheduler disables that schedule
 (`AGENT_NOT_AVAILABLE`) rather than fail it every week.
 
 ```js
@@ -189,7 +189,7 @@ them. A deployment's package may leave any of them out.
 | `pages: { [path]: { title, Component, feature? } }` | at `/workspaces/:id/<path>` by the app's one catch-all route; a core page at the same address always wins |
 | `settingsSections: [{ id, title, description?, Component, feature? }]` | at the end of a workspace's Settings navigation, each its own page at `/workspaces/:id/settings/extensions/<id>` |
 | `banners: [{ id, Component, feature? }]` | above every page of a workspace |
-| `agentPages: { [slug]: { name, icon?, Component?, feature? } }` | an agent a server extension added to the catalog, in the Agents overview and the workspace's agent lists, linking to `/workspaces/:id/agents/<slug>`; with a `Component` that page is the extension's (it gets `agentSlug` too), without one the generic agent page. A slug core has a page for keeps core's |
+| `agentPages: { [slug]: { name, icon?, Component?, feature? } }` | an agent a server extension added to the catalog ([Agents](#agents)), in the Agents overview and the workspace's agent lists, linking to `/workspaces/:id/agents/<slug>`; with a `Component` that page is the extension's (it gets `agentSlug` too), without one the generic agent page. A slug core has a page for keeps core's |
 | `accountPages: { [path]: { Component, feature? } }` | at `/account/<path>`, about the signed-in account rather than a workspace, for anyone signed in (a person with no workspace yet included), in the Admin page's frame; the component draws the page, heading included, and gets `path` and `api` |
 | `userMenuItems: [{ id, label, href, icon?, feature? }]` | in the account menu, after Admin and before Source code; `href` is a path in the app (`/account/billing`) or an `https://` address, opened in a new tab |
 
