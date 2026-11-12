@@ -2,9 +2,18 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import packageJson from "./package.json" with { type: "json" };
 
+const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  outputFileTracingRoot: path.resolve(path.dirname(fileURLToPath(import.meta.url)), ".."),
+  // The root of the workspace the app is installed in, which is also where Turbopack (`next dev`)
+  // resolves modules from and the most it compiles. It is this repository, unless the repository
+  // sits inside a larger pnpm workspace whose node_modules and packages are above it (a deployment
+  // that supplies its own @orbik/web-extensions, docs/architecture/extensions.md): that one sets
+  // NEXT_WORKSPACE_ROOT to its own root.
+  outputFileTracingRoot: process.env.NEXT_WORKSPACE_ROOT
+    ? path.resolve(process.env.NEXT_WORKSPACE_ROOT)
+    : repositoryRoot,
   // The Docker image runs the self-contained server `next build` writes with this, rather than
   // carrying the whole workspace's node_modules. Everywhere else the build is as before.
   ...(process.env.NEXT_OUTPUT === "standalone" ? { output: "standalone" } : {}),
