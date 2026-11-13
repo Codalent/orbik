@@ -150,8 +150,8 @@ malformed definition, a slug or tool name core already has, a tool no one provid
 requirement core already runs stops the process, as a failed extension does. In the web app such
 an agent has the generic agent page at `/workspaces/:id/agents/<slug>` (its summary, a Run button
 and its runs). An `agentPages` entry in the web extension lists it in the Agents overview and may
-give it a page of its own ([Web extensions](#web-extensions)). Remove an agent a schedule names and the scheduler disables that schedule
-(`AGENT_NOT_AVAILABLE`) rather than fail it every week.
+give it a page of its own ([Web extensions](#web-extensions)). Remove an agent a schedule names
+and the scheduler disables that schedule (`AGENT_NOT_AVAILABLE`) rather than fail it every week.
 
 ```js
 host.addAgentDefinitions({
