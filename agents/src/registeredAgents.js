@@ -45,7 +45,7 @@ export function createAgents({ config, database, logger, extensions = activeExte
 
   return [
     createCrawlerAgent({}),
-    createAiAgent({ config, database, logger, callLog, retrieval, retrievalReason: reason }),
+    createAiAgent({ config, database, logger, callLog, retrieval, retrievalReason: reason, extensionRuntimes: extensions.runtimes }),
     createLibraryAgent({
       retrieval,
       retrievalReason: reason,

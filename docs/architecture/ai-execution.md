@@ -41,7 +41,7 @@ dispatcher (`agents/src/ai/runDispatcher.js`) and executed by the one handler in
 | Package | Owns | Depends on Mongo? |
 |---|---|---|
 | `@orbik/protocol` | Run states, agent definitions, agent events, validation primitives — the contract the API and the agents worker share | **No** — it has no dependencies at all |
-| `@orbik/agent-definitions` | Every agent's definition: instructions, tool allow-list, schemas. The only copy; the API reads it for the catalog and the worker to execute a run | Not itself; it imports `@orbik/tools` to check each tool a definition names |
+| `@orbik/agent-definitions` | Every agent's definition: instructions, tool allow-list, schemas. The only copy; the API reads it for the catalog and the worker to execute a run. A deployment's extensions may add agents to it at startup (`extendAgentCatalog`; [extensions.md](extensions.md#agents)) | Not itself; it imports `@orbik/tools` to check each tool a definition names |
 | `@orbik/tools` | The deterministic tool registry, scoped to one workspace; and the MCP naming (`toolAlias`, `ORBIK_MCP_SERVER`) the API's MCP server uses | Yes |
 | `@orbik/retrieval` | The retrieval index and the embeddings module | Yes |
 | `agents/src/ai/` | The run handler, the model runtime, model router, provider adapter | Yes |
@@ -53,7 +53,9 @@ and input/output schemas. They live in `packages/agent-definitions/src/` and now
 database holds a copy, and nothing has to be published. Improving an agent's instructions is an
 edit to its definition; other code changes only when the *runtime or tools* change. The API and
 the worker each read the definitions in their own process, so both have to be running the release
-a change shipped in.
+a change shipped in. A deployment's extensions can add agents of their own, with their tools and
+plain-code runtimes; each process puts them in its catalog at startup and checks them as it checks
+these ([extensions.md § "Agents"](extensions.md#agents)).
 
 **A definition says what the executing process must have.** `runtimeRequirements` is part of the
 definition, and it is the only thing the worker reads to pick a runtime. A requirement can name a
@@ -61,7 +63,8 @@ definition, and it is the only thing the worker reads to pick a runtime. A requi
 deciding what happens. The Design system agent requires `design-system`, so the worker executes it
 with the code that renders the site in Chrome and samples what was rendered; it is the one such
 runtime today. The table of those runtimes is `PLAIN_CODE_RUNTIMES` in `agents/src/ai/index.js`,
-keyed by the requirement, and adding a plain-code agent is one entry in it; the run handler
+keyed by the requirement, and adding a plain-code agent is one entry in it (an extension adds one
+with `host.addRuntime`, beside the table rather than in it); the run handler
 (`chooseRuntime` in `agents/src/ai/executeRun.js`) has no agent's name in it. Every definition that
 names none of them goes to the model runtime (`agents/src/ai/model/modelRuntime.js`), which asks
 the model router for a route and calls the provider adapter

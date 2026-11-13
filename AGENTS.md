@@ -251,7 +251,9 @@ unset. Building the images is a production build: do it only when asked, and run
 loopback ports with its own volumes, never against your development database or Qdrant.
 
 Agent definitions are code and nothing else: `packages/agent-definitions/src/` is the only copy,
-read by the API for its catalog and by the worker to execute a run. There is nothing to publish
+read by the API for its catalog and by the worker to execute a run. A deployment's extensions may
+add agents, with their tools and plain-code runtimes, which every process checks and adds to its
+catalog at startup (docs/architecture/extensions.md § "Agents"); nothing in this repository adds one. There is nothing to publish
 and no `agent_definitions` collection; saving a definition restarts the processes that import it,
 and the next run follows it. A definition's `version` is a label recorded on runs and AI calls,
 not something that selects what runs.
