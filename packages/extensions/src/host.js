@@ -73,6 +73,15 @@ export function createExtensionHost({ processName = null, logger = defaultLog, n
       config,
       logger,
 
+      /**
+       * Forgets this process's cached limits after the extension changed a plan, so the next
+       * question asks its resolver again: `{ workspaceId }`, `{ ownerId }` (the account's answer and
+       * all of its workspaces'), or nothing for all. Other processes catch up within the TTL.
+       */
+      forgetLimits(target) {
+        forgetLimits(target);
+      },
+
       /** Answers what a workspace (or, for creating one, an account) may use; see `limits.js`. One extension per deployment. */
       setPlanLimits(resolve) {
         if (typeof resolve !== "function") throw new TypeError("setPlanLimits takes a function.");
@@ -252,6 +261,19 @@ export function createExtensionHost({ processName = null, logger = defaultLog, n
     return value;
   }
 
+  /** Drops cached limits: one workspace's, an account's and all of its workspaces', or all. */
+  function forgetLimits({ ownerId = null, workspaceId = null } = {}) {
+    if (ownerId === null && workspaceId === null) {
+      limitsCache.clear();
+      return;
+    }
+    if (workspaceId !== null) limitsCache.delete(cacheKey(null, workspaceId));
+    if (ownerId !== null) {
+      const owner = String(ownerId);
+      for (const [key, entry] of limitsCache) if (entry.ownerId === owner) limitsCache.delete(key);
+    }
+  }
+
   /** Tells every listener of an event, in registration order; never throws. */
   async function emit(event, payload) {
     for (const { extension, handler } of listeners.get(event) ?? []) {
@@ -279,17 +301,7 @@ export function createExtensionHost({ processName = null, logger = defaultLog, n
      * Forgets cached limits after a plan changes: one workspace's (`{ workspaceId }`), an
      * account's and every one of its workspaces' (`{ ownerId }`), or, with nothing named, all.
      */
-    forgetLimits({ ownerId = null, workspaceId = null } = {}) {
-      if (ownerId === null && workspaceId === null) {
-        limitsCache.clear();
-        return;
-      }
-      if (workspaceId !== null) limitsCache.delete(cacheKey(null, workspaceId));
-      if (ownerId !== null) {
-        const owner = String(ownerId);
-        for (const [key, entry] of limitsCache) if (entry.ownerId === owner) limitsCache.delete(key);
-      }
-    },
+    forgetLimits,
     emit,
     checkSignup,
     edition() {

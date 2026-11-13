@@ -73,10 +73,11 @@ leaving it out) means none:
 | `aiCalls` | `false` refuses every model and embedding call made for the workspace before anything is sent: `PLAN_LIMIT_REACHED` |
 | `reasoningCalls` | `false` refuses every call but embeddings (agent runs, chats, short texts) the same way, while crawled pages are still indexed and MCP search still answers: for an allowance of model usage that is spent. `aiCalls: false` wins over it |
 
-Answers are cached for 30 seconds in each process, per workspace and per account.
-`host.forgetLimits({ workspaceId })` drops one workspace's, `host.forgetLimits({ ownerId })` an
-account's and all of its workspaces', and `host.forgetLimits()` all of them, in the process that
-calls it. A malformed answer (a negative count, a list of numbers) throws rather than being read
+Answers are cached for 30 seconds in each process, per workspace and per account. An extension
+that changes a plan calls `host.forgetLimits({ workspaceId })` to drop one workspace's answer,
+`host.forgetLimits({ ownerId })` for an account's and all of its workspaces', or
+`host.forgetLimits()` for all of them, in the process that calls it; the others catch up within
+the 30 seconds. A malformed answer (a negative count, a list of numbers) throws rather than being read
 as unlimited.
 
 ### Events
