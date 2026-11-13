@@ -197,9 +197,9 @@ The agents need no step of their own: their definitions are code
 (`packages/agent-definitions`), read by the API and the worker when they start.
 
 There is no page allowance unless an extension sets one: every crawl month is unlimited, and the
-crawl page shows how many pages it fetched. Where a plan does set one,
+crawl page shows how many pages it fetched. Where a plan does set one, it is each workspace's, and
 `pnpm --dir backend run grant:crawl-budget -- --email you@example.com --pages 50000` adds pages to the
-current month only.
+current month only, of the one workspace that address owns (`--workspace <id>` names one).
 
 ## Qdrant (optional)
 

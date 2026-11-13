@@ -26,7 +26,7 @@ export const EVENTS = Object.freeze(["account.created", "workspace.created", "wo
 /** The edition a process is when no extension names another. */
 export const COMMUNITY_EDITION = "community";
 
-/** How long one account's resolved limits are reused before the resolver is asked again. */
+/** How long one resolved answer (a workspace's, or an account's) is reused before the resolver is asked again. */
 const LIMITS_TTL_MS = 30_000;
 
 /**
@@ -73,7 +73,7 @@ export function createExtensionHost({ processName = null, logger = defaultLog, n
       config,
       logger,
 
-      /** Answers what an account may use; see `limits.js`. One extension per deployment. */
+      /** Answers what a workspace (or, for creating one, an account) may use; see `limits.js`. One extension per deployment. */
       setPlanLimits(resolve) {
         if (typeof resolve !== "function") throw new TypeError("setPlanLimits takes a function.");
         once(planLimits, "Plan limits are");
@@ -226,16 +226,26 @@ export function createExtensionHost({ processName = null, logger = defaultLog, n
     });
   }
 
-  /** Reads one account's limits, asking the resolver at most once per account per TTL. */
-  async function limitsFor(ownerId) {
+  /**
+   * Reads the limits of one workspace, or of one account, asking the resolver at most once per
+   * TTL for each.
+   *
+   * A workspace's limits are asked with its owner and its id; a question that is the account's
+   * and no one workspace's (how many workspaces it may own) is asked with `workspaceId: null`.
+   * The resolver gets both either way, so a deployment whose plans are the account's can keep
+   * answering by `ownerId` alone.
+   *
+   * @param {{ownerId?: unknown, workspaceId?: unknown}} [subject]
+   */
+  async function limitsFor({ ownerId = null, workspaceId = null } = {}) {
     if (!planLimits || ownerId === null || ownerId === undefined) return UNLIMITED;
-    const key = String(ownerId);
+    const key = cacheKey(ownerId, workspaceId);
     const cached = limitsCache.get(key);
     if (cached && cached.expiresAt > now()) return cached.value;
     const value = Promise.resolve()
-      .then(() => planLimits.resolve({ ownerId }))
+      .then(() => planLimits.resolve({ ownerId, workspaceId: workspaceId ?? null }))
       .then(normalizeLimits);
-    limitsCache.set(key, { value, expiresAt: now() + LIMITS_TTL_MS });
+    limitsCache.set(key, { value, ownerId: String(ownerId), expiresAt: now() + LIMITS_TTL_MS });
     // A failed lookup is not kept: the next call asks again rather than repeating the failure for
     // the rest of the TTL.
     value.catch(() => limitsCache.delete(key));
@@ -265,10 +275,20 @@ export function createExtensionHost({ processName = null, logger = defaultLog, n
     limitsFor,
     /** Whether an extension answers plan limits; without one every account is unlimited. */
     get hasPlanLimits() { return Boolean(planLimits); },
-    /** Forgets cached limits — for an account, or all of them — after a plan changes. */
-    forgetLimits(ownerId) {
-      if (ownerId === undefined) limitsCache.clear();
-      else limitsCache.delete(String(ownerId));
+    /**
+     * Forgets cached limits after a plan changes: one workspace's (`{ workspaceId }`), an
+     * account's and every one of its workspaces' (`{ ownerId }`), or, with nothing named, all.
+     */
+    forgetLimits({ ownerId = null, workspaceId = null } = {}) {
+      if (ownerId === null && workspaceId === null) {
+        limitsCache.clear();
+        return;
+      }
+      if (workspaceId !== null) limitsCache.delete(cacheKey(null, workspaceId));
+      if (ownerId !== null) {
+        const owner = String(ownerId);
+        for (const [key, entry] of limitsCache) if (entry.ownerId === owner) limitsCache.delete(key);
+      }
     },
     emit,
     checkSignup,
@@ -296,4 +316,9 @@ export function createExtensionHost({ processName = null, logger = defaultLog, n
     },
   };
   return host;
+}
+
+/** One cache entry per workspace, and one per account for the questions no workspace is part of. */
+function cacheKey(ownerId, workspaceId) {
+  return workspaceId === null || workspaceId === undefined ? `account:${ownerId}` : `workspace:${workspaceId}`;
 }

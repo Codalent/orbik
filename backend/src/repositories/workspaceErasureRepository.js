@@ -13,8 +13,8 @@ import { HOME_PREFERENCES_COLLECTION } from "./homePreferenceRepository.js";
  * swept. A collection added for per-workspace data belongs on this list.
  *
  * Not here, on purpose:
- * - `crawl_budget_periods` is the owner's spend for the month, not the workspace's: removing a
- *   workspace must not hand back the pages it fetched.
+ * - `crawl_budget_periods` is kept as the record of what the workspace spent, with the owner it
+ *   belonged to (`userId`). Nothing reads a deleted workspace's months again.
  * - `rate_limits`, `sessions`, `system_state`, `migrations` and the `oauth_clients`, `_requests`
  *   and `_codes` rows belong to people, clients or the install. A pending authorization request
  *   that named this workspace expires in minutes, and what it issues is intersected with the

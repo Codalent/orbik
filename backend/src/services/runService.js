@@ -105,7 +105,7 @@ export function createRunService({
 
       // The worker refuses it too, for the runs that never come through here; this is the same
       // rule said to the person who pressed Run.
-      if (!agentAllowed(await limitsFor(workspace.ownerId), definition.slug)) {
+      if (!agentAllowed(await limitsFor({ ownerId: workspace.ownerId, workspaceId: workspace._id }), definition.slug)) {
         throw new AppError({ status: 403, code: "PLAN_LIMIT_REACHED", message: "This workspace's plan does not include this agent." });
       }
 

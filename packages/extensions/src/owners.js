@@ -4,8 +4,8 @@ import { COLLECTIONS, toObjectId } from "@orbik/core";
 const OWNER_TTL_MS = 60_000;
 
 /**
- * Finds the account that pays for a workspace: its owner, whoever acts in it. Everything a member
- * does is charged to the owner, so this is the id plan limits are asked for.
+ * Finds a workspace's owner, whoever acts in it. Plan limits are asked with the owner beside the
+ * workspace, so a deployment whose plans are the account's can answer by owner.
  *
  * @param {import("mongodb").Db} database
  * @param {{now?: () => number}} [options]

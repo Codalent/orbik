@@ -35,7 +35,7 @@ export default {
   name: "acme-plans",
   async register(host) {
     // Every process.
-    host.setPlanLimits(async ({ ownerId }) => planFor(ownerId));
+    host.setPlanLimits(async ({ ownerId, workspaceId }) => planFor(ownerId, workspaceId));
     host.on("ai.call.finished", ({ call }) => meter(call));
 
     if (host.process === "api") {
@@ -57,20 +57,27 @@ another process throws, so an extension checks `host.process` first.
 
 ### Plan limits
 
-`host.setPlanLimits(resolve)` — one extension per deployment. `resolve({ ownerId })` returns the
-limits of the account that pays for a workspace: its owner, whoever is acting in it. Every field is
-a ceiling, and `null` (or leaving it out) means none:
+`host.setPlanLimits(resolve)` — one extension per deployment. `resolve({ ownerId, workspaceId })`
+returns the limits of one workspace, whoever is acting in it; `ownerId` is its owner, so a
+deployment whose plans belong to accounts can answer by owner alone, and one whose plans belong to
+workspaces by `workspaceId`. The one question that is no workspace's, how many workspaces an
+account may own, is asked with `workspaceId: null`. Every field is a ceiling, and `null` (or
+leaving it out) means none:
 
 | Field | Enforced by |
 |---|---|
-| `monthlyCrawlPages` | the crawl budget, in the API and every crawl the worker makes. A month's ceiling is fixed when the month is first touched; with none the month is unlimited and still counts `consumed`. |
-| `maxWorkspaces` | creating a workspace: `403 PLAN_LIMIT_REACHED` |
+| `monthlyCrawlPages` | the crawl budget, which keeps one month per workspace, in the API and every crawl the worker makes. A month's ceiling is fixed when the month is first touched; with none the month is unlimited and still counts `consumed`. To change the current month (a mid-month upgrade, pages bought), `createCrawlBudget({ database }).grant({ workspaceId, pages, reason })` from `@orbik/crawl-budget` adds to it, and `statusFor({ workspaceId })` reads it; a call naming a `userId` instead, as before budgets were per workspace, throws. |
+| `maxWorkspaces` | creating a workspace, asked with `workspaceId: null`: `403 PLAN_LIMIT_REACHED` |
 | `maxMembersPerWorkspace` | inviting and accepting: `409 MEMBER_LIMIT_REACHED` |
 | `agents` | a list of agent slugs, or `null` for all. Starting a run in the API (`403 PLAN_LIMIT_REACHED`), and any run the worker executes, which fails with `PLAN_LIMIT_REACHED` |
-| `aiCalls` | `false` refuses every model and embedding call made for the account's workspaces before anything is sent |
+| `aiCalls` | `false` refuses every model and embedding call made for the workspace before anything is sent: `PLAN_LIMIT_REACHED` |
+| `reasoningCalls` | `false` refuses every call but embeddings (agent runs, chats, short texts) the same way, while crawled pages are still indexed and MCP search still answers: for an allowance of model usage that is spent. `aiCalls: false` wins over it |
 
-Answers are cached per account for 30 seconds in each process. A malformed answer (a negative
-count, a list of numbers) throws rather than being read as unlimited.
+Answers are cached for 30 seconds in each process, per workspace and per account.
+`host.forgetLimits({ workspaceId })` drops one workspace's, `host.forgetLimits({ ownerId })` an
+account's and all of its workspaces', and `host.forgetLimits()` all of them, in the process that
+calls it. A malformed answer (a negative count, a list of numbers) throws rather than being read
+as unlimited.
 
 ### Events
 
