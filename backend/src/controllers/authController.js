@@ -25,10 +25,30 @@ export function createAuthController(authService, cookieName, setupService = nul
       } catch (error) { next(error); }
     },
 
-    /** Creates an account when signup is open; refused as `SIGNUP_DISABLED` otherwise. */
+    /**
+     * Creates an account when signup is open; refused as `SIGNUP_DISABLED` otherwise. With
+     * `ORBIK_SIGNUP_VERIFY_EMAIL` on it makes none yet: it answers 202 with `verificationSent`, and
+     * the emailed link makes it.
+     */
     async signup(req, res, next) {
       try {
-        const result = await authService.signup({ ...req.validated, request: req });
+        const { email, password, extensions } = req.validated;
+        const result = await authService.signup({ email, password, fields: extensions ?? {}, request: req });
+        res.status(result.verificationSent ? 202 : 201).json({ ...result, csrfToken: req.session.csrfToken });
+      } catch (error) { next(error); }
+    },
+
+    /** What a signup confirmation link is for: the address, and until when it works. */
+    async describeSignupVerification(req, res, next) {
+      try {
+        res.json(await authService.describeSignupVerification(req.params.token));
+      } catch (error) { next(error); }
+    },
+
+    /** Confirms a signup's address: makes the account and signs this browser in. */
+    async confirmSignup(req, res, next) {
+      try {
+        const result = await authService.confirmSignup({ token: req.params.token, request: req });
         res.status(201).json({ ...result, csrfToken: req.session.csrfToken });
       } catch (error) { next(error); }
     },

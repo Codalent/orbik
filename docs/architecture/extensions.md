@@ -97,7 +97,12 @@ extension never fails the action it is told about.
   webhook: no CORS check, no JSON requirement and no body parsing, so the route reads the raw body
   itself (`express.raw()`) and authenticates by signature, never by session.
 - `host.checkSignup(check)` — runs before a self-service signup (`ORBIK_SIGNUP=open`) creates an
-  account. Throw an error with a 4xx `status` and a `code` to refuse it with that answer.
+  account, or, with `ORBIK_SIGNUP_VERIFY_EMAIL=true`, before the confirmation link is sent. `check`
+  gets `{ email, fields, request }`: `fields` is what the extension's `signupFields` collected on the
+  signup page (below), by field id, such as a captcha's token or a consent; `{}` when there are none.
+  Throw an error with a 4xx `status` and a `code` to refuse it with that answer, which the signup
+  page shows. With confirmation on, `account.created` is told when the link is confirmed, not when
+  the form is sent.
 - `host.setEmailSender(send)` — one extension per deployment; replaces SMTP. `send({ to, subject,
   text, html? })`.
 
@@ -191,6 +196,7 @@ them. A deployment's package may leave any of them out.
 | `banners: [{ id, Component, feature? }]` | above every page of a workspace |
 | `agentPages: { [slug]: { name, icon?, Component?, feature? } }` | an agent a server extension added to the catalog ([Agents](#agents)), in the Agents overview and the workspace's agent lists, linking to `/workspaces/:id/agents/<slug>`; with a `Component` that page is the extension's (it gets `agentSlug` too), without one the generic agent page. A slug core has a page for keeps core's |
 | `accountPages: { [path]: { Component, feature? } }` | at `/account/<path>`, about the signed-in account rather than a workspace, for anyone signed in (a person with no workspace yet included), in the Admin page's frame; the component draws the page, heading included, and gets `path` and `api` |
+| `signupFields: [{ id, Component, feature? }]` | in the signup form, above its button. The component gets `onChange(value)`, to set the field's text (or `null` to drop it), and `attempt`, which counts the times the form was sent, so a one-use token such as a captcha's can be renewed after a refusal. The values travel with the signup as `extensions` and reach the API's `checkSignup` as `fields` (`id`: lowercase letters, digits and dashes; at most 10 fields of 4096 characters) |
 | `userMenuItems: [{ id, label, href, icon?, feature? }]` | in the account menu, after Admin and before Source code; `href` is a path in the app (`/account/billing`) or an `https://` address, opened in a new tab |
 
 Components are client components and receive `workspaceId` (on a workspace's pages) and `api` — the app's own client

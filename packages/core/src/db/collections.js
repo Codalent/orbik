@@ -101,6 +101,12 @@ export const COLLECTIONS = Object.freeze({
    */
   passwordResets: "password_resets",
   /**
+   * Signups waiting for their address to be confirmed, when `ORBIK_SIGNUP_VERIFY_EMAIL` is on: the
+   * address, the chosen password's hash and the emailed link's hash, one row per address, for a
+   * day. Confirming the link creates the account and removes the row; no account exists before.
+   */
+  signupVerifications: "signup_verifications",
+  /**
    * A handful of documents about the install itself rather than any account, each under a fixed
    * `_id`: `setup`, the one-time code that claims a new install, which exists only until its first
    * account does; `install`, the anonymous id the usage ping reports under; `secrets`, the

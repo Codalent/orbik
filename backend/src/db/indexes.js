@@ -94,6 +94,21 @@ export async function ensureIndexes(database) {
       { name: "password_resets_user" },
     ),
 
+    // A signup waiting for its address: one per address (signing up again replaces it), found by
+    // its link's hash, gone a day after it expires.
+    database.collection(COLLECTIONS.signupVerifications).createIndex(
+      { tokenHash: 1 },
+      { unique: true, name: "signup_verifications_token_unique" },
+    ),
+    database.collection(COLLECTIONS.signupVerifications).createIndex(
+      { email: 1 },
+      { unique: true, name: "signup_verifications_email_unique" },
+    ),
+    database.collection(COLLECTIONS.signupVerifications).createIndex(
+      { expiresAt: 1 },
+      { expireAfterSeconds: 86_400, name: "signup_verifications_expiry_ttl" },
+    ),
+
     // One row of Home page preferences per person per workspace: unique, so two tabs skipping a
     // step at the same moment upsert one row rather than two that disagree.
     database.collection(HOME_PREFERENCES_COLLECTION).createIndex(

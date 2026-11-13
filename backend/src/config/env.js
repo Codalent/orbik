@@ -55,6 +55,9 @@ export function parseEnvironment(source) {
   // who reaches the sign-in page create an account.
   const signup = (source.ORBIK_SIGNUP ?? "closed").trim().toLowerCase();
   if (!["open", "closed"].includes(signup)) errors.push("ORBIK_SIGNUP must be open or closed.");
+  // With signup open, whether an account is made only once its address has been confirmed through
+  // an emailed link. Needs email (SMTP_URL, or an extension's sender), which the API checks at start.
+  const signupVerifyEmail = parseFlag(source.ORBIK_SIGNUP_VERIFY_EMAIL, "ORBIK_SIGNUP_VERIFY_EMAIL", errors);
 
   // The install's admins: who sees and answers access requests on the Admin page, and can make a
   // password reset link for someone. A comma-separated list of account addresses; unset, the
@@ -168,6 +171,7 @@ export function parseEnvironment(source) {
     sessionSecret: sessionSecret || null,
     generateSecrets,
     signup,
+    signupVerifyEmail,
     adminEmails,
     smtpUrl: smtpUrl || null,
     emailFrom: emailFrom || null,

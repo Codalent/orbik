@@ -134,10 +134,13 @@ export function createExtensionHost({ processName = null, logger = defaultLog, n
       },
 
       /**
-       * Runs before a self-service signup creates an account. Throwing refuses it; an error with
-       * `status` and `code` is answered as given, anything else as a 500.
+       * Runs before a self-service signup creates an account (or, when signup waits for the address
+       * to be confirmed, before the link is sent). Throwing refuses it; an error with `status` and
+       * `code` is answered as given, anything else as a 500. `fields` is what the web extension's
+       * `signupFields` collected on the signup page, by field id.
        *
-       * @param {(attempt: {email: string, request: import("express").Request}) => Promise<void>} check
+       * @param {(attempt: {email: string, fields: Record<string, string>,
+       *   request: import("express").Request}) => Promise<void>} check
        */
       checkSignup(check) {
         only("api", "checkSignup");

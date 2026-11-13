@@ -5,7 +5,7 @@ import { apiFetch } from "./client";
  * an approved request's one-time link, a password reset link, and the Admin page's reads and writes.
  */
 
-const TOKEN = /^orb[ap]_[A-Za-z0-9_-]{43}$/;
+const TOKEN = /^orb[apv]_[A-Za-z0-9_-]{43}$/;
 
 function requireToken(token) {
   const value = String(token ?? "");
@@ -66,6 +66,16 @@ export function dismissAccessRequest(id) {
 /** An admin's reset link for someone's account, to hand over. */
 export function createPasswordResetLink({ email }) {
   return apiFetch("/v1/admin/password-resets", { method: "POST", body: JSON.stringify({ email }) });
+}
+
+/** What a signup's confirmation link is for: the address, and until when it works. */
+export function readSignupVerification(token) {
+  return apiFetch(`/v1/auth/signup-verifications/${requireToken(token)}`);
+}
+
+/** Confirms a signup's address with its link: makes the account, and signs this browser in. */
+export function confirmSignup(token) {
+  return apiFetch(`/v1/auth/signup-verifications/${requireToken(token)}/confirm`, { method: "POST", body: JSON.stringify({}) });
 }
 
 /** The API's refusals on these pages, as sentences a person reads. */
