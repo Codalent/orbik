@@ -213,7 +213,7 @@ function loadDefinition(slug) {
 }
 
 /**
- * Why a run of this agent is over the workspace owner's plan, or null when it is not. The API
+ * Why a run of this agent is over the workspace's plan, or null when it is not. The API
  * refuses such a run when a person starts it; this is the same rule for the runs a schedule, a
  * crawl or the Library starts, which never pass through the API.
  *
@@ -225,7 +225,7 @@ async function planRefusal(database, run, slug) {
   const workspace = await database
     .collection(COLLECTIONS.workspaces)
     .findOne({ _id: new ObjectId(run.workspaceId) }, { projection: { ownerId: 1 } });
-  const limits = await extensions.limitsFor(workspace?.ownerId ?? null);
+  const limits = await extensions.limitsFor({ ownerId: workspace?.ownerId ?? null, workspaceId: workspace?._id ?? null });
   if (agentAllowed(limits, slug)) return null;
   return { code: "PLAN_LIMIT_REACHED", message: "This workspace's plan does not include this agent." };
 }

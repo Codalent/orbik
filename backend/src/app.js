@@ -91,8 +91,9 @@ import { AppError } from "./errors/appError.js";
  */
 export function createApp({ config, database, readiness, extensions = createExtensionHost({ processName: "api" }), devbar = null }) {
   const collections = getCollections(database);
-  // Every plan limit core enforces is read through here: the workspace owner's, whoever acts.
-  const limitsFor = (ownerId) => extensions.limitsFor(ownerId);
+  // Every plan limit core enforces is read through here: a workspace's (`{ ownerId, workspaceId }`)
+  // whoever acts in it, or the account's (`workspaceId: null`) for creating one.
+  const limitsFor = (subject) => extensions.limitsFor(subject);
   const userRepository = createUserRepository(collections.users);
   const workspaceRepository = createWorkspaceRepository(collections.workspaces, collections.workspaceMembers);
   // The install's own admins (ORBIK_ADMIN_EMAILS, or its first account): the Admin page's people.

@@ -26,7 +26,7 @@ import { cn } from "@/lib/utils";
  * @param {{total: number, pages: number, duplicates: number, orphans: number}} props.urls registry totals
  * @param {object} props.counters the latest run's counters
  * @param {{allowance: number|null, consumed: number, remaining: number|null, unlimited?: boolean, resetsAt: string}|null} props.budget
- *   the account's crawl budget for the current month; `allowance` and `remaining` are null when it is unlimited
+ *   the workspace's crawl budget for the current month; `allowance` and `remaining` are null when it is unlimited
  * @param {string|null} props.notice transient message about the last action
  * @param {string|null} props.error a message about something that failed
  * @param {string|null} props.runError the reason the last run ended badly
@@ -110,7 +110,7 @@ function BudgetRow({ budget }) {
               <span className="border-b border-dotted border-orb-line">pages left this month</span>
             </TooltipTrigger>
             <TooltipContent side="bottom">
-              One page fetched spends one page of budget, across every site in your account. Finding URLs costs nothing.
+              One page fetched spends one page of this workspace&apos;s budget, whichever site it is on. Finding URLs costs nothing.
             </TooltipContent>
           </Tooltip>
 

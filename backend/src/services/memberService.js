@@ -95,7 +95,7 @@ export function createMemberService({
         members,
         role: workspace.role,
         // From the owner's plan; null — no limit — in the open-source edition.
-        limits: { maxMembers: (await limitsFor(workspace.ownerId)).maxMembersPerWorkspace },
+        limits: { maxMembers: (await limitsFor({ ownerId: workspace.ownerId, workspaceId: workspace._id })).maxMembersPerWorkspace },
       };
     },
 

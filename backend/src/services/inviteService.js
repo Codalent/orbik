@@ -89,7 +89,7 @@ function inviteOwner() {
  * @param {object} dependencies.memberRepository `workspace_members`
  * @param {object} dependencies.userRepository accounts, looked up and created by address
  * @param {{frontendOrigins: string[]}} dependencies.config where the invite page is served
- * @param {(ownerId: ObjectId) => Promise<{maxMembersPerWorkspace: number|null}>} dependencies.limitsFor
+ * @param {(subject: {ownerId: ObjectId, workspaceId: ObjectId}) => Promise<{maxMembersPerWorkspace: number|null}>} dependencies.limitsFor
  *   the owner's plan limits
  * @param {((message: object) => Promise<void>)|null} [dependencies.sendEmail] when there is one,
  *   an invite is also emailed to its address; the link is returned either way
@@ -136,7 +136,7 @@ export function createInviteService({
 
   /** The most members besides the owner the workspace may have, or null for no limit. */
   async function memberLimit(workspace) {
-    return (await limitsFor(workspace.ownerId)).maxMembersPerWorkspace;
+    return (await limitsFor({ ownerId: workspace.ownerId, workspaceId: workspace._id })).maxMembersPerWorkspace;
   }
 
   /** Refuses when one more member would take the workspace past its limit, when it has one. */

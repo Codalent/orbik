@@ -84,7 +84,7 @@ export function CrawlSettingsForm({ site, defaultSeedUrl, onSave, onCancel }) {
 
       {/*
         Depth, page count and subdomain handling are all absent by design. Depth asks a question
-        nobody has measured about their own site; how much gets fetched is the account's monthly
+        nobody has measured about their own site; how much gets fetched is the workspace's monthly
         crawl budget rather than anything a single site can state; and a subdomain is a separate
         site that belongs in its own workspace.
       */}

@@ -19,7 +19,7 @@ const ACTIVE_STATUS = "running";
  * @param {object} dependencies collaborators
  * @param {object} dependencies.workspaceRepository workspace access by owner or membership
  * @param {object} dependencies.crawlRepository crawl dataset access
- * @param {object} dependencies.crawlBudget the account's monthly page-fetch allowance
+ * @param {object} dependencies.crawlBudget the workspace's monthly page-fetch allowance
  * @param {import("mongodb").Db} dependencies.database for `listRoutePatterns` and `listRoutePages`
  * @param {() => Date} [dependencies.now] clock; defaults to the system clock
  */
@@ -78,11 +78,10 @@ export function createCrawlService({ workspaceRepository, crawlRepository, crawl
       const workspace = await requireWorkspaceAccess(userId, workspaceId, { role: "read-only" });
       const site = await crawlRepository.findSiteByWorkspace(workspace._id);
 
-      // The budget is reported whether or not crawling is set up. It belongs to the account rather
-      // than to any one site, so somebody deciding whether to add a second site needs to see what
-      // is left before they configure it, not after. The account is the workspace owner's, whoever
-      // is looking: everything a member crawls is charged to the owner.
-      const budget = await crawlBudget.statusFor({ userId: workspace.ownerId });
+      // The budget is reported whether or not crawling is set up. It is the workspace's rather
+      // than any one site's, so somebody deciding whether to crawl another site from it needs to
+      // see what is left before they configure it, not after.
+      const budget = await crawlBudget.statusFor({ workspaceId: workspace._id });
 
       if (!site) {
         return {

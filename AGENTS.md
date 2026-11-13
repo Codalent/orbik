@@ -139,7 +139,7 @@ the Library, crawling and agents need member; inviting, changing roles and remov
 clearing crawled data need admin; nobody can change or remove the owner.
 Membership is `workspace_members` (one row per person other than the owner, with `role` and
 `invitedBy`), invites are `workspace_invites` (the token stored only as a hash, seven days, one
-use). How many members a workspace may have is the owner's plan's `maxMembersPerWorkspace`, which
+use). How many members a workspace may have is its plan's `maxMembersPerWorkspace`, which
 only an extension sets (below); core has no limit.
 
 - `GET /v1/workspaces/:id/members` — the owner and every member, with role and email.
@@ -158,7 +158,7 @@ only an extension sets (below); core has no limit.
 - `DELETE /v1/workspaces/:id` — the owner only, with `{"confirmName": "<the exact name>"}`
   (`400 CONFIRMATION_MISMATCH` otherwise); `409 WORKSPACE_BUSY` while a run or claimed job is
   executing for it. Removes every per-workspace record (`workspaceErasureRepository.js` lists the
-  collections and what is deliberately kept: the owner's `crawl_budget_periods`), its Qdrant points,
+  collections and what is deliberately kept: its `crawl_budget_periods`, the record of what it spent), its Qdrant points,
   its GridFS brand files, deletes tokens and grants that read only it and narrows the rest, clears
   users' `selectedWorkspaceId`, then the `workspaces` row last, so a failure half way is finished
   by retrying. With Qdrant down the
@@ -188,9 +188,9 @@ makes the link on the Admin page or with `pnpm --dir backend run reset:password 
 `user.isAdmin` whether to show the Admin page. The logo on every signed-out page links to
 `https://orbik.io` (`NEXT_PUBLIC_ORBIK_HOME_URL` overrides it).
 
-Everything a member does is **paid by the owner**: the crawl budget and the AI
-call log resolve the workspace's owner (`crawlBudget.ownerFor`, `agents/src/ai/executeRun.js`),
-and no budget row is ever made for a member. What a person starts — a crawl, a run, an Ask
+Everything a member does is **charged to the workspace**: the crawl budget keeps one month per
+workspace (`packages/crawl-budget`), plan limits are asked with the workspace and its owner
+(`limitsFor({ ownerId, workspaceId })`), and no budget row is ever made for a member. What a person starts — a crawl, a run, an Ask
 question — records `startedBy`, and Activity names them. An MCP token or OAuth grant covers the
 workspaces its holder can read; the write scope needs member or above on every workspace it
 covers, and a removed person's credentials stop reading that workspace at once.
@@ -214,9 +214,10 @@ pnpm --dir backend run seed:user -- --email user@example.com
 # email; the Admin page makes the same link
 pnpm --dir backend run reset:password -- --email user@example.com
 
-# Top up an account's crawl budget, which pays for page fetches. Only meaningful when an extension's
+# Top up a workspace's crawl budget, which pays for page fetches. Only meaningful when an extension's
 # plan limits set a monthly allowance; without one every month is unlimited and this adds nothing.
 # It adds to the CURRENT month only, and next month starts from the plan's allowance again.
+# --email works when that account owns one workspace; otherwise name it with --workspace <id>.
 pnpm --dir backend run grant:crawl-budget -- --email user@example.com --pages 50000
 ```
 

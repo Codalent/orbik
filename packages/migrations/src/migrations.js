@@ -52,6 +52,55 @@ export const MIGRATIONS = [
       });
     },
   },
+  {
+    id: "2026-11-13-crawl-budget-per-workspace",
+    description: "Keep the crawl budget per workspace: drop the per-account index, and give the months of an account that owns one workspace to it.",
+    async up({ database, logger }) {
+      const periods = database.collection("crawl_budget_periods");
+      try {
+        await periods.dropIndex("crawl_budget_periods_user_period_unique");
+      } catch (error) {
+        // IndexNotFound (27) and NamespaceNotFound (26): dropped already, or never made.
+        if (error?.code !== 27 && error?.code !== 26) throw error;
+      }
+
+      // An account with one workspace spent its months on that workspace, so they become its
+      // months and the current one keeps what is left of it. An account with several cannot be
+      // split after the fact: its months stay as they are, readable as the account's history, and
+      // each of its workspaces starts the current month afresh with its plan's allowance.
+      let moved = 0;
+      let kept = 0;
+      // An aggregation, not `distinct`: the connection uses MongoDB's strict API version 1, which
+      // does not include `distinct`.
+      const owners = await periods.aggregate([
+        { $match: { workspaceId: { $exists: false } } },
+        { $group: { _id: "$userId" } },
+      ]).toArray();
+      for (const { _id: ownerId } of owners) {
+        const owned = await database.collection("workspaces")
+          .find({ ownerId }, { projection: { _id: 1 } })
+          .limit(2)
+          .toArray();
+        const months = await periods.find({ userId: ownerId, workspaceId: { $exists: false } }, { projection: { _id: 1 } }).toArray();
+        if (owned.length !== 1) {
+          kept += months.length;
+          continue;
+        }
+        for (const { _id } of months) {
+          try {
+            await periods.updateOne({ _id, workspaceId: { $exists: false } }, { $set: { workspaceId: owned[0]._id } });
+            moved += 1;
+          } catch (error) {
+            // The workspace has that month already (a process wrote it before this ran): the
+            // older row stays as history.
+            if (error?.code !== 11000) throw error;
+            kept += 1;
+          }
+        }
+      }
+      logger("info", "migrations.crawl_budget_per_workspace", { moved, kept });
+    },
+  },
 ];
 
 /**

@@ -12,6 +12,7 @@ import { HOME_PREFERENCES_COLLECTION } from "../repositories/homePreferenceRepos
  */
 export async function ensureIndexes(database) {
   await dropLegacySessionTtlIndex(database);
+  await dropLegacyCrawlBudgetIndex(database);
   await Promise.all([
     database.collection(COLLECTIONS.users).createIndex(
       { email: 1 },
@@ -30,14 +31,19 @@ export async function ensureIndexes(database) {
       { expireAfterSeconds: 0, name: "rate_limits_expiry_ttl" },
     ),
 
-    // One crawl budget document per user per month. Uniqueness is what makes the month's
+    // One crawl budget document per workspace per month. Uniqueness is what makes the month's
     // allowance a single row that can be decremented atomically: two documents for one
-    // account-month would let two workers each charge against a different copy of the same
-    // allowance and overspend it. It also backs "this account's spend over time", which reads the
-    // same key in reverse.
+    // workspace-month would let two workers each charge against a different copy of the same
+    // allowance and overspend it. It also backs "this workspace's spend over time", which reads
+    // the same key in reverse. Partial, because months kept while budgets were per account have
+    // no `workspaceId` (the `2026-11-13-crawl-budget-per-workspace` migration).
     database.collection(COLLECTIONS.crawlBudgetPeriods).createIndex(
-      { userId: 1, period: -1 },
-      { unique: true, name: "crawl_budget_periods_user_period_unique" },
+      { workspaceId: 1, period: -1 },
+      {
+        unique: true,
+        name: "crawl_budget_periods_workspace_period_unique",
+        partialFilterExpression: { workspaceId: { $exists: true } },
+      },
     ),
 
     // One membership row per person per workspace: the uniqueness is what makes adding somebody
@@ -219,6 +225,20 @@ export async function ensureIndexes(database) {
  * IndexOptionsConflict. Dropping it is safe: connect-mongo recreates the TTL index
  * on connect, and the index carries no data of its own.
  */
+/**
+ * Drops the index that kept one crawl budget month per account, from before budgets were per
+ * workspace: it would refuse a second workspace of the same owner its own month. The migration
+ * drops it too, for the worker and the scheduler, which start without this function.
+ */
+async function dropLegacyCrawlBudgetIndex(database) {
+  try {
+    await database.collection(COLLECTIONS.crawlBudgetPeriods).dropIndex("crawl_budget_periods_user_period_unique");
+  } catch (error) {
+    // IndexNotFound (27) and NamespaceNotFound (26) mean there is nothing to clean up.
+    if (error?.code !== 27 && error?.code !== 26) throw error;
+  }
+}
+
 async function dropLegacySessionTtlIndex(database) {
   try {
     await database.collection(COLLECTIONS.sessions).dropIndex("sessions_expiry_ttl");

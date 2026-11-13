@@ -15,7 +15,7 @@ function hostOf(url) {
  * Creates workspace creation, listing, selection, change and deletion orchestration.
  *
  * @param {object} dependencies
- * @param {(ownerId: unknown) => Promise<{maxWorkspaces: number|null}>} [dependencies.limitsFor]
+ * @param {(subject: {ownerId: unknown, workspaceId: null}) => Promise<{maxWorkspaces: number|null}>} [dependencies.limitsFor]
  *   the creating account's plan limits; unlimited when not given
  * @param {{emit: Function}} [dependencies.events] told `workspace.created` after a new one is made
  *   and `workspace.deleted` after one is removed
@@ -55,7 +55,8 @@ export function createWorkspaceService({
       // Over the plan's number of workspaces, only a replay of one already made gets through: it
       // makes nothing new. Two creations racing past the limit can both land; a plan's count is a
       // ceiling a person is told about, not a lock.
-      const { maxWorkspaces } = await limitsFor(userId);
+      // The account's question, not any workspace's: asked with no workspace.
+      const { maxWorkspaces } = await limitsFor({ ownerId: userId, workspaceId: null });
       if (maxWorkspaces !== null
         && await workspaceRepository.countOwned(userId) >= maxWorkspaces
         && !(await workspaceRepository.findByCreationKey(userId, idempotencyKey))) {
