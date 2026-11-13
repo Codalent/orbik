@@ -12,6 +12,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { useExtensionSlots } from "@/lib/extensions/slots";
 
 /**
  * Where this install's source code is. Orbik is AGPL-licensed: someone who runs a changed copy for
@@ -32,6 +33,8 @@ const SOURCE_URL = process.env.NEXT_PUBLIC_ORBIK_SOURCE_URL || "https://github.c
  */
 export function UserMenu({ email, onSignOut, disabled = false, isAdmin = false }) {
   const initial = email?.trim().charAt(0).toUpperCase() || "?";
+  // What a deployment's extension adds: its account pages, a help link. Empty in this repository.
+  const { userMenuItems } = useExtensionSlots();
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
@@ -58,6 +61,11 @@ export function UserMenu({ email, onSignOut, disabled = false, isAdmin = false }
             <ShieldCheck aria-hidden="true" />Admin
           </DropdownMenuItem>
         )}
+        {userMenuItems.map(({ id, label, icon: Icon, href }) => (
+          <DropdownMenuItem key={id} render={isExternal(href) ? <a href={href} target="_blank" rel="noreferrer" /> : <Link href={href} />}>
+            {Icon && <Icon aria-hidden="true" />}{label}
+          </DropdownMenuItem>
+        ))}
         <DropdownMenuItem render={<a href={SOURCE_URL} target="_blank" rel="noreferrer" />}>
           <Code aria-hidden="true" />Source code
         </DropdownMenuItem>
@@ -68,4 +76,9 @@ export function UserMenu({ email, onSignOut, disabled = false, isAdmin = false }
       </DropdownMenuContent>
     </DropdownMenu>
   );
+}
+
+/** Whether a menu item leaves the app: an absolute http(s) address opens in a new tab. */
+function isExternal(href) {
+  return /^https?:\/\//i.test(href);
 }

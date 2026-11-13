@@ -8,6 +8,7 @@ import { humanize } from "@/lib/aiCalls/describe";
 import { ago, fromNow, personName, plural } from "@/lib/home/home";
 import { budgetUsedLine } from "@/lib/crawl/budget";
 import { useAskPanel } from "@/lib/ask/askPanel";
+import { useExtensionSlots } from "@/lib/extensions/slots";
 import { Panel, PanelTitle } from "@/components/ui/panel";
 import { StatTile } from "@/components/ui/stat-tile";
 import { cn } from "@/lib/utils";
@@ -45,7 +46,8 @@ export function WorkspaceGlance({ home, myEmail }) {
     agents: attention.length,
     failed: attention.filter((row) => row.failedRun).length,
   };
-  const agents = agentDirectory(id);
+  const { agentPages } = useExtensionSlots();
+  const agents = agentDirectory(id, agentPages);
   const lastCall = newest(ai.credentials.map((credential) => credential.lastUsedAt));
 
   return (
@@ -433,8 +435,8 @@ function newest(moments) {
  * them as the sidebar does. The Library's agent is called the Library here, because that is the
  * page its runs are read on.
  */
-function agentDirectory(workspaceId) {
-  const rows = new Map(buildAgentRows(workspaceId, null).map((row) => [row.id, { name: row.name, icon: row.icon, href: row.href }]));
+function agentDirectory(workspaceId, extensionAgents) {
+  const rows = new Map(buildAgentRows(workspaceId, null, extensionAgents).map((row) => [row.id, { name: row.name, icon: row.icon, href: row.href }]));
   rows.set("business-knowledge-base", { name: "Library", icon: BookMarked, href: `/workspaces/${workspaceId}/library` });
   return rows;
 }

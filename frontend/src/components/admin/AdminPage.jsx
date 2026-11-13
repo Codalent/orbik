@@ -2,9 +2,9 @@
 
 import { useState } from "react";
 import useSWR from "swr";
-import Link from "next/link";
-import { ArrowLeft, Check, Copy, Inbox, KeyRound, ShieldCheck, X } from "lucide-react";
+import { Check, Copy, Inbox, KeyRound, ShieldCheck, X } from "lucide-react";
 
+import { AccountFrame } from "@/components/account/AccountFrame";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -72,15 +72,15 @@ export function AdminPage() {
 
   if (auth.user && !auth.user.isAdmin) {
     return (
-      <Frame>
+      <AccountFrame>
         <EmptyState icon={ShieldCheck}>Only this Orbik&apos;s admins can open this page.</EmptyState>
-      </Frame>
+      </AccountFrame>
     );
   }
   if (!data && !error) return <NeutralLoading label="Loading Admin" />;
 
   return (
-    <Frame>
+    <AccountFrame>
       <PageHeader
         icon={ShieldCheck}
         title="Admin"
@@ -151,18 +151,7 @@ export function AdminPage() {
       </section>
 
       <ResetLinkPanel onIssued={setIssued} />
-    </Frame>
-  );
-}
-
-function Frame({ children }) {
-  return (
-    <main className="mx-auto flex min-h-screen w-full max-w-4xl flex-col gap-6 px-4 py-5 sm:px-10 sm:pt-7 sm:pb-10">
-      <Link href="/" className="-mb-2 inline-flex min-h-6 items-center gap-1.5 self-start text-xs text-orb-muted hover:text-orb-white">
-        <ArrowLeft aria-hidden="true" className="size-3.5" />Back to Orbik
-      </Link>
-      {children}
-    </main>
+    </AccountFrame>
   );
 }
 

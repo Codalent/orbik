@@ -64,11 +64,11 @@ function WorkspaceChrome({ children }) {
   // monitor at the sidebar's foot polls, from the same cache: this asks for nothing of its own and
   // is re-rendered whenever that poll brings something new.
   const { data: activity = null } = useSWR(LIVE_ACTIVITY_PATH);
-  // What an installed extension adds: rail items and banners. Empty in the open-source edition.
+  // What an installed extension adds: rail items, banners and agents. Empty in the open-source edition.
   const extensionSlots = useExtensionSlots();
 
   const knowledge = selectedWorkspaceId ? buildKnowledgeRows(selectedWorkspaceId, activity) : [];
-  const agents = selectedWorkspaceId ? buildAgentRows(selectedWorkspaceId, crawl) : [];
+  const agents = selectedWorkspaceId ? buildAgentRows(selectedWorkspaceId, crawl, extensionSlots.agentPages) : [];
   // Settings is in the rail because connecting an AI is something a person looks for from
   // wherever they are; it sits at the bottom of it, apart from the places a person works in.
   const settingsLink = selectedWorkspaceId ? [{ id: "settings", name: "Settings", icon: Settings, href: `/workspaces/${selectedWorkspaceId}/settings` }] : [];

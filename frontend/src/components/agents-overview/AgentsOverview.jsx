@@ -13,6 +13,7 @@ import { AGENT_STATUS, buildAgentRows } from "@/lib/agents/registry";
 import { agentOverviewPath } from "@/lib/api/agentOverview";
 import { AGENTS_PATH } from "@/lib/api/runs";
 import { useCrawlOverview } from "@/lib/crawl/useCrawlOverview";
+import { useExtensionSlots } from "@/lib/extensions/slots";
 import { fromNow, plural } from "@/lib/home/home";
 import { useCan } from "@/lib/workspaces/roles";
 import { AgentCard } from "./AgentCard";
@@ -58,12 +59,13 @@ export function AgentsOverview({ workspaceId }) {
   const canEdit = useCan("member", workspaceId);
   const { crawl, failed: crawlFailed } = useCrawlOverview(workspaceId);
   const catalog = useSWR(AGENTS_PATH);
+  const { agentPages } = useExtensionSlots();
   const overview = useSWR(agentOverviewPath(workspaceId), {
     refreshInterval: (latest) => (latest?.items?.some((item) => ["queued", "running"].includes(item.latestRun?.status)) ? LIVE_MS : IDLE_MS),
   });
 
   const settled = (crawl || crawlFailed) && (overview.data || overview.error);
-  const rows = buildAgentRows(workspaceId, crawl);
+  const rows = buildAgentRows(workspaceId, crawl, agentPages);
   const agents = rows.map((row) => withFigures(row, { crawl, catalog: catalog.data, overview: overview.data, overviewFailed: Boolean(overview.error) && !overview.data }));
   const groups = groupAgents(agents);
   const totals = headline(agents);

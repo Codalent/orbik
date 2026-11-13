@@ -1,4 +1,4 @@
-import { FileCode2, Palette, Waypoints } from "lucide-react";
+import { Bot, FileCode2, Palette, Waypoints } from "lucide-react";
 
 import { DESIGN_SYSTEM_AGENT_SLUG } from "@/lib/brand/brand";
 import { LLMS_TXT_AGENT_SLUG } from "@/lib/knowledge/knowledge";
@@ -63,11 +63,7 @@ const AGENTS = Object.freeze([
      * before there is a crawl there is nothing it could publish, and the row is drawn as not
      * set up.
      */
-    describe(crawl) {
-      if (!crawl) return { status: AGENT_STATUS.unknown };
-      if (!crawl.site || !crawl.latestRun) return { status: AGENT_STATUS.unconfigured };
-      return { status: AGENT_STATUS.idle };
-    },
+    describe: describeCrawlReader,
   },
   {
     id: DESIGN_SYSTEM_AGENT_SLUG,
@@ -83,26 +79,47 @@ const AGENTS = Object.freeze([
      * The pages it renders are chosen from the crawl, and every page it cites is one the crawler
      * fetched, so before there is a crawl the row is drawn as not set up.
      */
-    describe(crawl) {
-      if (!crawl) return { status: AGENT_STATUS.unknown };
-      if (!crawl.site || !crawl.latestRun) return { status: AGENT_STATUS.unconfigured };
-      return { status: AGENT_STATUS.idle };
-    },
+    describe: describeCrawlReader,
   },
 ]);
 
 /**
  * Builds the sidebar's agent rows for one workspace.
  *
+ * After core's agents come the ones a deployment's extension gives a place here (`agentPages` in
+ * `@orbik/web-extensions`), each linking to `/workspaces/:id/agents/<slug>`. Like the agents
+ * that read the crawl, one is "not set up" until the site has been crawled once. An entry with a
+ * core agent's slug is left out: core's row stays.
+ *
  * @param {string} workspaceId workspace the rows link into
  * @param {object|null} crawl crawl overview, or null when it could not be read
+ * @param {Array<[string, {name?: string, icon?: Function}]>} [extensionAgents] `[slug, entry]`
+ *   pairs from `useExtensionSlots().agentPages`
  */
-export function buildAgentRows(workspaceId, crawl) {
-  return AGENTS.map((agent) => ({
+export function buildAgentRows(workspaceId, crawl, extensionAgents = []) {
+  const core = AGENTS.map((agent) => ({
     id: agent.id,
     name: agent.name,
     icon: agent.icon,
     href: agent.href(workspaceId),
     ...agent.describe(crawl),
   }));
+  const taken = new Set(core.map((row) => row.id));
+  const added = extensionAgents
+    .filter(([slug]) => !taken.has(slug))
+    .map(([slug, entry]) => ({
+      id: slug,
+      name: entry.name ?? slug,
+      icon: entry.icon ?? Bot,
+      href: `/workspaces/${workspaceId}/agents/${encodeURIComponent(slug)}`,
+      ...describeCrawlReader(crawl),
+    }));
+  return [...core, ...added];
+}
+
+/** The status of an agent that reads the crawl: unknown, not set up until a first crawl, or idle. */
+function describeCrawlReader(crawl) {
+  if (!crawl) return { status: AGENT_STATUS.unknown };
+  if (!crawl.site || !crawl.latestRun) return { status: AGENT_STATUS.unconfigured };
+  return { status: AGENT_STATUS.idle };
 }
