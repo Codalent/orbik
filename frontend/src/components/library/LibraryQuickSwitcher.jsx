@@ -81,11 +81,11 @@ export function LibraryQuickSwitcher({ onClose }) {
         const found = await searchLibraryPassages(library.workspaceId, term, { kinds, limit: 5 });
         setMeaning({ key, results: found.results ?? [], error: null });
       } catch (failure) {
-        setMeaning({ key, results: [], error: failure?.message ?? "Search by meaning is not available." });
+        setMeaning({ key, results: [], error: meaningFailure(failure, library.ai?.isAdmin) });
       }
     }, MEANING_DELAY);
     return () => window.clearTimeout(timer);
-  }, [library.workspaceId, term, scope, key, commanding]);
+  }, [library.workspaceId, term, scope, key, commanding, library.ai?.isAdmin]);
 
   const files = useMemo(() => {
     if (commanding) return [];
@@ -423,4 +423,25 @@ function Highlighted({ text, term, className }) {
       ))}
     </span>
   );
+}
+
+/** The codes `GET /library/passages` answers with when this install has no embedding key to search with. */
+const NO_EMBEDDINGS = Object.freeze(new Set(["EMBEDDING_NOT_CONFIGURED", "EMBEDDING_MODEL_UNKNOWN"]));
+
+/**
+ * What "By meaning" says when it cannot search.
+ *
+ * The server's reason names the setting that is missing, which is what an install's admin needs and
+ * nobody else can act on. Everyone else is told that search by meaning is not available here, and
+ * that finding files by name still works.
+ */
+function meaningFailure(failure, isAdmin) {
+  // A plan's refusal is already said in the workspace's own terms.
+  if (isAdmin || failure?.status !== 503 || failure.code === "PLAN_LIMIT_REACHED") {
+    return failure?.message ?? "Search by meaning is not available.";
+  }
+  if (NO_EMBEDDINGS.has(failure.code)) {
+    return "AI is not available on this Orbik right now, so search by meaning cannot find passages. Searching by name above still works.";
+  }
+  return "Search by meaning is not available on this Orbik right now. Searching by name above still works.";
 }
