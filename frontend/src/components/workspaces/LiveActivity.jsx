@@ -24,7 +24,12 @@ const POLL_MS = Object.freeze({ active: 3000, idle: 15000 });
  *
  * It asks the server rather than assembling a picture from what the page happens to know,
  * because the page only knows about its own workspace and only while it is open. Polling slows
- * to a crawl when nothing is live, so an idle sidebar costs a request every fifteen seconds.
+ * to a crawl when nothing is live, so an idle sidebar costs a request every fifteen seconds; a
+ * crawl being asked for, starting or ending has it ask at once (`useCrawlOverview`), so a short
+ * crawl is not missed between two slow polls.
+ *
+ * On a phone, where the sidebar sits above the page, the box is one line instead: the first thing
+ * running and how many more, so the page's own head is not pushed down by a list.
  */
 export function LiveActivity() {
   // The cadence is chosen from the latest answer, so the faster one starts on the read after
@@ -39,32 +44,71 @@ export function LiveActivity() {
   const items = activity ? [...activity.crawls, ...activity.agents, ...activity.aiCalls, ...library] : [];
 
   return (
-    <section
-      aria-label="Activity"
-      aria-live="polite"
-      className="rounded-xl border border-orb-line bg-orb-black/30 p-2.5"
-    >
-      <header className="flex items-center gap-1.5 text-[0.7rem] font-medium text-orb-muted">
-        <Activity aria-hidden="true" className={cn("size-3", active && "text-orb-lime")} />
-        <span>Activity</span>
-        {active && <span aria-hidden="true" className="ml-auto size-1.5 rounded-full bg-orb-lime motion-safe:animate-pulse" />}
-      </header>
+    <>
+      <CompactActivity activity={activity} failed={failed} items={items} />
+      <section
+        aria-label="Activity"
+        aria-live="polite"
+        className="rounded-xl border border-orb-line bg-orb-black/30 p-2.5 max-md:hidden"
+      >
+        <header className="flex items-center gap-1.5 text-[0.7rem] font-medium text-orb-muted">
+          <Activity aria-hidden="true" className={cn("size-3", active && "text-orb-lime")} />
+          <span>Activity</span>
+          {active && <span aria-hidden="true" className="ml-auto size-1.5 rounded-full bg-orb-lime motion-safe:animate-pulse" />}
+        </header>
 
-      {failed && !activity ? (
-        <p className="mt-2 text-xs text-orb-muted">Status unavailable.</p>
-      ) : !activity ? (
-        <p className="mt-2 text-xs text-orb-muted">Checking…</p>
-      ) : items.length === 0 ? (
-        <p className="mt-2 text-xs text-orb-muted">Nothing running.</p>
-      ) : (
-        <ul className="mt-2 max-h-48 space-y-2 overflow-y-auto">
-          {activity.crawls.map((crawl) => <CrawlItem key={`crawl-${crawl.workspaceId}`} crawl={crawl} />)}
-          {library.map((entry) => <LibraryItem key={`library-${entry.workspaceId}`} entry={entry} />)}
-          {activity.agents.map((run) => <AgentItem key={`agent-${run.runId}`} run={run} />)}
-          {activity.aiCalls.map((call) => <CallItem key={`call-${call.id}`} call={call} />)}
-        </ul>
-      )}
-    </section>
+        {failed && !activity ? (
+          <p className="mt-2 text-xs text-orb-muted">Status unavailable.</p>
+        ) : !activity ? (
+          <p className="mt-2 text-xs text-orb-muted">Checking…</p>
+        ) : items.length === 0 ? (
+          <p className="mt-2 text-xs text-orb-muted">Nothing running.</p>
+        ) : (
+          <ul className="mt-2 max-h-48 space-y-2 overflow-y-auto">
+            {activity.crawls.map((crawl) => <CrawlItem key={`crawl-${crawl.workspaceId}`} crawl={crawl} />)}
+            {library.map((entry) => <LibraryItem key={`library-${entry.workspaceId}`} entry={entry} />)}
+            {activity.agents.map((run) => <AgentItem key={`agent-${run.runId}`} run={run} />)}
+            {activity.aiCalls.map((call) => <CallItem key={`call-${call.id}`} call={call} />)}
+          </ul>
+        )}
+      </section>
+    </>
+  );
+}
+
+/**
+ * The monitor as one line, for a phone: what is running first — a crawl before anything else,
+ * since it is what the rest waits on — and how many other things are.
+ */
+function CompactActivity({ activity, failed, items }) {
+  const active = activity?.active === true;
+  const crawl = activity?.crawls?.[0] ?? null;
+  const agent = activity?.agents?.[0] ?? null;
+  const library = activity?.library?.[0] ?? null;
+  const call = activity?.aiCalls?.[0] ?? null;
+  let summary;
+  if (failed && !activity) summary = "Status unavailable.";
+  else if (!activity) summary = "Checking…";
+  else if (crawl) {
+    const total = crawl.fetched + crawl.outstanding;
+    const count = crawl.phase === "fetching" || crawl.phase === "finalizing"
+      ? ` · ${crawl.fetched.toLocaleString()}${crawl.outstanding > 0 ? ` of about ${total.toLocaleString()}` : ""} pages`
+      : "";
+    summary = `${crawl.workspaceName ?? hostOf(crawl.seedUrl)} · ${describePhase(crawl.phase)}${count}`;
+  } else if (agent) summary = `${humanize(agent.agentSlug)} · ${describeRunStatus(agent.status)}`;
+  else if (library) summary = "Library · Copying pages";
+  else if (call) summary = call.purpose === "crawl-schedule" ? "Crawl planning" : humanize(call.agentSlug) || "Agent run";
+  else summary = "Nothing running.";
+  const more = items.length > 1 ? items.length - 1 : 0;
+
+  return (
+    <p className="flex min-w-0 items-center gap-1.5 rounded-lg border border-orb-line bg-orb-black/30 px-2.5 py-1.5 text-xs text-orb-muted md:hidden">
+      <Activity aria-hidden="true" className={cn("size-3 shrink-0", active && "text-orb-lime")} />
+      <span className="shrink-0 font-medium">Activity</span>
+      <span aria-hidden="true">·</span>
+      <span className={cn("min-w-0 truncate", active ? "text-orb-white" : "text-orb-muted")}>{summary}</span>
+      {more > 0 && <span className="ml-auto shrink-0 tabular-nums">+{more} more</span>}
+    </p>
   );
 }
 

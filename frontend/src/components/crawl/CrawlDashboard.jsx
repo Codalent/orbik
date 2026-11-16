@@ -10,17 +10,33 @@ import { Panel } from "@/components/ui/panel";
 import { Pill } from "@/components/ui/pill";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CrawlActivityLog, useCrawlActivity } from "./CrawlActivityLog";
+import { CrawlFindings } from "./CrawlFindings";
 import { CrawlFrequencySheet } from "./CrawlFrequencySheet";
 import { CrawlLogsSheet } from "./CrawlLogsSheet";
+import { CrawlNextStep } from "./CrawlNextStep";
 import { CrawlSettingsForm } from "./CrawlSettingsForm";
 import { CrawlSummary } from "./CrawlSummary";
 import { CrawlTopBar } from "./CrawlTopBar";
 import { CrawlTree } from "./CrawlTree";
 import { PageDetailSheet } from "./PageDetailSheet";
+import { ranOutOfPages } from "./runPresentation";
 import { clearCrawlData, requestCrawl, saveCrawlSite } from "@/lib/api/crawl";
 import { useRevalidateWorkspace } from "@/lib/api/cache";
+import { BUDGET_REFUSALS, crawlBlockedReason, isUnlimited } from "@/lib/crawl/budget";
 import { useCrawlOverview } from "@/lib/crawl/useCrawlOverview";
+import { useExtensionSlots } from "@/lib/extensions/slots";
 import { useCan } from "@/lib/workspaces/roles";
+
+/**
+ * Where the crawl stands — which run is live, whether one is waiting, how the last one ended — as
+ * one string. A notice about an action belongs to the stage it was given in: once the stage moves
+ * on (the queued crawl starts, the running one finishes) the notice has been overtaken by what the
+ * page itself now says, and is no longer shown.
+ */
+function stageOf(overview) {
+  if (!overview) return "";
+  return [overview.activeRun?.id ?? "", overview.queued ? "queued" : "", overview.latestRun?.id ?? "", overview.latestRun?.status ?? ""].join("|");
+}
 
 /**
  * The workspace's crawl view: configure it, run it, and read what it found.
@@ -43,7 +59,11 @@ export function CrawlDashboard({ workspaceId }) {
   const [editing, setEditing] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
-  const [notice, setNotice] = useState(null);
+  // `{ text, stage }`: shown while the crawl is still at the stage it was given in (`stageOf`).
+  const [notice, setNoticeState] = useState(null);
+  // The figure whose pages are listed in place of the tree: broken, orphans or duplicates.
+  const [finding, setFinding] = useState(null);
+  const extensionSlots = useExtensionSlots();
   const mounted = useRef(true);
 
   // Set on mount as well as cleared on unmount. In development React mounts every component,
@@ -63,6 +83,14 @@ export function CrawlDashboard({ workspaceId }) {
   const refreshOverview = status.refresh;
 
   /**
+   * Shows a notice about the action just taken, tied to the crawl's stage as `latest` (the status
+   * read again after the action) has it, or as the page has it when that read failed.
+   */
+  const setNotice = useCallback((text, latest) => {
+    setNoticeState(text ? { text, stage: stageOf(latest ?? overview) } : null);
+  }, [overview]);
+
+  /**
    * Re-reads everything cached for this workspace, not just crawl status.
    *
    * For the two actions whose reach is the whole workspace: new crawl settings and cleared crawl
@@ -80,6 +108,20 @@ export function CrawlDashboard({ workspaceId }) {
   const hasSite = Boolean(overview?.site);
   const runId = overview?.latestRun?.id ?? null;
   const live = Boolean(overview?.activeRun);
+  const queued = overview?.queued === true;
+  // Why no crawl can be asked for, when the workspace has no crawl pages to spend: the API refuses
+  // such a crawl, and the buttons say so before anybody presses them.
+  const blockedReason = crawlBlockedReason(overview?.budget);
+  const shownNotice = notice && notice.stage === stageOf(overview) ? notice.text : null;
+  const budgetLink = extensionSlots.crawlBudgetLink
+    ? {
+      label: extensionSlots.crawlBudgetLink.label,
+      external: /^https:\/\//.test(extensionSlots.crawlBudgetLink.path),
+      href: /^https:\/\//.test(extensionSlots.crawlBudgetLink.path)
+        ? extensionSlots.crawlBudgetLink.path
+        : `/workspaces/${workspaceId}/${extensionSlots.crawlBudgetLink.path.replace(/^\/+/, "")}`,
+    }
+    : null;
 
   // One read of the crawl's activity, shared by the live log on the page and the logs panel. It
   // runs while a crawl is in progress, and once more whenever the panel is opened on a finished
@@ -92,7 +134,16 @@ export function CrawlDashboard({ workspaceId }) {
 
   // The tree loads its own branches, so a finished crawl is picked up when a branch is next
   // opened rather than by refetching a whole listing nobody is looking at. Remounting on the run
-  // identifier is what makes a completed crawl redraw the branches already on screen.
+  // and its status is what makes a crawl that starts or completes redraw the branches already on
+  // screen; a run's identifier alone stays the same from start to finish, and the table used to
+  // say "No pages have been discovered yet." beside a completed crawl of 68 pages.
+  //
+  // While the crawl runs, the top level is read again in place as the registry grows (the figures
+  // poll every few seconds), in steps of pages rather than on every poll, so a large site's tree
+  // is not aggregated over and over for one more page.
+  const treeKey = `${runId ?? "no-run"}:${overview?.latestRun?.status ?? ""}`;
+  const fetchedSoFar = overview?.latestRun?.counters?.pagesFetched ?? 0;
+  const liveVersion = live ? `${overview?.urls?.total ?? 0}:${Math.floor(fetchedSoFar / 25)}` : 0;
 
   /**
    * Saves settings and returns to the status view.
@@ -107,11 +158,12 @@ export function CrawlDashboard({ workspaceId }) {
     try {
       await saveCrawlSite(workspaceId, values);
       await refreshWorkspace();
+      const latest = await refreshOverview();
       if (mounted.current) {
         setEditing(false);
         setNotice(firstSetup
           ? "Crawl queued. It starts within a minute, and this page updates automatically."
-          : "Settings saved.");
+          : "Settings saved.", latest);
       }
     } finally {
       if (mounted.current) setBusy(false);
@@ -129,15 +181,17 @@ export function CrawlDashboard({ workspaceId }) {
     setNotice(null);
     try {
       const result = await requestCrawl(workspaceId, { fresh });
-      await refreshOverview();
+      const latest = await refreshOverview();
       if (!mounted.current) return;
       setNotice(result.alreadyRunning
         ? "A crawl is already running."
         : result.fresh
           ? `Fresh crawl queued: ${result.pages.toLocaleString()} ${result.pages === 1 ? "page" : "pages"} will be fetched again in full. This page updates automatically.`
-          : "Crawl queued. This page updates automatically as the sites ahead finish.");
+          : "Crawl queued. This page updates automatically as the sites ahead finish.", latest);
     } catch (failure) {
-      handleFailure(failure, "The crawl could not be started. Try again.");
+      // Refused for want of crawl pages: the API's reason is the answer, and "try again" is not.
+      handleFailure(failure, BUDGET_REFUSALS.has(failure?.code) ? failure.message : "The crawl could not be started. Try again.");
+      if (BUDGET_REFUSALS.has(failure?.code)) await refreshOverview();
     } finally {
       if (mounted.current) setBusy(false);
     }
@@ -151,9 +205,11 @@ export function CrawlDashboard({ workspaceId }) {
     try {
       const result = await clearCrawlData(workspaceId);
       await refreshWorkspace();
+      const latest = await refreshOverview();
       if (!mounted.current) return;
       setSelectedHash(null);
-      setNotice(`Crawl data cleared: ${result.pages.toLocaleString()} ${result.pages === 1 ? "page" : "pages"} removed. Crawl now to read the site again.`);
+      setFinding(null);
+      setNotice(`Crawl data cleared: ${result.pages.toLocaleString()} ${result.pages === 1 ? "page" : "pages"} removed. Crawl now to read the site again.`, latest);
     } catch (failure) {
       handleFailure(failure, failure?.code === "CRAWL_RUNNING" ? failure.message : "The crawl data could not be cleared. Try again.");
     } finally {
@@ -211,6 +267,7 @@ export function CrawlDashboard({ workspaceId }) {
               defaultSeedUrl={overview.defaults.seedUrl}
               onSave={save}
               onCancel={hasSite ? () => setEditing(false) : undefined}
+              blockedReason={hasSite ? null : blockedReason}
             />
           </Panel>
         </div>
@@ -224,7 +281,10 @@ export function CrawlDashboard({ workspaceId }) {
           activeRun={overview.activeRun}
           latestRun={overview.latestRun}
           progress={activity.progress}
-          queued={overview.queued === true}
+          queued={queued}
+          blockedReason={blockedReason}
+          sitePages={overview.urls?.eligible ?? null}
+          limited={Boolean(overview.budget) && !isUnlimited(overview.budget)}
           onCrawlNow={canCrawl ? () => crawlNow() : undefined}
           onFreshCrawl={canCrawl ? () => crawlNow({ fresh: true }) : undefined}
           onSetFrequencies={canCrawl ? () => { setNotice(null); setFrequenciesOpen(true); } : undefined}
@@ -238,10 +298,18 @@ export function CrawlDashboard({ workspaceId }) {
           urls={overview.urls}
           counters={overview.latestRun?.counters ?? {}}
           budget={overview.budget}
-          notice={notice}
+          notice={shownNotice}
           error={error}
           runError={overview.latestRun?.error?.message ?? null}
+          runNote={!live && ranOutOfPages(overview.latestRun) ? ranOutNote(overview.latestRun.counters.pagesSkippedNoBudget) : null}
+          finding={finding}
+          onFinding={setFinding}
+          budgetLink={budgetLink}
         />
+
+        {/* The step after the first crawl, said here as well as on Home, once a crawl has
+            finished and while nothing else is going on. */}
+        {!live && !queued && overview.latestRun?.status === "succeeded" && <CrawlNextStep workspaceId={workspaceId} />}
 
         {/*
           The log is on the page only while a crawl is running, which is the one time it is
@@ -259,12 +327,24 @@ export function CrawlDashboard({ workspaceId }) {
           />
         )}
 
-        <CrawlTree
-          key={runId ?? "no-run"}
-          workspaceId={workspaceId}
-          selectedHash={selectedHash}
-          onSelect={setSelectedHash}
-        />
+        {finding ? (
+          <CrawlFindings
+            key={`${finding}:${treeKey}`}
+            workspaceId={workspaceId}
+            kind={finding}
+            selectedHash={selectedHash}
+            onSelect={setSelectedHash}
+            onClear={() => setFinding(null)}
+          />
+        ) : (
+          <CrawlTree
+            key={treeKey}
+            workspaceId={workspaceId}
+            selectedHash={selectedHash}
+            onSelect={setSelectedHash}
+            liveVersion={liveVersion}
+          />
+        )}
 
         <CrawlFrequencySheet
           open={frequenciesOpen && canCrawl}
@@ -302,6 +382,12 @@ export function CrawlDashboard({ workspaceId }) {
       {renderBody()}
     </main>
   );
+}
+
+/** What a crawl that ran out of crawl pages left behind, in a sentence. */
+function ranOutNote(skipped) {
+  const pages = `${skipped.toLocaleString()} ${skipped === 1 ? "page" : "pages"}`;
+  return `The last crawl ran out of crawl pages: ${pages} it found ${skipped === 1 ? "was" : "were"} not fetched and wait for the next crawl.`;
 }
 
 /**

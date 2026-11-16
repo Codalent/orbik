@@ -52,6 +52,16 @@ export function getCrawlTree(workspaceId, { path = "/", limit = 20, skip = 0 } =
 }
 
 /**
+ * Lists the pages behind one of the crawl page's figures, flat and by address.
+ *
+ * @param {"broken"|"orphans"|"duplicates"} kind which figure
+ */
+export function getCrawlFindings(workspaceId, { kind, limit = 50, skip = 0 }) {
+  const query = new URLSearchParams({ kind, limit: String(limit), skip: String(skip) });
+  return apiFetch(`/v1/workspaces/${requireId(workspaceId, "Workspace")}/crawl/findings?${query}`);
+}
+
+/**
  * Where one crawled page's record — everything the crawl recorded about it — is read from; also
  * its cache key.
  */

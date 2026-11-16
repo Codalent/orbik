@@ -1,4 +1,5 @@
 import { effectiveIntervalHours, patternIntervalHours } from "@orbik/core";
+import { BUDGET_STATE } from "@orbik/crawl-budget";
 
 import { AppError } from "../errors/appError.js";
 import { toPageSummary, toRunSummary, toSiteSummary } from "../repositories/crawlRepository.js";
@@ -52,6 +53,35 @@ export function createCrawlService({ workspaceRepository, crawlRepository, crawl
     });
   }
 
+  /**
+   * Refuses to ask for a crawl that could not fetch a single page.
+   *
+   * A crawl asked for with nothing to pay for its pages would sit on the page as "queued" and then
+   * end having read nothing a person can see, so it is refused here, with the reason, instead. The
+   * two reasons are worded apart on purpose: a plan that includes no crawl pages is not a month
+   * whose pages are used up, and only the second can promise a date crawling comes back by itself.
+   * With no limit set — the open-source edition — this never refuses.
+   */
+  async function requireCrawlBudget(workspace) {
+    const budget = await crawlBudget.statusFor({ workspaceId: workspace._id });
+    if (budget.state === BUDGET_STATE.notIncluded) {
+      throw new AppError({
+        status: 403,
+        code: "CRAWL_NOT_INCLUDED",
+        message: budget.resumesAt
+          ? `This workspace's plan includes no crawl pages this month, so no page can be fetched. Crawling can start ${formatDay(budget.resumesAt)}.`
+          : "This workspace's plan includes no crawl pages, so no page can be fetched.",
+      });
+    }
+    if (budget.state === BUDGET_STATE.spent) {
+      throw new AppError({
+        status: 409,
+        code: "CRAWL_BUDGET_SPENT",
+        message: `This month's ${budget.allowance.toLocaleString("en-US")} crawl pages are spent, so no page can be fetched.${budget.resumesAt ? ` Crawling resumes ${formatDay(budget.resumesAt)}.` : ""}`,
+      });
+    }
+  }
+
   /** Resolves the workspace and its crawl configuration, requiring the configuration to exist. */
   async function requireSite(userId, workspaceId, role) {
     const workspace = await requireWorkspaceAccess(userId, workspaceId, { role });
@@ -88,7 +118,7 @@ export function createCrawlService({ workspaceRepository, crawlRepository, crawl
           site: null,
           activeRun: null,
           latestRun: null,
-          urls: { total: 0, eligible: 0, orphans: 0 },
+          urls: { total: 0, eligible: 0, orphans: 0, duplicates: 0, broken: 0, pages: 0 },
           budget,
           defaults: { seedUrl: workspace.websiteUrl },
         };
@@ -124,6 +154,9 @@ export function createCrawlService({ workspaceRepository, crawlRepository, crawl
       const workspace = await requireWorkspaceAccess(userId, workspaceId, { role: "member" });
       const effectiveSeedUrl = seedUrl ?? workspace.websiteUrl;
       requireSitemapsOnSeedHost(effectiveSeedUrl, settings.sitemapUrls);
+      // The first save is also the first crawl's request, so it is refused when that crawl could
+      // fetch nothing; later saves only change settings and are always accepted.
+      if (!(await crawlRepository.findSiteByWorkspace(workspace._id))) await requireCrawlBudget(workspace);
       const site = await crawlRepository.upsertSite({
         workspaceId: workspace._id,
         seedUrl: effectiveSeedUrl,
@@ -147,11 +180,12 @@ export function createCrawlService({ workspaceRepository, crawlRepository, crawl
      * kept — it is a new reading of the site, not a new site.
      */
     async requestCrawl({ userId, workspaceId, fresh = false }) {
-      const { site } = await requireSite(userId, workspaceId, "member");
+      const { workspace, site } = await requireSite(userId, workspaceId, "member");
       const activeRun = await crawlRepository.findActiveRun(site._id);
       if (activeRun) {
         return { status: ACTIVE_STATUS, run: toRunSummary(activeRun), alreadyRunning: true, fresh: false, pages: 0 };
       }
+      await requireCrawlBudget(workspace);
 
       const pages = fresh ? await crawlRepository.requestFreshCrawl(site._id, now()) : 0;
       const marked = await crawlRepository.requestCrawlNow(site._id, now(), userId);
@@ -281,7 +315,8 @@ export function createCrawlService({ workspaceRepository, crawlRepository, crawl
      * for the whole site.
      */
     async requestRecrawl({ userId, workspaceId, target }) {
-      const { site } = await requireSite(userId, workspaceId, "member");
+      const { workspace, site } = await requireSite(userId, workspaceId, "member");
+      await requireCrawlBudget(workspace);
       const pages = await crawlRepository.requestRecrawl({ siteId: site._id, target, now: now(), startedBy: userId });
       if (pages === 0) {
         throw new AppError({ status: 404, code: "PAGE_NOT_FOUND", message: target.urlHash ? "This page is not in the crawl." : "No page has this route pattern." });
@@ -400,6 +435,34 @@ export function createCrawlService({ workspaceRepository, crawlRepository, crawl
         path: `/${prefix.join("/")}`,
         page: self ? toTreePage(site, self) : null,
         children: items.map((row) => toTreeNode(site, row)),
+        total,
+        skip,
+        limit,
+      };
+    },
+
+    /**
+     * Lists the pages behind one of the crawl page's figures, so "Broken 9" can be followed to the
+     * nine: flat, by address, with what each answered and, for a duplicate, the page it is folded
+     * into. Counted by the same filters as the figures in `getOverview`'s `urls`.
+     *
+     * @param {object} options
+     * @param {"broken"|"orphans"|"duplicates"} options.kind
+     */
+    async getFindings({ userId, workspaceId, kind, limit, skip }) {
+      const { site } = await requireSite(userId, workspaceId, "read-only");
+      const { items, total } = await crawlRepository.listFindings({ siteId: site._id, kind, limit, skip });
+      return {
+        kind,
+        items: items.map((row) => ({
+          url: row.url,
+          urlHash: row.urlHash,
+          status: row.lastStatus ?? null,
+          indexable: row.indexable === true,
+          uncrawled: row.state === "discovered",
+          inboundCount: row.inboundCount ?? 0,
+          duplicateOf: row.variantOf ? { urlHash: row.variantOf, url: row.variantOfUrl, reason: row.variantReason ?? null } : null,
+        })),
         total,
         skip,
         limit,
@@ -548,6 +611,14 @@ export function createCrawlService({ workspaceRepository, crawlRepository, crawl
       return { items: items.map((item) => ({ ...item, title: titleOf.get(item.urlHash) ?? null })) };
     },
   };
+}
+
+/**
+ * A day as a sentence carries it, "December 1", in UTC: the budget's months are UTC months, and
+ * the day a month turns over must not move with the server's timezone.
+ */
+function formatDay(iso) {
+  return new Date(iso).toLocaleDateString("en-US", { month: "long", day: "numeric", timeZone: "UTC" });
 }
 
 /** Splits a URL path into the segments the route tree is keyed by. */

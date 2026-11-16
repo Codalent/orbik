@@ -21,17 +21,17 @@ const STEPS = Object.freeze([
   {
     icon: Bot,
     title: "Goes easy on your server",
-    body: "It arrives as OrbikBot, obeys robots.txt, and fetches one page at a time on this hostname only. Your server never sees a spike.",
+    body: "It arrives as OrbikBot, obeys robots.txt, stays on this hostname, and paces itself to a few requests a second at most. Your server never sees a spike.",
   },
   {
     icon: Gauge,
-    title: "Spends page budget",
-    body: "Each page fetched costs one page of your monthly crawl budget. Finding URLs is free — only fetching them is charged.",
+    title: "Counts the pages it fetches",
+    body: "Each page fetched counts against the workspace's monthly crawl pages, where it has a limit. Finding URLs is free — only fetching them is counted.",
   },
   {
     icon: CalendarClock,
-    title: "Settles into a schedule",
-    body: "The first crawl measures how fast this site changes, and Orbik proposes how often to come back. You can change that whenever you like.",
+    title: "Then waits for you",
+    body: "Every page starts on Manual: fetched now, and again when you ask. Once the first crawl is in, choose which pages or folders to fetch daily, weekly or monthly with Set crawl frequencies.",
     accent: true,
   },
 ]);

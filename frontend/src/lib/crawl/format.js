@@ -13,6 +13,16 @@ export function formatDate(value) {
   return date.toLocaleDateString(undefined, { day: "numeric", month: "long" });
 }
 
+/**
+ * Formats the day a crawl-budget month turns over. Months are UTC months, so the day is read in
+ * UTC: in a timezone behind UTC, "December 1" would otherwise come out as "November 30".
+ */
+export function formatBudgetDay(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleDateString(undefined, { day: "numeric", month: "long", timeZone: "UTC" });
+}
+
 /** Formats a date and time, for a log where two runs on one day must be told apart. */
 export function formatDateTime(value) {
   const date = new Date(value);
