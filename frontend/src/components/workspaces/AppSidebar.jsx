@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { LayoutGrid, Plus } from "lucide-react";
 
-import { AgentNav, OrbitGlyph, STATUS_STYLE } from "./AgentNav";
+import { AgentNav, AgentNavCompact, OrbitGlyph, STATUS_STYLE } from "./AgentNav";
 import { LiveActivity } from "./LiveActivity";
 import { Pill } from "@/components/ui/pill";
 import { AGENT_STATUS } from "@/lib/agents/registry";
@@ -26,8 +26,11 @@ export function AppSidebar({ agents = [], currentPath, overviewHref }) {
   return (
     // The left half of the shell's one panel: no card of its own, only the line that divides it
     // from the content beside it (below it, on a narrow screen).
-    <aside aria-label="Agents sidebar" className={cn("flex w-full shrink-0 flex-col gap-3 border-b border-orb-line p-3 text-sidebar-foreground md:w-60 md:border-b-0 md:border-r", onOverview && "max-md:hidden")}>
-      <h2 className="px-3 pt-1 font-display text-base font-bold tracking-[-0.02em] text-orb-white">Agents</h2>
+    // Below `md` the column is folded into two lines above the page — the agents as one row that
+    // scrolls sideways, and the activity monitor as one line — so the page starts near the top.
+    <aside aria-label="Agents sidebar" className={cn("flex w-full shrink-0 flex-col gap-2 border-b border-orb-line p-2 text-sidebar-foreground md:w-60 md:gap-3 md:border-b-0 md:border-r md:p-3", onOverview && "max-md:hidden")}>
+      <h2 className="px-3 pt-1 font-display text-base font-bold tracking-[-0.02em] text-orb-white max-md:sr-only">Agents</h2>
+      <AgentNavCompact agents={agents} currentPath={currentPath} overviewHref={overviewHref} className="md:hidden" />
       {/* The list scrolls between the title and the foot. A workspace now has more agents than a
           short window is tall, and a column that only grows pushes the activity monitor out
           through the bottom of the sidebar; with the list as the part that gives, it stays where
@@ -36,7 +39,7 @@ export function AppSidebar({ agents = [], currentPath, overviewHref }) {
           `relative` is for the rows' `sr-only` labels. They are absolutely positioned, and with no
           positioned ancestor they are laid out against the page: the ones on rows scrolled out of
           view here then made the page itself taller than the window, and it scrolled. */}
-      <div className="relative flex flex-col gap-3 md:-mr-2 md:min-h-0 md:flex-1 md:overflow-y-auto md:pr-2">
+      <div className="relative flex flex-col gap-3 max-md:hidden md:-mr-2 md:min-h-0 md:flex-1 md:overflow-y-auto md:pr-2">
         {overviewHref && <OverviewRow href={overviewHref} current={currentPath === overviewHref} />}
         <AgentNav agents={agents} currentPath={currentPath} />
         <CreateAgentRow />

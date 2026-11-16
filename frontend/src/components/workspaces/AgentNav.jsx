@@ -1,6 +1,8 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import Link from "next/link";
+import { LayoutGrid } from "lucide-react";
 
 import { AGENT_STATUS } from "@/lib/agents/registry";
 import { cn } from "@/lib/utils";
@@ -50,6 +52,66 @@ export function AgentNav({ agents, currentPath }) {
             <AgentRow agent={agent} current={currentPath === agent.href} />
           </li>
         ))}
+      </ul>
+    </nav>
+  );
+}
+
+/**
+ * The same navigation for a phone: one row that scrolls sideways — every agent, with the overview
+ * first — instead of a column stacked above the page. As a column it pushed the page's own head
+ * some 600 pixels down a 390-pixel-wide screen; as a row it takes one line. The current agent is
+ * scrolled into view, since on a narrow screen it may be past the edge.
+ *
+ * @param {object} props
+ * @param {Array<object>} props.agents rows from `buildAgentRows`
+ * @param {string} [props.currentPath] the route being viewed
+ * @param {string} [props.overviewHref] the overview of every agent, listed first as "All agents"
+ * @param {string} [props.className]
+ */
+export function AgentNavCompact({ agents, currentPath, overviewHref, className }) {
+  const current = useRef(null);
+  useEffect(() => {
+    current.current?.scrollIntoView?.({ block: "nearest", inline: "center" });
+  }, [currentPath]);
+
+  const rows = [
+    ...(overviewHref ? [{ id: "overview", name: "All agents", href: overviewHref, icon: LayoutGrid, status: AGENT_STATUS.idle, overview: true }] : []),
+    ...agents,
+  ];
+  if (!rows.length) return null;
+
+  return (
+    <nav aria-label="Agents" className={cn("-mx-1 overflow-x-auto px-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden", className)}>
+      <ul className="flex w-max gap-1">
+        {rows.map((agent) => {
+          const here = currentPath === agent.href;
+          const style = STATUS_STYLE[agent.status] ?? STATUS_STYLE[AGENT_STATUS.unknown];
+          const Icon = agent.icon;
+          return (
+            <li key={agent.id}>
+              <Link
+                ref={here ? current : undefined}
+                href={agent.href}
+                aria-current={here ? "page" : undefined}
+                className={cn(
+                  "flex items-center gap-1.5 whitespace-nowrap rounded-full border px-2.5 py-1 text-xs font-medium outline-none transition-colors",
+                  "focus-visible:ring-2 focus-visible:ring-ring/70",
+                  here ? "border-orb-line bg-orb-raised text-orb-white" : "border-transparent text-orb-gray hover:bg-orb-raised/60 hover:text-orb-white",
+                )}
+              >
+                <Icon aria-hidden="true" className={cn("size-3.5", style.icon)} />
+                {agent.name}
+                {agent.status === AGENT_STATUS.working && (
+                  <span aria-hidden="true" className="size-1.5 rounded-full bg-orb-lime motion-safe:animate-pulse" />
+                )}
+                {!agent.overview && (
+                  <span className="sr-only">, {agent.label ?? STATUS_LABEL[agent.status] ?? STATUS_LABEL[AGENT_STATUS.unknown]}</span>
+                )}
+              </Link>
+            </li>
+          );
+        })}
       </ul>
     </nav>
   );
