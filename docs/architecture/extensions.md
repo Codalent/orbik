@@ -11,7 +11,7 @@ There are two halves, one for the server processes and one for the web app:
 | | Where | What it can do |
 |---|---|---|
 | Server extensions | `ORBIK_EXTENSIONS`, loaded by the API, the worker, the scheduler and `grant:crawl-budget` | plan limits, events, the edition and its features, API routes, scheduler loops, worker agents, agents in the catalog with their tools and runtimes, the email sender, signup checks |
-| Web extensions | the `@orbik/web-extensions` package the web app imports | rail items, pages, settings sections, banners, agents' pages, account pages, account menu items |
+| Web extensions | the `@orbik/web-extensions` package the web app imports | rail items, pages, settings sections, banners, agents' pages, account pages, account menu items, signup fields, notices in the create-workspace wizard |
 
 The rule that keeps the two repositories honest: **core starts and serves every page with no
 extension loaded**, and core never imports an extension. ESLint enforces the second
@@ -207,9 +207,10 @@ them. A deployment's package may leave any of them out.
 | `settingsSections: [{ id, title, description?, Component, feature? }]` | at the end of a workspace's Settings navigation, each its own page at `/workspaces/:id/settings/extensions/<id>` |
 | `banners: [{ id, Component, feature? }]` | above every page of a workspace |
 | `agentPages: { [slug]: { name, icon?, Component?, feature? } }` | an agent a server extension added to the catalog ([Agents](#agents)), in the Agents overview and the workspace's agent lists, linking to `/workspaces/:id/agents/<slug>`; with a `Component` that page is the extension's (it gets `agentSlug` too), without one the generic agent page. A slug core has a page for keeps core's |
-| `accountPages: { [path]: { Component, feature? } }` | at `/account/<path>`, about the signed-in account rather than a workspace, for anyone signed in (a person with no workspace yet included), in the Admin page's frame; the component draws the page, heading included, and gets `path` and `api` |
+| `accountPages: { [path]: { Component, feature? } }` | at `/account/<path>` (core's own `/account/password` keeps its page), about the signed-in account rather than a workspace, for anyone signed in (a person with no workspace yet included), in the Admin page's frame; the component draws the page, heading included, and gets `path` and `api` |
 | `signupFields: [{ id, Component, feature? }]` | in the signup form, above its button. The component gets `onChange(value)`, to set the field's text (or `null` to drop it), and `attempt`, which counts the times the form was sent, so a one-use token such as a captcha's can be renewed after a refusal. The values travel with the signup as `extensions` and reach the API's `checkSignup` as `fields` (`id`: lowercase letters, digits and dashes; at most 10 fields of 4096 characters) |
-| `userMenuItems: [{ id, label, href, icon?, feature? }]` | in the account menu, after Admin and before Source code; `href` is a path in the app (`/account/billing`) or an `https://` address, opened in a new tab |
+| `userMenuItems: [{ id, label, href, icon?, feature? }]` | in the account menu, after Admin and Change password and before Documentation and Source code; `href` is a path in the app (`/account/billing`) or an `https://` address, opened in a new tab |
+| `workspaceCreateNotices: [{ id, Component, feature? }]` | in the create-workspace wizard (`/workspaces/new`), above its buttons, on both steps (the name, then the website), to tell the person something before a workspace is made: what it will cost, a limit reached. The component gets `api` only and renders nothing when it has nothing to say; it sits inside the wizard's form, so a button in it needs `type="button"` |
 
 Components are client components and receive `workspaceId` (on a workspace's pages) and `api` — the app's own client
 (`api.fetch(path, init)`), so requests carry the session, the CSRF token and the error envelope as

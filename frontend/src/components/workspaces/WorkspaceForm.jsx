@@ -12,6 +12,7 @@ import { AuthError, AuthField, AuthPanel } from "@/components/auth/AuthFrame";
 import { cn } from "@/lib/utils";
 import { WORKSPACES_PATH, createWorkspace } from "@/lib/api/workspaces";
 import { useAuth } from "@/lib/auth/AuthProvider";
+import { extensionApi, useExtensionSlots } from "@/lib/extensions/slots";
 import { workspaceSchema } from "@/lib/validation/workspace";
 import { workspaceHomePath } from "@/lib/workspaces/home";
 
@@ -20,10 +21,15 @@ import { workspaceHomePath } from "@/lib/workspaces/home";
  * panel as the signed-out pages, because a new account lands here before it has a workspace to
  * be inside. The draft is kept in memory across the steps, and one idempotency key covers every
  * retry of the same attempt.
+ *
+ * A deployment's extension may say something here before a workspace is made — what it will cost,
+ * a limit — with `workspaceCreateNotices` (`@orbik/web-extensions`), drawn above the buttons on both
+ * steps. With none the form is exactly the two fields.
  */
 export function WorkspaceForm({ onCreated, canCancel = false, onCancel }) {
   const [step, setStep] = useState(1);
   const auth = useAuth();
+  const { workspaceCreateNotices } = useExtensionSlots();
   const router = useRouter();
   const { mutate } = useSWRConfig();
   const idempotencyKey = `workspace-${useId().replaceAll(":", "_")}-000000000000`;
@@ -74,13 +80,16 @@ export function WorkspaceForm({ onCreated, canCancel = false, onCancel }) {
         {errors.root && <AuthError>{errors.root.message}</AuthError>}
         {step === 1 ? (
           <AuthField htmlFor="workspace-name" label="Workspace name" error={errors.name?.message} errorId="workspace-name-error">
-            <Input key="workspace-name" id="workspace-name" autoComplete="organization" aria-invalid={Boolean(errors.name)} aria-describedby={errors.name ? "workspace-name-error" : undefined} {...register("name")} />
+            <Input key="workspace-name" id="workspace-name" autoComplete="organization" autoFocus aria-invalid={Boolean(errors.name)} aria-describedby={errors.name ? "workspace-name-error" : undefined} {...register("name")} />
           </AuthField>
         ) : (
           <AuthField htmlFor="website-url" label="Website URL" error={urlError?.message} errorId="website-url-error">
-            <Input key="website-url" id="website-url" type="url" placeholder="https://example.com" aria-invalid={Boolean(urlError)} aria-describedby={urlError ? "website-url-error" : undefined} {...register("websiteUrl")} />
+            {/* Text rather than type="url", which a browser marks invalid without a scheme: a bare
+                host is accepted and means https:// there. */}
+            <Input key="website-url" id="website-url" type="text" inputMode="url" autoComplete="url" autoCapitalize="none" spellCheck={false} autoFocus placeholder="example.com" aria-invalid={Boolean(urlError)} aria-describedby={urlError ? "website-url-error" : undefined} {...register("websiteUrl")} />
           </AuthField>
         )}
+        {workspaceCreateNotices.map(({ id, Component }) => <Component key={id} api={extensionApi} />)}
         <div className="flex flex-wrap items-center justify-between gap-3 border-t border-orb-line/70 pt-5">
           <div>{step === 2 && <Button type="button" variant="outline" onClick={() => setStep(1)} disabled={isSubmitting}>Back</Button>}</div>
           <div className="flex flex-wrap gap-2">
@@ -92,5 +101,40 @@ export function WorkspaceForm({ onCreated, canCancel = false, onCancel }) {
         </div>
       </form>
     </AuthPanel>
+  );
+}
+
+/**
+ * Who is signed in, and a way out, under the wizard: an account that has no workspace yet sees
+ * nothing else of the app, so this line is its only account menu.
+ */
+export function WorkspaceFormAccount() {
+  const auth = useAuth();
+  const router = useRouter();
+  const [leaving, setLeaving] = useState(false);
+  if (!auth.user?.email) return null;
+
+  async function signOut() {
+    setLeaving(true);
+    try {
+      await auth.signOut();
+    } finally {
+      router.replace("/login");
+    }
+  }
+
+  return (
+    <p className="[overflow-wrap:anywhere]">
+      Signed in as <span className="text-orb-gray">{auth.user.email}</span>
+      {" · "}
+      <button
+        type="button"
+        onClick={signOut}
+        disabled={leaving}
+        className="rounded-sm text-orb-gray underline decoration-orb-muted/70 underline-offset-4 transition-colors hover:text-orb-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/70 disabled:opacity-60"
+      >
+        {leaving ? "Signing out…" : "Sign out"}
+      </button>
+    </p>
   );
 }
