@@ -87,6 +87,8 @@ function SetupSteps({ state, work, wait }) {
   const coverage = state?.coverage ?? {};
   const stored = coverage.stored ?? 0;
   const ai = aiAvailability({ state, edition: library.edition, work });
+  // The agent's own setup once it is read, the Library's read before.
+  const working = work.setup ? Boolean(work.working) : Boolean(state?.writer?.working);
   const steps = [
     {
       key: "crawl",
@@ -95,11 +97,13 @@ function SetupSteps({ state, work, wait }) {
       note: stored ? `${stored.toLocaleString()} ${stored === 1 ? "page" : "pages"} copied into Sources` : null,
     },
     { key: "structure", label: "Folders chosen", done: !state?.structure?.needsChoice },
-    { key: "work", label: "Agent set to work", done: Boolean(work.working) },
+    { key: "work", label: "Agent set to work", done: working },
     {
       key: "ai",
       label: wait?.kind === "plan" ? "Included in the workspace's plan" : "AI available to write with",
-      done: wait?.kind === "plan" ? false : ai === "available",
+      // Not known until the scheduler's first pass after the agent is set to work, which says so
+      // within a minute; until then it is taken as there rather than shown as the hold-up.
+      done: wait?.kind !== "plan" && (ai === "available" || (ai === "unknown" && working)),
     },
     { key: "write", label: "Overview and folders written", done: false, moving: work.inFlight },
   ];
