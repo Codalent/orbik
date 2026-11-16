@@ -9,6 +9,8 @@ import { createUserRepository } from "./repositories/userRepository.js";
 import { createWorkspaceRepository } from "./repositories/workspaceRepository.js";
 import { createAuthService } from "./services/authService.js";
 import { createAuthRouter } from "./routes/authRoutes.js";
+import { createGoogleSignInService } from "./services/googleSignInService.js";
+import { createGoogleSignInRouter } from "./routes/googleSignInRoutes.js";
 import { createWorkspaceService } from "./services/workspaceService.js";
 import { createWorkspaceRouter } from "./routes/workspaceRoutes.js";
 import { createWorkspaceErasureRepository } from "./repositories/workspaceErasureRepository.js";
@@ -112,6 +114,15 @@ export function createApp({ config, database, readiness, extensions = createExte
       ? { collection: collections.signupVerifications, sendEmail, origin: config.frontendOrigins[0], logger: log }
       : null,
   });
+  // Signing in with Google, when GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET are set; null otherwise.
+  const googleSignIn = config.googleClientId
+    ? createGoogleSignInService({
+      config,
+      userRepository,
+      signup: { open: config.signup === "open", check: (attempt) => extensions.checkSignup(attempt), events: extensions },
+      logger: log,
+    })
+    : null;
   const setupService = createSetupService({ database, userRepository, events: extensions });
   // Getting in when signup is closed (an access request an admin approves), and back in without
   // the password (a reset link).
@@ -309,7 +320,7 @@ export function createApp({ config, database, readiness, extensions = createExte
   app.use(createHealthRouter(readiness));
   // devbar, the development toolbar, when ORBIK_DEVBAR is on: no session, the API's CORS only.
   if (devbar) app.use(DEVBAR_PATH, devbar.handle);
-  app.use(createEditionRouter({ extensions, config, setupRequired: () => setupService.required(), passwordReset: passwordResetService.selfService ? "email" : "admin" }));
+  app.use(createEditionRouter({ extensions, config, setupRequired: () => setupService.required(), passwordReset: passwordResetService.selfService ? "email" : "admin", signInWith: googleSignIn ? ["google"] : [] }));
   app.use(createSessionMiddleware(config, log));
   app.use(createAuthRouter({
     config,
@@ -318,6 +329,7 @@ export function createApp({ config, database, readiness, extensions = createExte
     csrfProtection,
     rateLimitCollection: collections.rateLimits,
   }));
+  if (googleSignIn) app.use(createGoogleSignInRouter({ config, googleSignIn, rateLimitCollection: collections.rateLimits, logger: log }));
   app.use(createAccessRouter({
     accessRequestService,
     passwordResetService,

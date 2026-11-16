@@ -179,7 +179,7 @@ export function createAuthService({
         throw new AppError({ status: 403, code: "SIGNUP_DISABLED", message: "Self-service signup is unavailable." });
       }
       try {
-        await signup.check({ email, fields, request });
+        await signup.check({ email, fields, request, method: "password" });
       } catch (error) {
         // An extension's refusal is answered as it was given — a 4xx status and a code of its own —
         // and anything else it throws is a fault, answered as one.

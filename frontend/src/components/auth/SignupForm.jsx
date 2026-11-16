@@ -15,6 +15,7 @@ import { useExtensionSlots } from "@/lib/extensions/slots";
 import { signupSchema } from "@/lib/validation/auth";
 import { AUTH_LINK, AuthError, AuthField, AuthPanel, AuthPanelFoot } from "./AuthFrame";
 import { SignupDisabledForm } from "./SignupDisabledForm";
+import { AuthDivider, GoogleSignInButton, googleSignInOffered } from "./GoogleSignIn";
 
 /**
  * Creating an account, on an install whose signup is open (`ORBIK_SIGNUP=open`). Closed — the
@@ -77,6 +78,7 @@ export function SignupForm() {
 
   return (
     <AuthPanel title="Create an account" description="Then add your website as your first workspace.">
+      {googleSignInOffered(edition) && <><GoogleSignInButton /><AuthDivider /></>}
       <form onSubmit={handleSubmit(submit)} noValidate className="space-y-5">
         {errors.root && <AuthError>{errors.root.message}</AuthError>}
         <AuthField htmlFor="signup-email" label="Email" error={errors.email?.message} errorId="signup-email-error">

@@ -85,6 +85,15 @@ export function parseEnvironment(source) {
     if (!emailFrom) errors.push("EMAIL_FROM is required when SMTP_URL is set, e.g. Orbik <orbik@example.com>.");
   }
 
+  // Signing in with Google: an OAuth client of the "Web application" type from Google Cloud's
+  // console, whose authorised redirect URI is PUBLIC_API_URL + /v1/auth/google/callback. Both or
+  // neither; with neither, the sign-in pages show no Google button and the routes are not served.
+  const googleClientId = (source.GOOGLE_CLIENT_ID ?? "").trim();
+  const googleClientSecret = (source.GOOGLE_CLIENT_SECRET ?? "").trim();
+  if (Boolean(googleClientId) !== Boolean(googleClientSecret)) {
+    errors.push("GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET are set together, or neither.");
+  }
+
   const sessionMaxAgeSeconds = Number(source.SESSION_MAX_AGE_SECONDS ?? 86400);
   if (
     !Number.isInteger(sessionMaxAgeSeconds) ||
@@ -174,6 +183,8 @@ export function parseEnvironment(source) {
     signupVerifyEmail,
     adminEmails,
     smtpUrl: smtpUrl || null,
+    googleClientId: googleClientId || null,
+    googleClientSecret: googleClientSecret || null,
     emailFrom: emailFrom || null,
     sessionMaxAgeSeconds,
     sessionMaxAgeMs: sessionMaxAgeSeconds * 1000,

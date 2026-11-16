@@ -11,14 +11,19 @@ export function canonicalizeEmail(email) {
  */
 export function createUserRepository(collection) {
   return {
-    /** Creates a validated operational user record. */
-    async create({ email, passwordHash, status = "active" }) {
+    /**
+     * Creates a validated operational user record. `passwordHash` is null for an account made by
+     * signing in with Google, which has none until a password reset gives it one; `googleSub` links
+     * that Google account.
+     */
+    async create({ email, passwordHash, status = "active", googleSub = null }) {
       const now = new Date();
       const document = {
         email: canonicalizeEmail(email),
         passwordHash,
         status,
         selectedWorkspaceId: null,
+        ...(googleSub ? { google: { sub: googleSub, linkedAt: now } } : {}),
         createdAt: now,
         updatedAt: now,
       };
@@ -52,6 +57,30 @@ export function createUserRepository(collection) {
         { email: canonicalizeEmail(email) },
         { projection: { email: 1, status: 1, selectedWorkspaceId: 1 } },
       );
+    },
+
+    /** The account a Google account is linked to, whatever its status, without the password hash. */
+    findByGoogleSub(sub) {
+      return collection.findOne(
+        { "google.sub": String(sub) },
+        { projection: { email: 1, status: 1, selectedWorkspaceId: 1 } },
+      );
+    },
+
+    /**
+     * Links a Google account to an active account that has none linked (or this one already).
+     * False when the account is linked to another Google account, or is not active.
+     */
+    async linkGoogle(userId, sub) {
+      const now = new Date();
+      const result = await collection.updateOne(
+        { _id: toObjectId(userId), status: "active", $or: [{ "google.sub": { $exists: false } }, { "google.sub": String(sub) }] },
+        { $set: { "google.sub": String(sub), updatedAt: now } },
+      );
+      if (result.matchedCount === 1) {
+        await collection.updateOne({ _id: toObjectId(userId), "google.linkedAt": { $exists: false } }, { $set: { "google.linkedAt": now } });
+      }
+      return result.matchedCount === 1;
     },
 
     /**

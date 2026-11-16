@@ -18,6 +18,11 @@ export async function ensureIndexes(database) {
       { email: 1 },
       { unique: true, name: "users_email_unique" },
     ),
+    // One account per Google account. Partial, because most accounts have none linked.
+    database.collection(COLLECTIONS.users).createIndex(
+      { "google.sub": 1 },
+      { unique: true, name: "users_google_sub_unique", partialFilterExpression: { "google.sub": { $type: "string" } } },
+    ),
     database.collection(COLLECTIONS.workspaces).createIndex(
       { ownerId: 1, creationKey: 1 },
       { unique: true, name: "workspaces_owner_creation_key_unique" },
