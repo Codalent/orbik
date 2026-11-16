@@ -80,7 +80,7 @@ export function ForgotPasswordForm() {
       <form onSubmit={handleSubmit(submit)} noValidate className="space-y-5">
         {errors.root && <AuthError>{errors.root.message}</AuthError>}
         <AuthField htmlFor="reset-email" label="Email" error={errors.email?.message} errorId="reset-email-error">
-          <Input id="reset-email" type="email" autoComplete="email" aria-invalid={Boolean(errors.email)} aria-describedby={errors.email ? "reset-email-error" : undefined} {...register("email")} />
+          <Input id="reset-email" type="email" autoComplete="email" autoFocus aria-invalid={Boolean(errors.email)} aria-describedby={errors.email ? "reset-email-error" : undefined} {...register("email")} />
         </AuthField>
         <Button className="h-10 w-full" type="submit" disabled={isSubmitting}>{isSubmitting ? "Sending…" : "Send reset link"}</Button>
       </form>
