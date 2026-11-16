@@ -329,6 +329,10 @@ function libraryFacts(library) {
     filesWritten: library.activeRun?.filesWritten ?? 0,
     copying: library.copying,
     files: library.stats.files,
+    // Why no write run has started, as the Library scheduler last said it, and the newest run: what
+    // the Library page reads to say what its agent waits on, so Home says the same.
+    writer: library.writer ?? null,
+    latestRun: library.latestRun ? { status: library.latestRun.status, error: library.latestRun.error ?? null } : null,
     error: null,
   };
   if (library.firstWrite && library.overview) {

@@ -9,6 +9,7 @@ import { ConnectAiStep } from "./ConnectAiStep";
 import { STEP_STATE, STEP_TITLES, WAITS_FOR, ago, crawlBudgetWords, doneLine, plural, whoCanDo } from "@/lib/home/home";
 import { setAgentWorking } from "@/lib/api/agentSetup";
 import { aiUnavailableText, isAiUnavailableError, useAiAvailability } from "@/lib/ask/ai";
+import { libraryWait } from "@/lib/library/agentWait";
 import { cn } from "@/lib/utils";
 
 /** The agent that writes the Library, whose switch the "Library written" step can turn on. */
@@ -173,7 +174,7 @@ export function SetupChecklist({ home, myEmail, onPreferences, onRetryCrawl, onS
  */
 function StepRow({ step, number, last, open, primary = false, onToggle, home, myEmail, ai, busy, onSkip, onRetryCrawl, onStartCrawl, onChanged }) {
   const title = STEP_TITLES[step.id] ?? step.id;
-  const status = statusLine(step, myEmail, ai);
+  const status = statusLine(step, myEmail, ai, home);
   const bodyId = `home-step-${step.id}`;
   const muted = step.state === STEP_STATE.notPermitted || step.state === STEP_STATE.skipped;
 
@@ -235,7 +236,7 @@ function toneOf(state) {
 }
 
 /** The one line under a step's title: where it stands, in words. */
-function statusLine(step, myEmail, ai) {
+function statusLine(step, myEmail, ai, home) {
   const detail = step.detail ?? {};
   if (step.state === STEP_STATE.done) {
     if (step.id === "ai") return `Connected · ${detail.client ?? "your AI"} last called ${ago(detail.lastUsedAt)}`;
@@ -259,12 +260,12 @@ function statusLine(step, myEmail, ai) {
   }
   if (step.state === STEP_STATE.attention) return detail.error?.message ? "Needs attention" : "The last attempt failed";
   if (step.id === "website" && crawlBudgetWords(detail.budget).blocked) return "No crawl budget";
-  // What the Library is waiting for, most actionable first: a switch somebody can turn on, then
-  // AI the install does not have, then the step before it.
-  if (step.id === "library" && detail.working === false) return "Paused — the Library agent is not set to work";
-  if (step.id === "library" && !ai.reasoning) return "Waits for AI to be available";
+  // What the Library is waiting for, as the Library page itself says it.
+  if (step.id === "library") {
+    const wait = libraryWaitFor(step, home, ai);
+    if (wait) return capitalised(wait.short);
+  }
   if (step.waitsFor) return `Waits for ${WAITS_FOR[step.waitsFor] ?? "the step before"}`;
-  if (step.id === "library") return "Starts on its own within a few minutes";
   return "Not started";
 }
 
@@ -450,7 +451,6 @@ function LibraryStep({ step, home, ai, primary, onChanged }) {
   const detail = step.detail ?? {};
   const text = "max-w-[62ch] text-sm leading-relaxed text-orb-gray";
   const libraryHref = `/workspaces/${id}/library`;
-  const paused = detail.working === false;
   const writes = "the overview first, then the folders around it, from the pages your site links to most";
 
   async function setToWork() {
@@ -466,24 +466,22 @@ function LibraryStep({ step, home, ai, primary, onChanged }) {
     }
   }
 
+  // Before the first write, what it waits on is the Library page's own account (`libraryWait`),
+  // from the same facts — the scheduler's last answer among them — so the two pages agree.
+  const wait = step.state === STEP_STATE.done || step.state === STEP_STATE.inProgress ? null : libraryWaitFor(step, home, ai);
   let sentence;
   if (step.state === STEP_STATE.done) {
     sentence = `Orbik wrote the overview and ${plural(detail.files, "file")} around it, and rewrites them when your site changes.`;
   } else if (step.state === STEP_STATE.inProgress) {
     sentence = `Orbik is writing it: ${writes}.`;
-  } else if (step.state === STEP_STATE.attention) {
-    sentence = isAiUnavailableError(detail.error)
-      ? aiUnavailableText("the Library cannot be written", { isAdmin: ai.isAdmin })
-      : detail.error?.message ?? "The last write did not finish. It is tried again when your site next changes.";
-  } else if (paused) {
-    sentence = `The Library agent is paused, so nothing is written. Set to work, it writes the Library once the folders are chosen — ${writes} — and rewrites it whenever a crawl finds a change.`;
-  } else if (!ai.reasoning) {
-    sentence = `${aiUnavailableText("the Library cannot be written", { isAdmin: ai.isAdmin })} Your pages are still copied into the Library's Sources, word for word.`;
-  } else if (step.waitsFor) {
-    sentence = `Orbik writes it on its own once the folders are chosen: ${writes}.`;
+  } else if (wait?.kind === "failed" && isAiUnavailableError(detail.error)) {
+    sentence = aiUnavailableText("the Library cannot be written", { isAdmin: ai.isAdmin, reason: detail.error?.message });
+  } else if (wait) {
+    sentence = `${wait.title}. ${wait.detail}`;
   } else {
-    sentence = `Orbik starts writing it on its own within a few minutes: ${writes}.`;
+    sentence = `Orbik writes it on its own: ${writes}.`;
   }
+  const paused = wait?.action === "work";
 
   return (
     <>
@@ -499,4 +497,32 @@ function LibraryStep({ step, home, ai, primary, onChanged }) {
       </div>
     </>
   );
+}
+
+/**
+ * What the Library's agent waits on before its first write — `libraryWait`, the Library page's
+ * one account of it — from what the Home read carries: whether the first crawl is in, whether the
+ * folders are chosen, the agent's switch, the scheduler's last answer (`writer`), the newest run,
+ * and whether the install has AI.
+ */
+function libraryWaitFor(step, home, ai) {
+  const detail = step.detail ?? {};
+  const done = (id) => home.steps.find((other) => other.id === id)?.state === STEP_STATE.done;
+  return libraryWait({
+    state: {
+      readiness: { markdownPages: done("website") ? 1 : 0 },
+      structure: { needsChoice: !done("structure"), reason: null },
+      writer: detail.writer ?? { working: detail.working !== false, check: null, everyMs: null },
+      latestRun: detail.latestRun ?? null,
+    },
+    work: { inFlight: step.state === STEP_STATE.inProgress, working: detail.working !== false, run: detail.latestRun ?? null },
+    canEdit: Boolean(step.permitted),
+    isAdmin: ai.isAdmin,
+    edition: ai.reasoning ? null : { ai: { reasoning: false } },
+  });
+}
+
+/** A phrase with its first letter in capitals: "paused" → "Paused". */
+function capitalised(text) {
+  return text ? text[0].toUpperCase() + text.slice(1) : text;
 }
