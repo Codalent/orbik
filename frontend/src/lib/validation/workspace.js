@@ -18,11 +18,24 @@ function canonicalizeWorkspaceName(value) {
   return name;
 }
 
-/** Canonicalizes public HTTP(S) URLs while blocking obvious local/private targets. */
+/** A scheme at the start of an address, as in `https://`. */
+const SCHEME = /^[a-z][a-z\d+.-]*:\/\//iu;
+
+/** What every refusal of an address the form cannot use says, with the shape it wants. */
+const PUBLIC_URL_HINT = "Enter the site's public address, such as https://example.com.";
+
+/**
+ * Canonicalizes public HTTP(S) URLs while blocking obvious local/private targets.
+ *
+ * An address typed without a scheme (`example.com`, `www.example.com/blog`), as people usually
+ * type one, is taken to be https; `http://` still has to be typed for a site without HTTPS. The
+ * value sent to the API is always the full canonical URL.
+ */
 export function canonicalizePublicUrl(value) {
-  const input = value.trim();
+  const typed = value.trim();
+  const input = typed && !SCHEME.test(typed) ? `https://${typed}` : typed;
   let url;
-  try { url = new URL(input); } catch { throw new Error("Enter a complete public website URL."); }
+  try { url = new URL(input); } catch { throw new Error(PUBLIC_URL_HINT); }
   if (!["http:", "https:"].includes(url.protocol) || url.username || url.password) {
     throw new Error("Enter a complete public HTTP or HTTPS URL without credentials.");
   }
@@ -30,7 +43,7 @@ export function canonicalizePublicUrl(value) {
   const privateAddress = ipaddr.isValid(host) && unsafeIpRanges.has(ipaddr.parse(host).range());
   const localName = host === "localhost" || /\.(?:localhost|local|internal|home|lan)$/iu.test(host);
   if (!host || localName || (!host.includes(".") && !ipaddr.isValid(host)) || privateAddress) {
-    throw new Error("Enter a complete public website URL.");
+    throw new Error(PUBLIC_URL_HINT);
   }
   const canonical = url.toString();
   if (canonical.length > 2048) throw new Error("Website URL must not exceed 2048 characters.");

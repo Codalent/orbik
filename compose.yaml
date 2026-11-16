@@ -54,7 +54,12 @@ services:
       context: .
       dockerfile: deploy/Dockerfile
       target: web
-    image: orbik-web:local
+    # Named after the Compose project, so a second install on the same machine (its own
+    # COMPOSE_PROJECT_NAME) builds images of its own instead of replacing this one's. These images
+    # are built here and exist in no registry: `never` stops Compose looking for them on Docker Hub
+    # first, which only prints "pull access denied" before it builds them anyway.
+    image: ${COMPOSE_PROJECT_NAME:-orbik}-web:local
+    pull_policy: never
     restart: unless-stopped
 
   api:
@@ -62,7 +67,8 @@ services:
       context: .
       dockerfile: deploy/Dockerfile
       target: api
-    image: orbik-api:local
+    image: ${COMPOSE_PROJECT_NAME:-orbik}-api:local
+    pull_policy: never
     restart: unless-stopped
     environment:
       <<: *server-environment
@@ -72,8 +78,10 @@ services:
       PORT: "4100"
       TRUST_PROXY: loopback,uniquelocal
       # The address people and AI clients reach this install at. The web app and the API share it.
-      FRONTEND_ORIGINS: ${ORBIK_URL:-http://localhost:8080}
-      PUBLIC_API_URL: ${ORBIK_URL:-http://localhost:8080}
+      # Unset, it follows ORBIK_HTTP_PORT, so moving the port alone keeps the setup link, invite
+      # links and the sign-in checks pointing at the address the install is really on.
+      FRONTEND_ORIGINS: ${ORBIK_URL:-http://localhost:${ORBIK_HTTP_PORT:-8080}}
+      PUBLIC_API_URL: ${ORBIK_URL:-http://localhost:${ORBIK_HTTP_PORT:-8080}}
       # The session and asset-link secrets are generated on first start and kept in the database,
       # unless set here.
       ORBIK_GENERATE_SECRETS: "true"
@@ -101,7 +109,8 @@ services:
       context: .
       dockerfile: deploy/Dockerfile
       target: agents
-    image: orbik-agents:local
+    image: ${COMPOSE_PROJECT_NAME:-orbik}-agents:local
+    pull_policy: never
     restart: unless-stopped
     command: ["node", "src/worker.js"]
     environment:
@@ -115,7 +124,8 @@ services:
         condition: service_healthy
 
   scheduler:
-    image: orbik-agents:local
+    image: ${COMPOSE_PROJECT_NAME:-orbik}-agents:local
+    pull_policy: never
     restart: unless-stopped
     command: ["node", "src/scheduler.js"]
     environment:
@@ -138,6 +148,10 @@ services:
   qdrant:
     image: qdrant/qdrant:v1.19.1
     restart: unless-stopped
+    environment:
+      # Qdrant reports its own anonymous telemetry unless told not to. An install sends nothing
+      # anywhere unless ORBIK_TELEMETRY says so, and that includes the services it bundles.
+      QDRANT__TELEMETRY_DISABLED: "true"
     volumes:
       - qdrant-data:/qdrant/storage
 
