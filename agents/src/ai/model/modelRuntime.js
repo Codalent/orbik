@@ -59,6 +59,7 @@ export function createModelRuntime({ modelRouter, logger }) {
       const route = modelRouter.resolve(definition);
       const usage = emptyUsage();
       const descriptions = tools.list();
+      const offered = new Set(descriptions.map((tool) => tool.name));
 
       yield { type: AGENT_EVENT_TYPES.started };
 
@@ -128,14 +129,22 @@ export function createModelRuntime({ modelRouter, logger }) {
         const calls = response.content.filter((block) => block.type === "tool_use");
         const results = [];
         for (const call of calls) {
-          yield { type: AGENT_EVENT_TYPES.toolStarted, tool: call.name };
+          // A model now and then calls a tool it was never offered — `json`, to hand over its
+          // result, is the usual one. The call is answered as a failure like any other bad call,
+          // so the model can go on; it is not reported as progress, because no tool ran, and an
+          // event naming something that is not a tool is refused, which used to fail the run with
+          // its work done.
+          const known = offered.has(call.name);
+          if (known) yield { type: AGENT_EVENT_TYPES.toolStarted, tool: call.name };
           const outcome = await invokeTool(tools, call, signal, logger);
           results.push(outcome.block);
-          yield {
-            type: AGENT_EVENT_TYPES.toolCompleted,
-            tool: call.name,
-            summary: outcome.summary,
-          };
+          if (known) {
+            yield {
+              type: AGENT_EVENT_TYPES.toolCompleted,
+              tool: call.name,
+              summary: outcome.summary,
+            };
+          }
         }
 
         // Every result goes back in a single user message. Splitting them across messages teaches
@@ -177,7 +186,11 @@ async function invokeTool(tools, call, signal, logger) {
         type: "tool_result",
         tool_use_id: call.id,
         is_error: true,
-        content: error?.message ?? "The tool failed.",
+        // A tool that does not exist is most often the model trying to hand over its result, so
+        // it is told how a result is given as well as that the call went nowhere.
+        content: error?.code === "UNKNOWN_TOOL"
+          ? `${error.message} Call only the tools you were given. To give your final result, reply with it as text, without calling a tool.`
+          : error?.message ?? "The tool failed.",
       },
       summary: "failed",
     };

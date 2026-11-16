@@ -27,6 +27,9 @@ What changed in each release of Orbik. Releases are tagged `vX.Y.Z`; upgrading i
 - **Workspaces and crawling.** A website address typed without `https://` (`example.com`) is taken
   to be HTTPS rather than refused, in the new-workspace form and the crawler's start address and
   sitemaps.
+- **Agents and Ask.** A model that calls a tool it was not given (`json`, to hand over its answer,
+  is the usual one) is told so and goes on to answer, instead of the run failing with
+  `INVALID_AGENT_EVENT` after its work was done. Seen with Ask on its first question.
 - **AI keys.** The OpenAI key is the required one: the embeddings behind search need it. The
   reasoning calls (the Library's knowledge base, Ask, llms.txt, the brand) run on Anthropic or
   OpenAI, chosen with `ORBIK_AI_PROVIDER`; unset, Anthropic when its key is set and OpenAI
