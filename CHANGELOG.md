@@ -42,6 +42,9 @@ What changed in each release of Orbik. Releases are tagged `vX.Y.Z`; upgrading i
   walks through nginx and Certbot. Editing `deploy/Caddyfile` is no longer needed.
 - **Library.** While the Knowledge base agent is paused, the structure step says that proposals
   come once it is set to work, rather than showing a spinner that never ended.
+- **Light mode.** New colours: cool greys in place of green-tinted ones, and stronger blue, orange
+  and red. Main buttons are the brand's bright lime with dark text, as in dark mode, instead of
+  olive. The Orbik logo is black, and the workspace's initial sits on a grey tile.
 
 ## 0.1.0 — 2026-11-09
 

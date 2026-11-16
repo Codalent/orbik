@@ -35,6 +35,9 @@
   --color-orb-white: var(--moon-white);
   --color-orb-gray: var(--satellite-gray);
   --color-orb-muted: var(--text-muted);
+  --color-orb-logo: var(--orbik-logo);
+  --color-monogram: var(--monogram);
+  --color-monogram-foreground: var(--monogram-foreground);
 
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-ring: var(--ring);
@@ -95,26 +98,42 @@
  * The ramp keeps its names, so every `orb-*` class follows without change: the names say a role,
  * not a colour — `orb-black` is the chrome behind the panels, `orb-white` the strongest text.
  *
- * Panels are white and lifted off a grey chrome, and the raised surface is a tint between them
- * so hover states and badges still show on a panel. The accents are deeper shades of the same
- * hues: the dark-mode values are meant to glow on black and are unreadable as text on white.
- * Each one here is at least 4.5:1 on all three surfaces and carries the chrome colour as text
- * when it is a fill, which is how a lime button reads.
+ * Panels are white and lifted off a cool grey chrome, and the raised surface is a tint between
+ * them so hover states and badges still show on a panel. The greys lean slightly blue rather than
+ * green: a green-grey under white panels reads as faded paper, and the page as dull.
+ *
+ * The accents are deeper shades of the same hues: the dark-mode values are meant to glow on black
+ * and are unreadable as text on white. Each one here is at least 4.5:1 on all three surfaces.
+ * Lime is the exception that needs two values: as text, an icon or a dot it is this leaf green,
+ * but as a fill — a main button, the workspace tile — it stays the brand's own #B9F227 with ink
+ * on it, as in dark mode, through `--primary` below. A dark lime fill is olive, not Orbik.
  */
 :root[data-theme="light"] {
-  --orbik-black: #ECEEE9;
+  --orbik-black: #EEF1F4;
   --deep-space: #FFFFFF;
-  --surface-raised: #F2F4EF;
-  --orbit-line: #D9DCD5;
+  --surface-raised: #F3F5F8;
+  --orbit-line: #D8DDE3;
 
-  --orbit-lime: #437000;
-  --signal-cyan: #0A6E80;
-  --solar-orange: #A84D08;
-  --alert-coral: #C42F2F;
+  --orbit-lime: #2F7A12;
+  --signal-cyan: #0072A3;
+  --solar-orange: #C2410C;
+  --alert-coral: #C62828;
 
-  --moon-white: #121417;
-  --satellite-gray: #4B535A;
-  --text-muted: #5F676E;
+  --moon-white: #0D1117;
+  --satellite-gray: #475467;
+  --text-muted: #5B6573;
+}
+
+/*
+ * The Orbik mark's colour: lime on the dark theme, ink on the light one, the way the logo is
+ * printed on white. Not `orb-lime`, which on white is a green for text and status, not the brand.
+ */
+:root {
+  --orbik-logo: var(--orbit-lime);
+}
+
+:root[data-theme="light"] {
+  --orbik-logo: var(--moon-white);
 }
 
 /* The semantic shadcn tokens below are bound to the brand ramp above, in either mode. */
@@ -148,6 +167,13 @@
   --plate: var(--surface-raised);
   --plate-border: var(--orbit-line);
 
+  /*
+   * The workspace's initial, on Home and the invite page: a brand-lime tile on the dark theme. On
+   * the light one it is grey, so the lime on a page is the thing to press, not the workspace's name.
+   */
+  --monogram: var(--primary);
+  --monogram-foreground: var(--primary-foreground);
+
   --sidebar-foreground: var(--moon-white);
 }
 
@@ -156,7 +182,16 @@
 
   /* A menu is a white sheet with a shadow, not a grey one: the raised tint is for things on a panel. */
   --popover: var(--deep-space);
-  --primary-foreground: #FFFFFF;
+
+  /*
+   * A lime fill is the brand lime with ink on it (14:1), as in dark mode; `--ring` stays on the
+   * leaf green above, since a focus ring has to show against white and #B9F227 does not (1.4:1).
+   */
+  --primary: #B9F227;
+  --primary-foreground: var(--moon-white);
+
+  --monogram: var(--orbit-line);
+  --monogram-foreground: var(--moon-white);
 }
 
 /*

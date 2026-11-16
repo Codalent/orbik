@@ -252,13 +252,13 @@ export function InviteAcceptance() {
   );
 }
 
-/** The workspace's initial in a lime tile, as Home's header draws it. */
+/** The workspace's initial in its tile, as Home's header draws it. */
 function WorkspaceMark({ name }) {
   const initial = String(name ?? "").match(/[\p{L}\p{N}]/u)?.[0]?.toUpperCase() ?? "·";
   return (
     <span
       aria-hidden="true"
-      className="flex size-11 items-center justify-center rounded-xl bg-orb-lime font-display text-lg font-bold text-orb-black shadow-[0_0_0_4px_color-mix(in_oklab,var(--color-orb-lime)_14%,transparent)]"
+      className="flex size-11 items-center justify-center rounded-xl bg-monogram font-display text-lg font-bold text-monogram-foreground shadow-[0_0_0_4px_color-mix(in_oklab,var(--color-monogram)_14%,transparent)]"
     >
       {initial}
     </span>

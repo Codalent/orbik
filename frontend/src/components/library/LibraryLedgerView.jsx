@@ -232,7 +232,7 @@ function Selected({ item, state, onInclude, onOpenCopy }) {
               type="button"
               onClick={onInclude}
               disabled={state === "asking"}
-              className="inline-flex h-9 items-center rounded-full bg-orb-lime px-4 text-sm font-medium text-orb-black hover:bg-orb-lime/80 disabled:opacity-50"
+              className="inline-flex h-9 items-center rounded-full bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/80 disabled:opacity-50"
             >
               {state === "asking" ? "Sending…" : "Include"}
             </button>

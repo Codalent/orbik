@@ -258,7 +258,7 @@ function SourceSelection({ node }) {
               type="button"
               onClick={include}
               disabled={asked === "asking"}
-              className="inline-flex h-8 items-center rounded-full bg-orb-lime px-3.5 text-compact font-medium text-orb-black hover:bg-orb-lime/80 disabled:opacity-50"
+              className="inline-flex h-8 items-center rounded-full bg-primary px-3.5 text-compact font-medium text-primary-foreground hover:bg-primary/80 disabled:opacity-50"
             >
               {asked === "asking" ? "Sending…" : "Include"}
             </button>
