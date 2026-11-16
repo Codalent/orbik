@@ -14,6 +14,10 @@ const nextConfig = {
   outputFileTracingRoot: process.env.NEXT_WORKSPACE_ROOT
     ? path.resolve(process.env.NEXT_WORKSPACE_ROOT)
     : repositoryRoot,
+  // Where `next build` writes and `next start` reads the build: `.next` unless NEXT_DIST_DIR names
+  // another directory (relative to frontend/), so a deployment can build into a fresh one while the
+  // old build is still being served, then start the server on it. Set it the same for both.
+  ...(process.env.NEXT_DIST_DIR ? { distDir: process.env.NEXT_DIST_DIR } : {}),
   // The Docker image runs the self-contained server `next build` writes with this, rather than
   // carrying the whole workspace's node_modules. Everywhere else the build is as before.
   ...(process.env.NEXT_OUTPUT === "standalone" ? { output: "standalone" } : {}),

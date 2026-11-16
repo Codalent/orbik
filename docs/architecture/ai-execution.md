@@ -126,6 +126,20 @@ the key). The keys and the setting are read from `agents/.env`. In `backend/.env
 key matters, and it pays for one thing: the embedding an MCP `content_search` needs. The API never
 calls a reasoning model. Every reasoning call goes through the worker.
 
+The web app cannot see either file, so it asks the API. At start the worker also records the two
+answers — whether the reasoning provider's key is set, and whether the embedding key is — in
+`system_state` (`_id: "ai"`: `provider`, `reasoning`, `embeddings`, `recordedAt`; never a key), and
+`GET /v1/edition` reports them as `ai`:
+
+| Field | Means |
+|---|---|
+| `ai.reasoning` | The reasoning provider has its key: agent runs, the Ask chat and plain-code agents' short texts can be served. As the worker last recorded it; left out until a worker has started with this release |
+| `ai.search` | The embedding key is set both in the worker, which builds the index and searches it for the chat, and in the API, which searches it for the Library page and MCP clients |
+
+The API reads the record at most every 15 seconds, so a worker restarted with a new key shows within
+that. A page reads `ai.reasoning === false` to say, before a person presses **Run now**, that the
+run would fail, and disables what needs a model.
+
 Each provider has a route table in `agents/src/ai/model/modelRouter.js` that decides which model
 serves which kind of work; `parseAgentEnvironment` (`agents/src/config/env.js`) puts the chosen one
 on the config as `routes`, and every model router the worker builds is handed it:

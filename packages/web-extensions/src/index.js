@@ -88,8 +88,8 @@ export const agentPages = {};
 export const accountPages = {};
 
 /**
- * Items added to the account menu (the avatar at the top right), after Admin and before Source
- * code. `href` is a path in the web app (`/account/billing`) or an `https://` address, which opens
+ * Items added to the account menu (the avatar at the top right), after Admin and Change password
+ * and before Documentation and Source code. `href` is a path in the web app (`/account/billing`) or an `https://` address, which opens
  * in a new tab.
  *
  * @type {Array<{id: string, label: string, href: string, feature?: string,
@@ -108,3 +108,13 @@ export const userMenuItems = [];
  *   Component: import("react").ComponentType<{onChange: (value: string|null) => void, attempt: number}>}>}
  */
 export const signupFields = [];
+
+/**
+ * Notices in the create-workspace wizard, above its buttons on both steps — what the new workspace
+ * will cost, a limit the account is at — so a deployment can tell the person before a workspace is
+ * made. A notice with nothing to say renders nothing.
+ *
+ * @type {Array<{id: string, feature?: string,
+ *   Component: import("react").ComponentType<{api: object}>}>}
+ */
+export const workspaceCreateNotices = [];

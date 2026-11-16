@@ -9,7 +9,10 @@ export const EDITION_PATH = "/v1/edition";
  * Reads the edition once per page load and keeps it: it changes only when the install is
  * reconfigured or claimed, and the setup page re-reads it when it claims one.
  *
- * @returns {{edition: {edition: string, version: string, features: string[], signup: "open"|"closed", passwordReset: "email"|"admin", signInWith: string[], setupRequired: boolean}|undefined, error: unknown, mutate: Function}}
+ * `ai` says whether the reasoning provider (`reasoning`) and the embedding key (`search`) are
+ * configured; either may be missing when the API cannot know it, so test `=== false`.
+ *
+ * @returns {{edition: {edition: string, version: string, features: string[], signup: "open"|"closed", passwordReset: "email"|"admin", signInWith: string[], setupRequired: boolean, ai?: {reasoning?: boolean, search: boolean}}|undefined, error: unknown, mutate: Function}}
  */
 export function useEdition() {
   const { data, error, mutate } = useSWR(EDITION_PATH, {

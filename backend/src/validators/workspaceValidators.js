@@ -40,6 +40,19 @@ export function canonicalizePublicUrl(value) {
   return canonical;
 }
 
+/**
+ * A workspace's website as people type it: a bare host (`example.com`, `www.example.com`) means
+ * `https://` there. Input that names a scheme is left as it is, and anything that is not a public
+ * host still fails `canonicalizePublicUrl`. Only a workspace's website is read this way; the
+ * crawl's start address and sitemaps are full URLs.
+ */
+export function withAssumedScheme(value) {
+  if (typeof value !== "string") return value;
+  const input = value.trim();
+  if (!input || /^[a-z][a-z0-9+.-]*:\/\//i.test(input)) return input;
+  return `https://${input.replace(/^\/\//, "")}`;
+}
+
 /** Validates the exact workspace creation body and idempotency header. */
 export function validateWorkspaceCreate(req, _res, next) {
   const fields = [];
@@ -52,7 +65,7 @@ export function validateWorkspaceCreate(req, _res, next) {
   try { name = canonicalizeWorkspaceName(req.body?.name); } catch (error) {
     fields.push({ field: "name", code: "INVALID", message: error.message });
   }
-  try { websiteUrl = canonicalizePublicUrl(req.body?.websiteUrl); } catch (error) {
+  try { websiteUrl = canonicalizePublicUrl(withAssumedScheme(req.body?.websiteUrl)); } catch (error) {
     fields.push({ field: "websiteUrl", code: "INVALID", message: error.message });
   }
   const idempotencyKey = req.get("Idempotency-Key")?.trim();
@@ -101,7 +114,7 @@ export function validateWorkspaceUpdate(req, _res, next) {
     }
   }
   if (body.websiteUrl !== undefined) {
-    try { changes.websiteUrl = canonicalizePublicUrl(body.websiteUrl); } catch (error) {
+    try { changes.websiteUrl = canonicalizePublicUrl(withAssumedScheme(body.websiteUrl)); } catch (error) {
       fields.push({ field: "websiteUrl", code: "INVALID", message: error.message });
     }
   }

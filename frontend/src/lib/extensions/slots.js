@@ -29,6 +29,7 @@ const agentPages = record("agentPages");
 const accountPages = record("accountPages");
 const userMenuItems = list("userMenuItems");
 const signupFields = list("signupFields");
+const workspaceCreateNotices = list("workspaceCreateNotices");
 const crawlBudgetLink = (() => {
   const value = exported("crawlBudgetLink");
   return value && typeof value.label === "string" && typeof value.path === "string" ? value : null;
@@ -64,6 +65,7 @@ export function useExtensionSlots() {
     banners: banners.filter(shown),
     userMenuItems: userMenuItems.filter(shown),
     signupFields: signupFields.filter(shown),
+    workspaceCreateNotices: workspaceCreateNotices.filter(shown),
     /** Where more crawl pages are got, as `{ label, path }`, or null when the install offers none. */
     crawlBudgetLink: crawlBudgetLink && shown(crawlBudgetLink) ? crawlBudgetLink : null,
     /** The agents an extension gives a place in the Agents overview, as `[slug, entry]` pairs. */

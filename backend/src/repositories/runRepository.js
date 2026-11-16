@@ -26,7 +26,7 @@ export function toRunSummary(run) {
 }
 
 /** The headline of a result, for a list that must not carry twenty full reports. */
-const OUTCOME_FIELDS = Object.freeze(["mode", "target", "card", "branch", "scores", "improvement", "pullRequest", "summary"]);
+const OUTCOME_FIELDS = Object.freeze(["mode", "target", "card", "branch", "scores", "improvement", "pullRequest", "summary", "note", "incomplete"]);
 
 /**
  * Reduces a result to the fields a list row shows, or null when there is no result.
@@ -38,7 +38,7 @@ const OUTCOME_FIELDS = Object.freeze(["mode", "target", "card", "branch", "score
  */
 function toOutcome(result) {
   if (!result || typeof result !== "object") return null;
-  const outcome = pick(result, OUTCOME_FIELDS);
+  const outcome = { ...pick(result, OUTCOME_FIELDS), ...runNote(result) };
   if (Array.isArray(result.cards)) {
     outcome.cards = result.cards.slice(0, 10).map((entry) => {
       if (!entry || typeof entry !== "object") return entry;
@@ -47,6 +47,31 @@ function toOutcome(result) {
     });
   }
   return Object.keys(outcome).length ? outcome : null;
+}
+
+/**
+ * What a run list says beside "finished" when a run succeeded without its main result: `note`, a
+ * short line in a person's words, and `incomplete` when the main result was not produced.
+ *
+ * An agent records them on its result (the Design system agent does when it rendered the site but
+ * proposed no system). A result recorded before that, which carries only how its proposal went
+ * (`synthesis.status`), is given the same words here, so an older run is not listed as plainly
+ * finished either. A result with neither gives nothing.
+ *
+ * @param {object|null|undefined} result a run's stored result
+ * @returns {{note?: string, incomplete?: boolean}}
+ */
+export function runNote(result) {
+  if (!result || typeof result !== "object") return {};
+  if (typeof result.note === "string" && result.note) {
+    return { note: result.note, ...(result.incomplete === true ? { incomplete: true } : {}) };
+  }
+  const status = result.synthesis?.status;
+  const rendered = result.summary?.rendered;
+  const said = (words) => (Number.isFinite(rendered) ? `Rendered ${rendered} ${rendered === 1 ? "page" : "pages"}; the ${words}` : `The ${words}`);
+  if (status === "skipped") return { note: said("proposal was skipped"), incomplete: true };
+  if (status === "failed") return { note: said("proposal could not be written"), incomplete: true };
+  return {};
 }
 
 /** Copies the named fields that are present. */
