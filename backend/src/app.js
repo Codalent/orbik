@@ -125,7 +125,7 @@ export function createApp({ config, database, readiness, extensions = createExte
       logger: log,
     })
     : null;
-  const setupService = createSetupService({ database, userRepository, events: extensions });
+  const setupService = createSetupService({ database, userRepository, events: extensions, origin: config.frontendOrigins[0] });
   // Getting in when signup is closed (an access request an admin approves), and back in without
   // the password (a reset link).
   const accessRequestService = createAccessRequestService({ database, userRepository, admins, config, sendEmail, events: extensions, logger: log });

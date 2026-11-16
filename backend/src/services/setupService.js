@@ -32,9 +32,10 @@ const GROUP_LENGTH = 4;
  * @param {import("mongodb").Db} options.database
  * @param {object} options.userRepository
  * @param {{emit: Function}} options.events told `account.created` when the first account is made
+ * @param {string} [options.origin] the web app's address, named in the line printed once claimed
  * @param {() => Date} [options.now]
  */
-export function createSetupService({ database, userRepository, events, now = () => new Date() }) {
+export function createSetupService({ database, userRepository, events, origin, now = () => new Date() }) {
   const state = database.collection(COLLECTIONS.systemState);
   const users = database.collection(COLLECTIONS.users);
   // Once an account exists, setup is over for the life of the process: it is never re-opened.
@@ -82,6 +83,9 @@ export function createSetupService({ database, userRepository, events, now = () 
       }
       complete = true;
       await state.deleteOne({ _id: SETUP_ID });
+      // The setup banner is still the last thing in this log, and its link no longer works. Said
+      // under it in the same plain words, so whoever reads the log later is not sent to it.
+      console.log(setupClaimedNotice({ origin }));
 
       await regenerateSession(request.session);
       request.session.userId = user._id.toHexString();
@@ -137,6 +141,12 @@ export function setupBanner({ code, url }) {
   const width = Math.max(...lines.map((line) => line.length)) + 4;
   const rule = "─".repeat(width);
   return [rule, ...lines.map((line) => `  ${line}`), rule].join("\n");
+}
+
+/** The line printed under the setup banner once the first account exists. It names no account. */
+export function setupClaimedNotice({ origin }) {
+  const signIn = origin ? `Sign in at ${new URL("/login", origin).href}` : "Sign in on the web app";
+  return `Orbik is set up: its first account exists, so the setup link and code above no longer work. ${signIn}.`;
 }
 
 function generateCode() {

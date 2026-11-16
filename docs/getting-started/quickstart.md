@@ -7,6 +7,11 @@ site, choose how its Library is organised and connect an AI client.
 
 You need Docker with Compose and about 2 GB of free memory while the images build.
 
+The easiest way is to let an AI coding agent do it: give
+[the install prompt](../self-hosting/README.md#with-an-ai-coding-agent) to Claude Code, Codex or
+Cursor's agent, and it installs Orbik, asks for your keys (step 2) and hands you the setup link
+(step 3). To do it by hand:
+
 ```sh
 git clone https://github.com/Codalent/orbik.git
 cd orbik
