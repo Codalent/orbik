@@ -174,6 +174,17 @@ address and the password's hash in `signup_verifications` (one row per address, 
 makes the account, signs the browser in and only then tells extensions `account.created`. It needs
 email (SMTP or an extension's sender), or the API refuses to start.
 
+With `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` set, the sign-in and signup pages offer
+**Continue with Google** (`GET /v1/edition` lists `google` in `signInWith`). Two browser navigations,
+no JSON: `GET /v1/auth/google/start?next=<path>` keeps a state, a nonce and a PKCE verifier in the
+session and redirects to Google; Google returns to `PUBLIC_API_URL` + `/v1/auth/google/callback`,
+which redeems the code, checks the ID token's claims and signs the browser in, then redirects to the
+web app (`next`, or `/`), or to `/login?google=<reason>` when it does not. An account is found by
+`users.google.sub`, or else by an address Google says is verified and linked then; a new one
+(no `passwordHash`) is made only with signup open, after the extensions' `checkSignup` (told
+`method: "google"`), and `account.created` says `via: "google"`. Without real Google credentials,
+verify the routes' redirects with `curl` and the service with a fake `fetch` in a throwaway script.
+
 While signup is closed, `/signup` is a **Request access** form: the address goes to
 `access_requests` (one row per address; `POST /v1/access-requests`, the same 202 whoever asks) and
 shows on the install's **Admin** page (`/admin`, in the account menu), where an admin approves it —

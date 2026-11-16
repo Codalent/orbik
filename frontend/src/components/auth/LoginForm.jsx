@@ -14,6 +14,7 @@ import { returnPathFromCurrentUrl } from "@/lib/auth/returnPath";
 import { loginSchema } from "@/lib/validation/auth";
 import { workspaceHomePath } from "@/lib/workspaces/home";
 import { AUTH_LINK, AuthError, AuthField, AuthPanel, AuthPanelFoot } from "./AuthFrame";
+import { AuthDivider, GoogleSignInButton, GoogleSignInError, googleSignInOffered } from "./GoogleSignIn";
 
 /** Accessible credential form with exact password handling and one pending submission. */
 export function LoginForm() {
@@ -25,6 +26,7 @@ export function LoginForm() {
     if (edition?.setupRequired) router.replace("/setup");
   }, [edition?.setupRequired, router]);
   const signupOpen = edition?.signup === "open";
+  const google = googleSignInOffered(edition);
   const { register, handleSubmit, setError, formState: { errors, isSubmitting } } = useForm({
     resolver: zodResolver(loginSchema),
     defaultValues: { email: "", password: "" },
@@ -57,6 +59,8 @@ export function LoginForm() {
       title="Sign in"
       description={signupOpen ? "Use your Orbik account." : "Use the Orbik account you were given or invited to."}
     >
+      <GoogleSignInError />
+      {google && <><GoogleSignInButton /><AuthDivider /></>}
       <form onSubmit={handleSubmit(submit)} noValidate className="space-y-5">
         {errors.root && <AuthError>{errors.root.message}</AuthError>}
         <AuthField htmlFor="email" label="Email" error={errors.email?.message} errorId="email-error">

@@ -87,7 +87,7 @@ extension never fails the action it is told about.
 
 | Event | Where | Payload |
 |---|---|---|
-| `account.created` | API | `{ user: { id, email }, via: "setup" \| "signup" \| "invite" \| "access-request" }` |
+| `account.created` | API | `{ user: { id, email }, via: "setup" \| "signup" \| "invite" \| "access-request" \| "google" }` |
 | `access.requested` | API | `{ request: { id, email } }`, the first time an address asks for access on the closed signup page |
 | `workspace.created` | API | `{ workspace: { id, name, websiteUrl, ownerId }, userId }` |
 | `workspace.deleted` | API | `{ workspace: { id, name, websiteUrl, ownerId }, userId }`, after every record core keeps of it is gone; remove what the extension stored about it |
@@ -106,8 +106,12 @@ extension never fails the action it is told about.
   itself (`express.raw()`) and authenticates by signature, never by session.
 - `host.checkSignup(check)` — runs before a self-service signup (`ORBIK_SIGNUP=open`) creates an
   account, or, with `ORBIK_SIGNUP_VERIFY_EMAIL=true`, before the confirmation link is sent. `check`
-  gets `{ email, fields, request }`: `fields` is what the extension's `signupFields` collected on the
+  gets `{ email, fields, request, method }`: `fields` is what the extension's `signupFields` collected on the
   signup page (below), by field id, such as a captcha's token or a consent; `{}` when there are none.
+  `method` is `password` for the signup form and `google` for an account made by signing in with
+  Google (`GOOGLE_CLIENT_ID`), which has no form and so no `fields`: a check that needs a field
+  should decide what a Google signup needs instead. A refusal there sends the person back to the
+  sign-in page with a general "cannot sign up here".
   Throw an error with a 4xx `status` and a `code` to refuse it with that answer, which the signup
   page shows. With confirmation on, `account.created` is told when the link is confirmed, not when
   the form is sent.

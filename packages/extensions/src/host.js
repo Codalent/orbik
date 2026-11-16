@@ -15,7 +15,7 @@ export const PROCESSES = Object.freeze(["api", "worker", "scheduler", "script"])
  * throws is logged and otherwise ignored: an extension metering or mailing never fails the action
  * it is told about.
  *
- * - `account.created` (API): `{ user: { id, email }, via: "setup" | "signup" | "invite" }`
+ * - `account.created` (API): `{ user: { id, email }, via: "setup" | "signup" | "invite" | "access-request" | "google" }`
  * - `workspace.created` (API): `{ workspace: { id, name, websiteUrl, ownerId }, userId }`
  * - `workspace.deleted` (API): `{ workspace: { id, name, websiteUrl, ownerId }, userId }`, after
  *   every record of it core keeps is gone; an extension removes what it stored about it

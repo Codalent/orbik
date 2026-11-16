@@ -42,6 +42,32 @@ reach its owner. That needs email to be set up (`SMTP_URL`).
 
 Settings like these are listed in [Configuration](../self-hosting/configuration.md).
 
+## Signing in with Google
+
+With `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` set, the sign-in page, and the signup page when
+signup is open, offer **Continue with Google**.
+
+- **An address that already has an account** signs in to it, whichever way the account was made,
+  as long as Google says it has verified the address. That links the Google account: from then
+  on the account is found by it. The password, if the account has one, keeps working.
+- **An address with no account** gets one only when signup is open (`ORBIK_SIGNUP=open`). It is
+  made at once, without a confirmation email, since Google has confirmed the address already, and
+  it has no password: **Forgot password?** gives it one. With signup closed, the sign-in page says
+  there is no account, and the person asks for an invite or for access as before.
+- An account linked to one Google account does not sign in with another that has the same address
+  (an address moved between Google accounts). Sign in with the password, or with the first one.
+
+To set it up, make an OAuth client in [Google Cloud's console](https://console.cloud.google.com/apis/credentials):
+
+1. On the **OAuth consent screen**, choose *External*, name the app and add the `openid` and
+   `email` scopes. Nothing else is asked for.
+2. Under **Credentials**, create an **OAuth client ID** of the type *Web application*, with this
+   authorised redirect URI: your install's address followed by `/v1/auth/google/callback`, such as
+   `https://orbik.example.com/v1/auth/google/callback` (`ORBIK_URL`, or `PUBLIC_API_URL` without
+   Docker, where the API's own address is the one that counts).
+3. Put the client's ID and secret in `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` and start the
+   install again.
+
 ## The Admin page
 
 The install's admins are the addresses in `ORBIK_ADMIN_EMAILS` (comma-separated), or, with it

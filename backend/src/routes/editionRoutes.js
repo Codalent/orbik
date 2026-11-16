@@ -32,8 +32,10 @@ export const ORBIK_VERSION = (() => {
  * @param {() => Promise<boolean>} options.setupRequired whether no account exists yet
  * @param {"email"|"admin"} [options.passwordReset] how a forgotten password is reset: a link the
  *   person is emailed, or one the install's admin makes for them (no email configured)
+ * @param {string[]} [options.signInWith] the other ways to sign in the sign-in page offers besides
+ *   a password: `google` when GOOGLE_CLIENT_ID is set
  */
-export function createEditionRouter({ extensions, config, setupRequired, passwordReset = "admin" }) {
+export function createEditionRouter({ extensions, config, setupRequired, passwordReset = "admin", signInWith = [] }) {
   const router = Router();
   router.get("/v1/edition", async (_req, res, next) => {
     try {
@@ -45,6 +47,7 @@ export function createEditionRouter({ extensions, config, setupRequired, passwor
         features,
         signup: config.signup,
         passwordReset,
+        signInWith,
         setupRequired: await setupRequired(),
       });
     } catch (error) { next(error); }
