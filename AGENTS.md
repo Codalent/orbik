@@ -119,7 +119,9 @@ and structured answers plain-code agents ask for — goes to one provider, `ORBI
 (`anthropic` or `openai`; unset, Anthropic when `ORBIK_ANTHROPIC_API_KEY` is set and OpenAI
 otherwise), through that provider's table in `agents/src/ai/model/modelRouter.js`
 (`ANTHROPIC_ROUTES`, `OPENAI_ROUTES`; docs/architecture/ai-execution.md). The worker logs the choice
-at start (`ai.provider`). Without the chosen provider's key, model runs fail saying no AI provider
+at start (`ai.provider`) and records whether the provider's key and the embedding key are set in
+`system_state` (`_id: "ai"`), which the API reports as `ai: {reasoning, search}` in `GET /v1/edition`
+so pages can say AI is unavailable before a person presses Run. Without the chosen provider's key, model runs fail saying no AI provider
 is configured and the Library's write run is not started; without the OpenAI key, indexing is
 skipped with a recorded reason and the Library and ask pages say the index is not configured.
 Every page is still copied into the Library's source layer: that step calls no model. The API
