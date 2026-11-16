@@ -1,5 +1,6 @@
 import { AppError } from "../errors/appError.js";
 import { createWorkspaceAccessCheck, hasRole } from "./workspaceAccess.js";
+import { runNote } from "../repositories/runRepository.js";
 
 /**
  * The steps of a workspace's setup, in the order the Home page lists them.
@@ -213,6 +214,8 @@ export function createHomeService({
             startedAt: run.startedAt ? run.startedAt.toISOString() : null,
             finishedAt: run.finishedAt ? run.finishedAt.toISOString() : null,
             startedBy: personOf(run.startedBy),
+            // `note` and `incomplete`: a run that succeeded without its main result says so.
+            ...runNote(run.result),
           })),
         },
       };

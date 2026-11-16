@@ -167,7 +167,7 @@ export function createDesignSystemRuntime({ database, logger, writeStructured, b
         // A design system is read from the crawled site, so without one there is nothing to
         // render. Said as an outcome rather than a failure: nothing went wrong, and the page can
         // tell the person exactly what to do next.
-        const result = { state: DERIVATION_STATES.noCrawl, host: null, summary: emptySummary() };
+        const result = { state: DERIVATION_STATES.noCrawl, host: null, summary: emptySummary(), ...outcomeNote(DERIVATION_STATES.noCrawl) };
         yield { type: AGENT_EVENT_TYPES.progress, step: STEPS.prepare, message: "The site has not been crawled yet, so there are no pages to render" };
         yield { type: AGENT_EVENT_TYPES.completed, result };
         return { result, usage: null };
@@ -194,6 +194,7 @@ export function createDesignSystemRuntime({ database, logger, writeStructured, b
           host,
           derivedAt: existing.derivedAt ? existing.derivedAt.toISOString() : null,
           summary: emptySummary(),
+          ...outcomeNote(DERIVATION_STATES.unchanged),
         };
         yield { type: AGENT_EVENT_TYPES.progress, step: STEPS.fingerprint, message: "The styling is what the system was derived from; nothing to do (STYLE_UNCHANGED)" };
         yield { type: AGENT_EVENT_TYPES.completed, result };
@@ -499,6 +500,7 @@ export function createDesignSystemRuntime({ database, logger, writeStructured, b
         throw new AgentError({ code: "CANCELLED", message: "The run was cancelled.", retryable: false });
       }
 
+      const summary = { ...summarise(stored), pins: system?.pins?.length ?? 0, changes: system?.changes?.length ?? 0 };
       const result = {
         state: system ? DERIVATION_STATES.derived : DERIVATION_STATES.observed,
         host,
@@ -508,7 +510,8 @@ export function createDesignSystemRuntime({ database, logger, writeStructured, b
           status: synthesis.status,
           reason: (visual.reason ?? graphics.reason) ? { code: (visual.reason ?? graphics.reason).code, message: (visual.reason ?? graphics.reason).message } : null,
         },
-        summary: { ...summarise(stored), pins: system?.pins?.length ?? 0, changes: system?.changes?.length ?? 0 },
+        summary,
+        ...outcomeNote(system ? DERIVATION_STATES.derived : DERIVATION_STATES.observed, { synthesis: synthesis.status, rendered: summary.rendered }),
       };
       yield { type: AGENT_EVENT_TYPES.completed, result };
       return { result, usage };
@@ -586,6 +589,30 @@ function summarise(stored) {
     icons: stored.assets.icons.length,
     undetermined: stored.observed.undetermined.length,
   };
+}
+
+/**
+ * The line a run list shows beside "finished" when the run did not end with a complete system:
+ * `note`, and `incomplete` when the run's main result — a proposed system — was not produced.
+ *
+ * The run itself still succeeds in those cases: what was observed is stored and nothing went
+ * wrong in the run. Without the note, a run that rendered the site and skipped the proposal for
+ * want of a model is listed as plainly finished, and nobody looks. The run lists carry both fields
+ * (`outcome` in `GET …/runs`, `latestRun` in the Agents overview).
+ *
+ * @param {string} state one of `DERIVATION_STATES`
+ * @param {{synthesis?: string, rendered?: number}} [facts] how the proposal went, and how many
+ *   pages were rendered
+ * @returns {{note?: string, incomplete?: boolean}}
+ */
+export function outcomeNote(state, { synthesis = null, rendered = 0 } = {}) {
+  const pages = `Rendered ${rendered} ${rendered === 1 ? "page" : "pages"}`;
+  if (state === DERIVATION_STATES.noCrawl) return { note: "Nothing rendered: the site has not been crawled yet", incomplete: true };
+  if (state === DERIVATION_STATES.unchanged) return { note: "Styling unchanged since the last derivation; nothing to do" };
+  if (synthesis === "skipped") return { note: `${pages}; the proposal was skipped`, incomplete: true };
+  if (synthesis === "failed") return { note: `${pages}; the proposal could not be written`, incomplete: true };
+  if (synthesis === "partial") return { note: `${pages}; the graphics language was not described` };
+  return {};
 }
 
 /** The summary of a run that rendered nothing. */
