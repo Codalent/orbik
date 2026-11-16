@@ -70,8 +70,8 @@ export function createLibraryService({
    * The structure step as the Library page shows it: whether the Library is waiting on a choice,
    * what was chosen, what was proposed, and the default to start from when nothing was.
    */
-  async function structureOf(workspaceId) {
-    const setup = await setups.findOne(setupFilter(workspaceId), { projection: { structure: 1 } });
+  async function structureOf(workspaceId, read = null) {
+    const setup = read ?? await setups.findOne(setupFilter(workspaceId), { projection: { structure: 1 } });
     const state = libraryStructureState(setup);
     const suggestion = state.suggestion;
     return {
@@ -221,7 +221,7 @@ export function createLibraryService({
      */
     async getLibrary({ userId, workspaceId, path, depth }) {
       const { workspace, site, scope } = await scopeFor(userId, workspaceId, "read-only");
-      const [tree, stats, sources, latestRun, markdownPages, index, sourceCoverage, roles, structure] = await Promise.all([
+      const [tree, stats, sources, latestRun, markdownPages, index, sourceCoverage, roles, setup] = await Promise.all([
         guard(async () => withSelection(scope, await library.tree({ scope, path, depth, maxNodes: 500 }))),
         library.stats({ scope }),
         knowledgeRepository.countSources({ workspaceId: workspace._id, agentSlug: KNOWLEDGE_AGENT_SLUG }),
@@ -230,8 +230,9 @@ export function createLibraryService({
         indexStatus.statusOf({ workspaceId: workspace._id, siteId: site?._id ?? null }),
         coverage.coverageOf({ workspaceId: workspace._id, siteId: site?._id ?? null }),
         library.roles({ scope }),
-        structureOf(workspace._id),
+        setups.findOne(setupFilter(workspace._id), { projection: SETUP_PROJECTION }),
       ]);
+      const structure = await structureOf(workspace._id, setup);
       return {
         // Where the front page and the entry map are: found by role, because they move with the
         // folder they are in when a person renames it.
@@ -250,6 +251,8 @@ export function createLibraryService({
         coverage: sourceCoverage,
         // The top-level structure: chosen, or waiting on the person to choose it.
         structure,
+        // Whether the agent is set to work, and why the Library scheduler last left it waiting.
+        writer: writerOf(setup),
       };
     },
 
@@ -271,7 +274,7 @@ export function createLibraryService({
     async getSetupState({ userId, workspaceId }) {
       const { workspace, scope } = await scopeFor(userId, workspaceId, "read-only");
       const [setup, stats, roles, latestRun, firstWrite, mirroring] = await Promise.all([
-        setups.findOne(setupFilter(workspace._id), { projection: { structure: 1, working: 1 } }),
+        setups.findOne(setupFilter(workspace._id), { projection: SETUP_PROJECTION }),
         library.stats({ scope }),
         library.roles({ scope }),
         runRepository.findLatest({ workspaceId: workspace._id, agentSlug: KNOWLEDGE_AGENT_SLUG }),
@@ -301,6 +304,9 @@ export function createLibraryService({
         // Whether the agent is set to work. Paused, it writes nothing, and the Home page says so
         // rather than leaving "Library written" waiting for a run that is never coming.
         working: Boolean(setup?.working),
+        // Why no write run has started, as the Library scheduler last said it: the same field the
+        // Library page reads, so Home and the Library give one account of the wait.
+        writer: writerOf(setup),
         overview: overview
           ? { path: overview.path, excerpt: openingParagraph(overview.markdown), updatedAt: iso(overview.updatedAt) }
           : null,
@@ -671,6 +677,31 @@ const STATUS_BY_CODE = Object.freeze({
   [LIBRARY_ERROR_CODES.userFolderProtected]: 403,
   [LIBRARY_ERROR_CODES.nodeLocked]: 403,
 });
+
+/** What the Library page reads from the knowledge agent's setup row. */
+const SETUP_PROJECTION = Object.freeze({ structure: 1, working: 1, writeCheck: 1 });
+
+/**
+ * Whether the knowledge agent is set to work, and the Library scheduler's last word on why no
+ * write run has started.
+ *
+ * `check.code` is the scheduler's own reason — `PROVIDER_NOT_CONFIGURED`, `STRUCTURE_NOT_CHOSEN`,
+ * `PLAN_LIMIT_REACHED` (with the `limit` that refused it), `NOTHING_CHOSEN`, `CRAWL_IN_FLIGHT`,
+ * `MIRROR_IN_FLIGHT`, `UP_TO_DATE`, `RUN_STARTED`, … — with `since`, when that became the answer,
+ * and `at`, when it was last given. `everyMs` is how often the scheduler asks, which is how long a
+ * run can take to start once nothing stands in its way. Both are null on a workspace the scheduler
+ * has not looked at since this was recorded. The page words them; nothing here is a sentence.
+ */
+function writerOf(setup) {
+  const check = setup?.writeCheck ?? null;
+  return {
+    working: Boolean(setup?.working),
+    check: check?.reason
+      ? { code: check.reason, limit: check.limit ?? null, since: iso(check.since), at: iso(check.checkedAt) }
+      : null,
+    everyMs: Number.isFinite(check?.everyMs) ? check.everyMs : null,
+  };
+}
 
 /** A moment as ISO text, or null. */
 function iso(value) {

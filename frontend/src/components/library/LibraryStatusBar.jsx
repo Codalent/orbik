@@ -5,6 +5,7 @@ import useSWR from "swr";
 import { useLibrary } from "./libraryContext";
 import { useLibraryFreshness } from "./LibraryFreshness";
 import { libraryNodePath } from "@/lib/api/library";
+import { coverageLine, coverageNote } from "@/lib/library/library";
 import { cn } from "@/lib/utils";
 
 /**
@@ -40,23 +41,35 @@ export function LibraryStatusBar({ activePath, activeTab }) {
   const words = editing && draft
     ? countWords(draft.blocks.map((block) => block.text).join(" "))
     : node?.kind === "file" ? node.words ?? null : null;
-  const agent = work.inFlight ? "working now" : !work.working ? "paused" : work.run?.status === "failed" ? "last run failed" : "idle";
+  // What the agent is waiting on, when anything is: "not run yet" and "idle" with no reason were
+  // what a Library that could never be written used to say for good.
+  const waiting = !work.inFlight && library.wait && library.wait.kind !== "writing" ? library.wait : null;
+  const agent = work.inFlight
+    ? "working now"
+    : waiting
+      ? waiting.short
+      : !work.working ? "paused" : work.run?.status === "failed" ? "last run failed" : "idle";
+  const line = coverageLine(coverage);
 
   return (
     <footer className="hidden h-7 shrink-0 items-center gap-4 overflow-hidden border-t border-orb-line bg-orb-black px-3 text-xs whitespace-nowrap tabular-nums text-orb-muted md:flex">
-      <span className="inline-flex items-center gap-1.5">
+      <span title={waiting?.detail} className={cn("inline-flex items-center gap-1.5", waiting?.tone === "orange" && "text-orb-orange", waiting?.tone === "coral" && "text-orb-coral")}>
         <span
           aria-hidden="true"
           className={cn(
             "size-1.5 rounded-full",
-            work.inFlight ? "bg-orb-lime motion-safe:animate-pulse" : work.working ? "border border-dashed border-orb-muted" : "bg-orb-line",
+            work.inFlight
+              ? "bg-orb-lime motion-safe:animate-pulse"
+              : waiting?.tone === "orange" ? "bg-orb-orange"
+                : waiting?.tone === "coral" ? "bg-orb-coral"
+                  : work.working ? "border border-dashed border-orb-muted" : "bg-orb-line",
           )}
         />
         Knowledge base agent {agent}
       </span>
-      {coverage?.pages > 0 && (
-        <span>
-          {coverage.stored.toLocaleString()} of {coverage.pages.toLocaleString()} pages stored
+      {line && (
+        <span title={coverageNote(coverage)} className="cursor-help">
+          {line}
           {outstanding > 0 && ` · ${outstanding.toLocaleString()} to go`}
         </span>
       )}

@@ -325,7 +325,7 @@ function Row({ node, depth = 0, reference = false, expanded = false, active = fa
       title={reference
         ? `A page of the site, stored in Sources${node.summary ? `: ${node.summary}` : ""}`
         : copy
-          ? `${node.chosen ? "The knowledge base is written from this page" : "Stored, left out of the writing"}${node.url ? ` · ${node.url}` : ""}`
+          ? `${node.chosen ? "Used to write the knowledge base" : "Stored and searchable, not written from"}${node.url ? ` · ${node.url}` : ""}`
           : node.summary || undefined}
     >
       <button
@@ -448,18 +448,25 @@ function indentOf(depth) {
   return 6 + depth * 14;
 }
 
-/** What the two dots under Sources mean, said once below them. */
+/**
+ * What the two dots under Sources mean, said once below them, under a label that says what it is
+ * a key to.
+ */
 function SourceLegend() {
   return (
-    <div className="mx-2 mt-3 flex flex-col gap-1.5 rounded-lg border border-orb-line px-3 py-2.5 text-xs text-orb-muted">
+    <div role="note" className="mx-2 mt-3 flex flex-col gap-1.5 rounded-lg border border-orb-line px-3 py-2.5 text-xs text-orb-muted">
+      <span className="text-2xs font-medium uppercase tracking-[0.12em] text-orb-gray">
+        The dots in Sources
+      </span>
       <span className="flex items-center gap-2">
         <span aria-hidden="true" className="size-[7px] shrink-0 rounded-full bg-orb-gray" />
-        the knowledge base is written from it
+        used to write the knowledge base
       </span>
       <span className="flex items-center gap-2">
         <span aria-hidden="true" className="size-[7px] shrink-0 rounded-full border-[1.5px] border-orb-muted" />
-        stored, left out of the writing
+        stored and searchable, not written from
       </span>
+      <span className="text-orb-muted">The source ledger says why for each page.</span>
     </div>
   );
 }
@@ -526,20 +533,27 @@ const STATUS_LABELS = Object.freeze({
  */
 function AgentStrip() {
   const library = useLibrary();
-  const { work, phases, state } = library;
+  const { work, phases, state, wait } = library;
   const { run, inFlight, working } = work;
   const ready = (state?.readiness?.markdownPages ?? 0) > 0;
-  const waiting = Boolean(state?.structure?.needsChoice);
   const status = inFlight ? (STATUS_LABELS[run?.status] ?? "working now") : run ? STATUS_LABELS[run.status] ?? "idle" : "not run yet";
   const failed = !inFlight && run?.status === "failed";
   const last = work.setup?.lastRunAt ?? run?.finishedAt ?? run?.startedAt;
+  // What it is waiting on, when anything is, rather than "not run yet" with no reason: the same
+  // account the overview and the status line give, with the whole sentence on hover.
+  const waiting = !inFlight && wait && wait.kind !== "writing" ? wait : null;
   const line = inFlight
     ? runHeadline(phases) ?? (work.events.length ? describeRunEvent(work.events.at(-1)) : "Starting…")
-    : !ready
-      ? "Crawl your site first"
-      : waiting
-        ? "Waiting for you to choose its folders"
-        : [status, last ? `wrote ${formatDate(last)}` : null, working ? null : "paused"].filter(Boolean).join(" · ");
+    : waiting
+      ? [sentenceCase(waiting.short), last ? `wrote ${formatDate(last)}` : null].filter(Boolean).join(" · ")
+      : [status, last ? `wrote ${formatDate(last)}` : null, working ? null : "paused"].filter(Boolean).join(" · ");
+  const lineTone = inFlight
+    ? "text-orb-lime"
+    : failed || waiting?.tone === "coral"
+      ? "text-orb-coral"
+      : waiting?.tone === "orange"
+        ? "text-orb-orange"
+        : "text-orb-muted";
   const switchLabel = working
     ? "The agent is set to work: it rewrites the Library whenever a crawl finds a change. Press to pause it."
     : "The agent is paused: your site is still crawled, the Library is left as it is. Press to set it to work.";
@@ -562,7 +576,7 @@ function AgentStrip() {
         </span>
         <div className="min-w-0 flex-1 leading-tight">
           <p className="truncate text-compact font-medium text-orb-white">Knowledge base agent</p>
-          <p role="status" className={cn("truncate text-xs", inFlight ? "text-orb-lime" : failed ? "text-orb-coral" : "text-orb-muted")}>
+          <p role="status" title={waiting ? waiting.detail : undefined} className={cn("truncate text-xs", lineTone)}>
             {line}
           </p>
         </div>
@@ -600,13 +614,28 @@ function AgentStrip() {
           </>
         ) : (
           <>
-            <StripButton onClick={(event) => library.openView(VIEWS.changes, event)}>What changed</StripButton>
-            <StripButton onClick={(event) => library.openView(VIEWS.ledger, event)}>Source ledger</StripButton>
+            <StripButton
+              title="What the agent's last run wrote, changed and left alone, file by file, and what it is waiting on"
+              onClick={(event) => library.openView(VIEWS.changes, event)}
+            >
+              What changed
+            </StripButton>
+            <StripButton
+              title="Every page of your site, and whether the knowledge base is written from it, with the reason"
+              onClick={(event) => library.openView(VIEWS.ledger, event)}
+            >
+              Source ledger
+            </StripButton>
           </>
         )}
       </div>
     </div>
   );
+}
+
+/** A short state as the start of a line: "waiting for its folders" → "Waiting for its folders". */
+function sentenceCase(text) {
+  return text ? text.charAt(0).toUpperCase() + text.slice(1) : text;
 }
 
 /** One of the agent strip's two pill buttons. */

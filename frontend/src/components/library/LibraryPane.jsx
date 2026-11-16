@@ -9,6 +9,7 @@ import { LibraryNodeView } from "./LibraryNodeView";
 import { PANE_ICON_BUTTON, PaneBody, TabIcon, ViewHeader } from "./LibraryPaneParts";
 import { LibraryStructureChoice } from "./LibraryStructureChoice";
 import { useLibrary } from "./libraryContext";
+import { aboutInterval } from "@/lib/library/agentWait";
 import { VIEWS, activeTab, locationOf } from "@/lib/library/workspaceTabs";
 import { cn } from "@/lib/utils";
 import { useShortcut } from "@/lib/keyboard";
@@ -267,6 +268,7 @@ function ChangesView({ pane, tab, focused }) {
         <LibraryRunChanges
           changes={library.changes}
           run={library.work.run}
+          wait={library.wait}
           onOpen={(path) => library.open(path, "tab")}
           onRebuild={library.rebuildStructure}
           className="min-h-0 min-w-0 flex-1 overflow-y-auto px-6 py-6 md:px-10"
@@ -294,9 +296,12 @@ function StructureView({ pane, tab, focused }) {
             key={`${structure.reason}:${structure.suggestion?.generatedAt ?? "none"}`}
             structure={structure}
             working={library.work.working}
-            busy={library.busy}
+            busy={library.busy || library.work.busy}
             onChoose={library.chooseStructure}
             onSuggestAgain={library.suggestStructureAgain}
+            onStartAgent={library.work.working ? null : library.work.toggleWorking}
+            ai={library.ai}
+            startsWithin={aboutInterval(library.state?.writer?.everyMs ?? 60_000)}
           />
         ) : (
           <p className="flex-1 p-8 text-sm text-orb-gray">The Library&apos;s folders have been chosen. Rename, add or move them in the explorer.</p>

@@ -3,6 +3,8 @@
 import { ChevronDown, Library, Pause, Play, Square } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { Panel } from "@/components/ui/panel";
+import { WaitAction } from "./LibraryWaiting";
 import { formatDate } from "@/lib/format";
 import { describeRunEvent } from "@/lib/agents/runEvents";
 import { actionTone, runHeadline } from "@/lib/library/runActivity";
@@ -159,10 +161,12 @@ function timing({ run, events, setup, inFlight, working }, phases, ready) {
  * @param {object|null} props.run
  * @param {(path: string) => void} props.onOpen
  * @param {(() => void)|null} [props.onRebuild] opens the structure step again, when it is not open
+ * @param {object|null} [props.wait] what the agent is waiting on (`libraryWait`), said here too:
+ *   before the first run this panel is where somebody looks for why nothing has happened
  * @param {string} [props.className] replaces the panel's own frame, for a page that gives it a
  *   whole tab rather than a band above the files
  */
-export function LibraryRunChanges({ changes, run, onOpen, onRebuild = null, className, children }) {
+export function LibraryRunChanges({ changes, run, onOpen, onRebuild = null, wait = null, className, children }) {
   return (
     <section
       aria-label="What the last run changed"
@@ -170,7 +174,7 @@ export function LibraryRunChanges({ changes, run, onOpen, onRebuild = null, clas
     >
       <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
         <h2 className="text-sm font-medium text-orb-white">
-          {run?.finishedAt ? `Run of ${formatDate(run.finishedAt)}` : "The last run"}
+          {run?.finishedAt ? `Run of ${formatDate(run.finishedAt)}` : run ? "The last run" : "No run yet"}
         </h2>
         {changes ? (
           <p className="text-xs tabular-nums text-orb-muted">
@@ -183,10 +187,18 @@ export function LibraryRunChanges({ changes, run, onOpen, onRebuild = null, clas
           // still says which of your pages the agent has read, which is the question this panel is
           // most often opened for.
           <p className="text-xs text-orb-muted">
-            {run ? "This run left no record of what it changed." : "No run has been recorded yet."}
+            {run ? "This run left no record of what it changed." : "The agent has not written anything yet."}
           </p>
         )}
       </div>
+
+      {wait && wait.kind !== "writing" && (
+        <Panel role="status" className="mt-3 max-w-2xl">
+          <p className="text-sm font-medium text-orb-white">{wait.title}</p>
+          <p className="mt-1 text-sm leading-relaxed text-orb-gray">{wait.detail}</p>
+          <WaitAction wait={wait} className="mt-3" />
+        </Panel>
+      )}
 
       {changes?.summary && <p className="mt-2 max-w-3xl text-sm text-orb-gray">{changes.summary}</p>}
 

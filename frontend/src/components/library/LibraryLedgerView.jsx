@@ -63,6 +63,10 @@ export function LibraryLedgerView({ pane, tab, focused }) {
   }, [data, filter]);
   const chosen = items.find((item) => (item.key ?? item.url) === selected) ?? items[0] ?? null;
   const site = library.state?.coverage?.pages ? hostOf(items[0]?.url) : null;
+  // The crawl's own count of the site is every address it found; the ledger is the pages with
+  // content. Said once here, so the two figures are not read as a contradiction.
+  const pages = library.state?.coverage?.pages ?? 0;
+  const crawled = library.state?.coverage?.crawl?.addresses ?? 0;
 
   /** Asks for one page, and leaves the row saying what happened either way. */
   async function include(item) {
@@ -97,6 +101,13 @@ export function LibraryLedgerView({ pane, tab, focused }) {
           <h2 className="font-display text-2xl leading-8 font-bold tracking-[-0.035em] text-orb-white">Source ledger</h2>
           <p className="mt-1 mb-4 text-sm text-orb-gray">
             Every page of {site ?? "your site"} the agent has decided about, and whether the knowledge base is written from it.
+            {crawled > pages && pages > 0 && (
+              <>
+                {" "}These are the site&apos;s {pages.toLocaleString()} pages with content. The crawl&apos;s{" "}
+                {crawled.toLocaleString()} addresses also count {(crawled - pages).toLocaleString()} that are not: errors,
+                files such as .md copies, redirects and pages marked noindex, none of them stored.
+              </>
+            )}
           </p>
 
           <div className="mb-3.5 flex flex-wrap items-center gap-2">

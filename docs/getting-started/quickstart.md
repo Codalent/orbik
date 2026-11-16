@@ -80,17 +80,18 @@ recrawling and frequencies.
 Open **Library**. Before Orbik writes anything above the copied pages, you choose its top-level
 folders.
 
-1. At the foot of the Library's explorer is the **Knowledge base agent**. It starts paused: set
-   it to work with its switch. It then rewrites the Library whenever a crawl finds a change.
-2. With the agent at work and your keys set, Orbik reads your site and, within a few
-   minutes, proposes two or three structures, each with a sentence on why it fits. Nothing is
-   proposed while the agent is paused. Orbik's default — `00 Start Here`, `01 Company`,
-   `02 Offer`, … — is always offered too.
-3. Pick one, rename, add, remove or reorder folders if you like, and press
-   **Use this structure**.
+1. The Library opens on **Choose how your Library is organised**. Orbik's default — `00 Start
+   Here`, `01 Company`, `02 Offer`, … — is always offered. With the **Knowledge base agent** set
+   to work (its switch is at the foot of the Library's explorer) and your keys set, Orbik also
+   reads your site and, within a few minutes, proposes two or three structures, each with a
+   sentence on why it fits.
+2. Pick one, rename, add, remove or reorder folders if you like, and press
+   **Use this structure and start writing**. That also sets the agent to work: it rewrites the
+   Library whenever a crawl finds a change.
 
-The agent starts writing within a few minutes. You can rename any folder later, and every link
-follows it.
+The Library opens on the overview, which says what the agent is doing: its first run starts within
+a minute, and the overview follows it as it writes. You can rename any folder later, and every
+link follows it.
 
 ## 7. Read the Library
 

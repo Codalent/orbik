@@ -995,7 +995,22 @@ when all of these hold:
 - a page the knowledge base is written from moved after the newest run started — it was copied
   afresh, was newly chosen, or left the site — or the structure was chosen after it, or there has
   never been a run. The run that follows a choice carries the structure in its input, and is a
-  rebuild when the Library was written before.
+  rebuild when the Library was written before;
+- the workspace's plan, when an extension sets plan limits, includes the agent and AI calls that
+  reason. Otherwise the reason is `PLAN_LIMIT_REACHED`, with the `limit` that refused it (`agents`,
+  `aiCalls` or `reasoningCalls`): the same rules the worker and the AI call log apply once a run
+  starts, asked before it is made, so a workspace over its plan waits with the reason shown rather
+  than collecting a failed run on every change, and its run starts on the next pass after the plan
+  allows it.
+
+**What it decided is kept for the page.** On every pass the scheduler records its answer on the
+knowledge agent's `agent_setups` row as `writeCheck`: the reason (or `RUN_STARTED`), the plan's
+`limit` when one refused it, `since` (when the answer last changed), `checkedAt` (when it was last
+given) and `everyMs` (`AGENT_SOURCE_INTERVAL_MS`, how often it asks). Some reasons only the agents
+process can give — whether a reasoning provider is configured is its environment, not the API's —
+and a Library that waits with no reason shown is the one thing its page must not do. `GET /library`
+carries it as `writer` (below); a `checkedAt` far behind `everyMs` says the scheduler has stopped
+looking. No row is made for it: a workspace without one has never been set to work.
 
 "Moved" is `movedAt` on the page's `source_note_state` row, and only chosen pages have one. A blog
 that publishes daily changes the source layer daily and starts nothing; its index page is linked
@@ -1228,9 +1243,22 @@ showed one file at a time.
   `libraryContext.js`. The agent route for `business-knowledge-base` renders the same page, so a link
   from the agent list lands in one place. The page lands on the overview, at the `overviewPath`
   `GET /library` names, unless the browser remembers tabs or the address names a file; until a run
-  has written an overview, that tab says what it is waiting on instead of reporting a missing file.
+  has written an overview, that tab says what it is waiting on instead of reporting a missing file
+  (`LibraryWaiting.jsx`): the steps before the first write — site crawled, folders chosen, agent set
+  to work, AI available, written — with the one it is stuck on marked, the reason in a sentence, the
+  one action that moves it forward (crawl the site, choose the folders, set the agent to work), and,
+  once a run starts, its progress. The overview's place moves — `/overview` until the folders are
+  chosen, the start folder's after — and a tab left at a place that holds no overview follows it.
   While the Library waits on a structure, the structure step (`LibraryStructureChoice.jsx`) opens as
   a tab of its own, once; an alert brings it back if it was closed.
+- **What the agent is waiting on** is one account, `libraryWait` in `lib/library/agentWait.js`,
+  read by the overview's tab, the agent at the explorer's foot, the status line and What changed:
+  not crawled, folders not chosen, paused, no AI to write with, the workspace's plan, the crawl or
+  the copy still going, the scheduler not looking, or about to start ("within a minute", from
+  `writer.everyMs`). The words depend on the reader: an install's admin (`user.isAdmin`) is told the
+  setting to change; everyone else "AI is not available on this Orbik right now, so …", with no
+  variable name or error code. A reasoning provider counts as missing when the scheduler said
+  `PROVIDER_NOT_CONFIGURED`, a run failed with it, or `GET /v1/edition` says `ai.reasoning: false`.
 - **Tabs, panes and the address.** `lib/library/workspaceTabs.js` is the model, as plain values and
   pure functions: one or two panes, each a strip of tabs, each tab a history of *locations* — a node
   by path, or one of the page's own views (`ledger`, `changes`, `structure`, `empty`) — so Back and
@@ -1264,9 +1292,11 @@ showed one file at a time.
   run write replaces the whole tree and a splice would be lost each time. Read from the root, each
   folder of the mirror is given at most 25 rows for the same reason; a folder that still does not
   fit once fetched says how many more there are and that search finds them.
-  At the explorer's foot is the **agent**: idle, working (with the run's headline) or paused, when
-  it last wrote, the Set to work / Pause switch, and **What changed** and **Source ledger**, each
-  opening a tab — or, while a run is in flight, **This run** (the run in the inspector) and Stop.
+  Under Sources, while it is open, a key headed **The dots in Sources** says what the two dots mean.
+  At the explorer's foot is the **agent**: idle, working (with the run's headline), paused, or what
+  it is waiting on (the whole sentence on hover), when it last wrote, the Set to work / Pause
+  switch, and **What changed** and **Source ledger**, each opening a tab and each saying what it is
+  on hover — or, while a run is in flight, **This run** (the run in the inspector) and Stop.
   There is no Run now.
 - `LibraryPane.jsx`, `LibraryPaneParts.jsx` — one pane: the tab strip (new tab, close, split right
   or close the second pane, show or hide the inspector), and for the tab in front a header of Back,
@@ -1349,20 +1379,27 @@ showed one file at a time.
   left-out page, **Include**; the page chosen in the list is shown beside it — why it was decided as
   it was, what including it does, and **Open the copy** (`GET /library/locate?url=`). The llms.txt
   page keeps the folded `SourceLedger.jsx`.
-- `LibraryStatusBar.jsx` — the line along the foot: the agent's state and how many of the site's
-  pages are stored (and how many are still to go), and, for the focused pane's file, its words, its
-  revision, and whether it is saved — read from the cache the pane filled, never fetched for itself.
+- `LibraryStatusBar.jsx` — the line along the foot: the agent's state (or what it is waiting on)
+  and how many of the site's pages are stored beside how many addresses the crawl found — "30 pages
+  stored, from 68 addresses crawled" — with where the rest went on hover (an error, not a page to
+  store, not fetched yet, a duplicate), and how many are still to go; and, for the focused pane's
+  file, its words, its revision, and whether it is saved — read from the cache the pane filled,
+  never fetched for itself. The crawl counts every address it found; Sources stores the pages with
+  content, and the two figures are both right.
 - `LibraryFolder.jsx` — one folder open: its summary, its children with theirs, and a side column
   saying who made it (which decides whether agents may rename, move or delete it) and how deep it
   sits. A folder that names a listing has a second list, **Pages from the site**: how many, which
   page of the site lists them, and each one opening its copy under Sources. On the Library page it
   is drawn without its own bar (`header={false}`); New file, New subfolder, the lock and "⋯" are in
   the pane's header.
-- `LibraryStructureChoice.jsx` — the structure step: the proposed variants with why each fits, the
+- `LibraryStructureChoice.jsx` — the structure step: two sentences on what the folders are for,
+  the rules behind a **How this works** disclosure, the proposed variants with why each fits, the
   default beside them, and an editor for the picked one (rename, add, remove, reorder folders;
-  the first holds the overview and the index) with "Use this structure". While proposals are
-  pending the page re-reads every eight seconds; when none could be made it says why and offers
-  the default.
+  the first holds the overview and the index). With the agent paused it confirms with **Use this
+  structure and start writing**, which also sets the agent to work, or **Save without starting**;
+  with the agent at work, **Use this structure**. Either lands on the overview's tab, which says
+  what happens next. While proposals are pending the page re-reads every eight seconds; when none
+  could be made, or there is no AI to make them, it says why and offers the default.
 - `LibraryMoveDialog.jsx` — "Rename or move…": name, address (following the name unless edited)
   and parent, with the path shown as it will be and a line saying every link follows. History
   shows a version a rename made as "Links updated: /02-offer was renamed /offer".
@@ -1454,7 +1491,7 @@ and what they stood for is re-derived from the hashes.
 All under `/v1/workspaces/:workspaceId`, owner-scoped. Writes require the session's CSRF token.
 
 ```
-GET    /library?path=&depth=              the tree, overviewPath and indexPath, its size, coverage, the last run, and the structure step
+GET    /library?path=&depth=              the tree, overviewPath and indexPath, its size, coverage, the last run, the structure step, and the writer
 GET    /library/tree?path=&depth=         one branch
 GET    /library/search?q=&path=&limit=    matching files, with a line of context each
 GET    /library/passages?q=&kinds=&limit= passages that answer a question, by meaning; kinds is page,library
@@ -1500,6 +1537,15 @@ given the path of its copy with `library.locatePage`, so every result opens insi
 Without an index it answers `503` with the reason (`INDEX_UNAVAILABLE`, or why the index is not
 configured), not an empty list. `GET /library/backlinks/*path` reads the `links` every file keeps,
 on the `library_nodes_links` index the rename rewrite already uses (`library.backlinks`).
+
+`GET /library` also carries `writer`: `{working, check: {code, limit, since, at} | null, everyMs}`,
+whether the knowledge agent is set to work and the scheduler's last answer on why no write run
+started (`writeCheck`, under [The Library agent](#the-library-agent)); the Library's read for the
+Home page (`getSetupState`) returns the same `writer`. Its `coverage` has `crawl`: `{addresses, errors, notPages,
+notFetched}`, the crawl's own count of the site (every address it did not fold into another as a
+duplicate, which is what the crawl's page reports) and why the ones that are not pages with content
+are not stored — they answered 400 or above, they answered but are not indexable (a non-HTML file
+such as a `.md` twin, a redirect, `noindex`), or they have not been fetched.
 
 `PUT /library/structure` answers `409 STRUCTURE_ALREADY_CHOSEN` once a structure is chosen and no
 rebuild was asked for: after that a structure is changed the way any folder is, by renaming, adding

@@ -18,6 +18,11 @@ Apart from duplicate URLs and pages marked `noindex`, every page is stored, what
 the site. Only the knowledge base is written from a selection, so what a site costs follows the
 size of its knowledge base, not its page count.
 
+The crawl counts more than that: every address it found, including ones that answered with an
+error and files that are not pages, such as the `.md` copy some sites publish beside each page.
+Those are not stored, so the status line along the foot of the Library names both figures — "30
+pages stored, from 68 addresses crawled" — and says on hover where the rest went.
+
 ## Which pages the knowledge base is written from
 
 Code chooses them, with no model asked: up to 80 pages, by how many of the site's pages link to
@@ -28,7 +33,7 @@ logins and carts, paginated and tag listings, and pages with next to nothing on 
 unless somebody asks for them.
 
 **Source ledger**, at the foot of the explorer, lists every page with the reason it was used or
-left out — "Linked from 72 of the site's 72 pages" — under **All**, **Used** and **Left out**. On a
+left out — "Linked from 72 of the site's 72 pages with content" — under **All**, **Used** and **Left out**. On a
 left-out page, **Include** asks for the knowledge base to be written from it too. The row says
 **Queued** until the next write run has used it. A copy's inspector offers the same under **In the
 knowledge base**.
@@ -36,10 +41,10 @@ knowledge base**.
 ## Choosing the top-level folders
 
 The top level of the Library is yours. After the first crawl, once the **Knowledge base agent** is
-set to work (the switch at the foot of the explorer), Orbik reads the site map and the most
-linked-to pages and proposes two or three ways to organise it, each with a line on why it fits,
-beside its default. While the agent is paused nothing is proposed, since a proposal is a model
-call; the default is there either way:
+set to work, Orbik reads the site map and the most linked-to pages and proposes two or three ways
+to organise it, each with a line on why it fits, beside its default. While the agent is paused, or
+when no AI is available, nothing is proposed, since a proposal is a model call; the default is
+there either way:
 
 ```
 00 Start Here   overview · index · open-questions
@@ -52,8 +57,16 @@ call; the default is there either way:
 
 Home calls this step **Choose how your Library is organised**, and the Library opens it as a tab.
 Pick one, rename, add, remove or reorder its folders (up to twelve; the first holds the overview
-and the index), and press **Use this structure**. **Propose again** asks for new proposals. Nothing
-is written until you confirm.
+and the index), and confirm. With the agent paused, **Use this structure and start writing** also
+sets it to work, and **Save without starting** keeps it paused; with the agent already at work the
+button is **Use this structure**. **How this works** on the step has the rules below. **Propose
+from my site** sets the agent to work so that it proposes structures, and **Propose again** asks
+for new ones. Nothing is written until you confirm.
+
+Confirming opens the overview. Until it is written, it lists the steps before the first write —
+site crawled, folders chosen, agent set to work, AI available — marks the one it is waiting on, and
+offers the one action that moves it forward. Once nothing stands in the way the first run starts
+within a minute, and the overview shows its progress, then the overview itself.
 
 After that, agents never write at the top level and never rename, move or delete a folder a person
 made. The numbers are part of each folder's name and nothing more; the order is set with **Move
@@ -98,7 +111,8 @@ What you write is kept:
 
 ## When the knowledge base is rewritten
 
-Nobody starts a write run by hand. At the foot of the explorer, the **Knowledge base agent**
+Nobody starts a write run by hand. At the foot of the explorer, the **Knowledge base agent** line
+says what it is doing, or what it is waiting on (point at it for the whole sentence), and its
 switch decides whether the agent works at all:
 
 - Set to work, it rewrites the knowledge base when a crawl finds that a page it is written from
@@ -109,13 +123,14 @@ switch decides whether the agent works at all:
   base is left as it is.
 
 While a run is in flight, **This run** shows it and **Stop** ends it. **What changed** lists what
-past runs changed. A run that fails is tried again when the site next changes, or when the agent
-is paused and set to work again.
+past runs changed, and, while nothing has been written, why. A run that fails is tried again when
+the site next changes, or when the agent is paused and set to work again.
 
 Writing needs a reasoning key: `ORBIK_ANTHROPIC_API_KEY`, or `ORBIK_OPENAI_API_KEY` on its own
 (`ORBIK_AI_PROVIDER` picks one when both are set; see
 [Configuration](../self-hosting/configuration.md)). Without one the copies and the search index are
-still made. Every model call is listed under
+still made, and the Library says the knowledge base cannot be written: to the install's admins with
+the setting to change, to everyone else as "AI is not available on this Orbik right now". Every model call is listed under
 **Settings** → **AI calls**. On a site of about seventy pages, with Claude making the reasoning
 calls, a first build came to about $0.90 and a structure proposal about $0.10; an ordinary
 update, which reads only the pages that changed, costs a fraction of a first build.

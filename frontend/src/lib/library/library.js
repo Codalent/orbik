@@ -270,6 +270,57 @@ export function writingStatus({ coverage, working, inFlight }) {
 }
 
 /**
+ * How many of the site's pages are stored, said so it can be set beside the crawl's own count:
+ * "30 pages stored, from 68 addresses crawled".
+ *
+ * The two count different things, and both are right. The crawl counts every address it found —
+ * pages, but also addresses that answered with an error, files that are not pages (a `.md` twin of
+ * a page, a PDF), redirects and pages marked `noindex`. Sources stores the pages with readable
+ * content, once each. Side by side without a word on the difference they read as a contradiction,
+ * so the line names both, and {@link coverageNote} says where the rest went.
+ *
+ * @param {object|null|undefined} coverage the `coverage` block of `GET /library`
+ * @returns {string|null}
+ */
+export function coverageLine(coverage) {
+  if (!coverage?.pages) return null;
+  const stored = coverage.stored ?? 0;
+  const pages = coverage.stored === coverage.pages
+    ? `${stored.toLocaleString()} ${stored === 1 ? "page" : "pages"} stored`
+    : `${stored.toLocaleString()} of ${coverage.pages.toLocaleString()} pages stored`;
+  const addresses = coverage.crawl?.addresses ?? 0;
+  return addresses > coverage.pages ? `${pages}, from ${addresses.toLocaleString()} addresses crawled` : pages;
+}
+
+/**
+ * Where every address the crawl found went, as a sentence or two for a hover: the arithmetic
+ * behind {@link coverageLine}.
+ *
+ * @param {object|null|undefined} coverage the `coverage` block of `GET /library`
+ * @returns {string|undefined}
+ */
+export function coverageNote(coverage) {
+  if (!coverage?.pages) return undefined;
+  const count = (value, one, many) => `${value.toLocaleString()} ${value === 1 ? one : many}`;
+  const crawl = coverage.crawl ?? {};
+  const parts = [];
+  if (crawl.addresses) {
+    parts.push(`The crawl found ${count(crawl.addresses, "address", "addresses")}, and ${count(coverage.pages, "is a page", "are pages")} with content.`);
+  }
+  parts.push(`Sources keeps a copy of each page with content: ${count(coverage.stored ?? 0, "is", "are")} stored.`);
+  const left = [
+    crawl.errors ? `${count(crawl.errors, "address answered", "addresses answered")} with an error` : null,
+    crawl.notPages ? `${count(crawl.notPages, "is not a page", "are not pages")} to store (a file such as a .md copy, a redirect, or a page marked noindex)` : null,
+    crawl.notFetched ? `${count(crawl.notFetched, "has", "have")} not been fetched yet` : null,
+    coverage.notStored ? `${count(coverage.notStored, "page repeats", "pages repeat")} another or has no text` : null,
+  ].filter(Boolean);
+  if (left.length) parts.push(`Not stored: ${left.join("; ")}.`);
+  const outstanding = (coverage.pending ?? 0) + (coverage.failed ?? 0);
+  if (outstanding) parts.push(`${count(outstanding, "page is", "pages are")} still to be copied.`);
+  return parts.join(" ");
+}
+
+/**
  * Who wrote a node, as one short label.
  *
  * Both writers are recorded, and "both" is the interesting case rather than an edge one: it is
