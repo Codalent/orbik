@@ -90,6 +90,13 @@ When the install sends email, admins are also told about each new request.
 **Password reset link** makes a reset link for someone who can't get one by email: enter their
 email and choose **Make link**, then send it to them.
 
+## Changing your password
+
+**Change password** in the account menu (the initial at the top right) opens `/account/password`:
+enter the current password and the new one twice. The new password works at once, this browser
+stays signed in, and the account is signed out everywhere else. An account made with **Continue
+with Google** has no password, so the menu does not offer it; **Forgot password?** gives it one.
+
 ## Forgotten passwords
 
 **Forgot password?** on the sign-in page works when the install sends email (`SMTP_URL` and

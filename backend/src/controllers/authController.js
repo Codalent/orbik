@@ -25,6 +25,14 @@ export function createAuthController(authService, cookieName, setupService = nul
       } catch (error) { next(error); }
     },
 
+    /** Changes the signed-in account's password and signs its other sessions out. */
+    async changePassword(req, res, next) {
+      try {
+        const { currentPassword, newPassword } = req.validated;
+        res.json(await authService.changePassword({ userId: req.auth.userId, currentPassword, newPassword, request: req }));
+      } catch (error) { next(error); }
+    },
+
     /**
      * Creates an account when signup is open; refused as `SIGNUP_DISABLED` otherwise. With
      * `ORBIK_SIGNUP_VERIFY_EMAIL` on it makes none yet: it answers 202 with `verificationSent`, and

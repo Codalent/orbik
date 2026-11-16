@@ -194,7 +194,11 @@ way — or dismisses it. The install's admins are the addresses in `ORBIK_ADMIN_
 unset its first account; everyone else gets 404 from `/v1/admin/*`. **Forgot password** on the
 sign-in page emails a one-time `/reset-password/<token>` link (an hour, `password_resets`, only the
 hash stored); using it sets the password, deletes every other session of the account and signs
-this browser in. An install without email cannot send one, so the page says to ask the admin, who
+this browser in. Signed in, **Change password** in the account menu (`/account/password`, `POST
+/v1/auth/password` with `currentPassword` and `newPassword`, five tries per account a quarter hour)
+checks the current password, sets the new one and deletes the account's other sessions, keeping
+this one; the session's `user.hasPassword` is false for an account Google sign-in made, which has
+none to change. An install without email cannot send one, so the page says to ask the admin, who
 makes the link on the Admin page or with `pnpm --dir backend run reset:password -- --email …`.
 `GET /v1/edition` says which (`passwordReset`: `email` or `admin`), and the session's
 `user.isAdmin` whether to show the Admin page. The logo on every signed-out page links to

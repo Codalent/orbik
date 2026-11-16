@@ -37,3 +37,14 @@ export function claimSetup({ code, email, password }) {
 export function logout() {
   return apiFetch("/v1/auth/logout", { method: "POST", body: "{}" });
 }
+
+/**
+ * Changes the signed-in account's password, given its current one. The API signs the account's
+ * other sessions out and answers `{changed, otherSessionsSignedOut}`; this one stays signed in.
+ */
+export function changePassword({ currentPassword, newPassword }) {
+  return apiFetch("/v1/auth/password", {
+    method: "POST",
+    body: JSON.stringify({ currentPassword, newPassword }),
+  });
+}
