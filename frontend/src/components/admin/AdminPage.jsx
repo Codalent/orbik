@@ -57,7 +57,7 @@ export function AdminPage() {
     try {
       if (action === "approve") {
         const result = await approveAccessRequest(row.id);
-        setIssued({ kind: "access", email: row.email, url: result.url, emailed: result.emailed });
+        setIssued({ kind: "access", email: row.email, url: result.url, emailed: result.emailed, emailFailed: result.emailStatus === "failed" });
       } else {
         await dismissAccessRequest(row.id);
       }
@@ -175,7 +175,9 @@ function IssuedLink({ issued, onClose }) {
       <p className="text-sm text-orb-gray">
         {issued.emailed
           ? `We emailed them this link to ${what}. You can also send it yourself.`
-          : `Send them this link to ${what}. It works once, and is shown only now.`}
+          : issued.emailFailed
+            ? `It could not be emailed to them. Send them this link to ${what} yourself. It works once, and is shown only now.`
+            : `Send them this link to ${what}. It works once, and is shown only now.`}
       </p>
       <div className="mt-3 flex gap-2">
         <Input readOnly value={issued.url} aria-label="Link" className="font-mono text-xs" onFocus={(event) => event.target.select()} />

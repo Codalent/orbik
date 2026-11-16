@@ -34,12 +34,17 @@ export const ORBIK_VERSION = (() => {
  *   person is emailed, or one the install's admin makes for them (no email configured)
  * @param {string[]} [options.signInWith] the other ways to sign in the sign-in page offers besides
  *   a password: `google` when GOOGLE_CLIENT_ID is set
+ * @param {() => Promise<{reasoning?: boolean, search: boolean}|null>} [options.aiAvailability] whether
+ *   the reasoning provider and the embedding key are configured (`services/aiAvailability.js`), so
+ *   a page can say that AI is unavailable before a person starts something that needs it; `ai` is
+ *   left out without it
  */
-export function createEditionRouter({ extensions, config, setupRequired, passwordReset = "admin", signInWith = [] }) {
+export function createEditionRouter({ extensions, config, setupRequired, passwordReset = "admin", signInWith = [], aiAvailability = null }) {
   const router = Router();
   router.get("/v1/edition", async (_req, res, next) => {
     try {
       const { name, features } = extensions.edition();
+      const ai = aiAvailability ? await aiAvailability() : null;
       res.set("Cache-Control", "no-store");
       res.json({
         edition: name,
@@ -49,6 +54,7 @@ export function createEditionRouter({ extensions, config, setupRequired, passwor
         passwordReset,
         signInWith,
         setupRequired: await setupRequired(),
+        ...(ai ? { ai } : {}),
       });
     } catch (error) { next(error); }
   });

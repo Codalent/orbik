@@ -38,7 +38,9 @@ whoever asks, so it never tells anyone whether an address already has an account
 account there. Leave it `closed` unless the install is only reachable by people you trust. With
 `ORBIK_SIGNUP_VERIFY_EMAIL=true` as well, signing up sends a link to the address instead, and the
 account is made when that link is opened and confirmed, so every account's address is known to
-reach its owner. That needs email to be set up (`SMTP_URL`).
+reach its owner. That needs email to be set up (`SMTP_URL`). When the email cannot be sent to the
+address (the mail service refused it), the form says so and nothing is kept: check the address and
+sign up again.
 
 Settings like these are listed in [Configuration](../self-hosting/configuration.md).
 
@@ -87,6 +89,13 @@ When the install sends email, admins are also told about each new request.
 
 **Password reset link** makes a reset link for someone who can't get one by email: enter their
 email and choose **Make link**, then send it to them.
+
+## Changing your password
+
+**Change password** in the account menu (the initial at the top right) opens `/account/password`:
+enter the current password and the new one twice. The new password works at once, this browser
+stays signed in, and the account is signed out everywhere else. An account made with **Continue
+with Google** has no password, so the menu does not offer it; **Forgot password?** gives it one.
 
 ## Forgotten passwords
 

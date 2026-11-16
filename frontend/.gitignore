@@ -13,8 +13,9 @@
 # testing
 /coverage
 
-# next.js
+# next.js, and builds made into another directory with NEXT_DIST_DIR (.next-<release>)
 /.next/
+/.next*/
 /out/
 
 # production

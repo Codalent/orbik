@@ -29,6 +29,7 @@ const agentPages = record("agentPages");
 const accountPages = record("accountPages");
 const userMenuItems = list("userMenuItems");
 const signupFields = list("signupFields");
+const workspaceCreateNotices = list("workspaceCreateNotices");
 
 /**
  * The extension slots this install shows: every entry of `@orbik/web-extensions` whose feature,
@@ -60,6 +61,7 @@ export function useExtensionSlots() {
     banners: banners.filter(shown),
     userMenuItems: userMenuItems.filter(shown),
     signupFields: signupFields.filter(shown),
+    workspaceCreateNotices: workspaceCreateNotices.filter(shown),
     /** The agents an extension gives a place in the Agents overview, as `[slug, entry]` pairs. */
     agentPages: Object.entries(agentPages).filter(([, entry]) => shown(entry)),
     /**

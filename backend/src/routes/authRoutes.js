@@ -5,7 +5,7 @@ import { ensureCsrfToken } from "../middleware/csrf.js";
 import { createRateLimit } from "../middleware/rateLimits.js";
 import { requireAuthentication } from "../middleware/auth.js";
 import { hashToken } from "../services/oneTimeLink.js";
-import { validateEmptyBody, validateLogin, validateSetup, validateSignup } from "../validators/authValidators.js";
+import { validateChangePassword, validateEmptyBody, validateLogin, validateSetup, validateSignup } from "../validators/authValidators.js";
 
 /** Builds authentication routes with security middleware in explicit order. */
 export function createAuthRouter({ config, authService, setupService, csrfProtection, rateLimitCollection }) {
@@ -21,6 +21,16 @@ export function createAuthRouter({ config, authService, setupService, csrfProtec
   router.get("/v1/auth/session", ensureCsrfToken, controller.session);
   router.post("/v1/auth/login", ensureCsrfToken, csrfProtection, loginLimit, validateLogin, controller.login);
   router.post("/v1/auth/logout", requireAuthentication, csrfProtection, controller.logout);
+  // Changing the password, signed in: the current one is checked, so it is limited per account as
+  // login is per address, against a stolen session guessing it.
+  const passwordChangeLimit = createRateLimit({
+    collection: rateLimitCollection,
+    keyPrefix: "password-change",
+    points: 5,
+    durationSeconds: 900,
+    keyFromRequest: (req) => String(req.session?.userId ?? req.ip),
+  });
+  router.post("/v1/auth/password", requireAuthentication, csrfProtection, passwordChangeLimit, validateChangePassword, controller.changePassword);
   // Per address, as many accounts an hour as a household or an office would make, and no more:
   // the ceiling is what stops a script filling an open install with accounts.
   const signupLimit = createRateLimit({

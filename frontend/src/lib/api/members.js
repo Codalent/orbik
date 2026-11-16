@@ -34,11 +34,12 @@ export function invitesPath(workspaceId) {
 }
 
 /**
- * Invites an address as `role` and returns `{invite, url, emailed}`.
+ * Invites an address as `role` and returns `{invite, url, emailStatus, emailed}`.
  *
  * `url` is the link the person is sent, and this is the only time it exists anywhere but in the
- * invitee's hands: the server keeps only a hash of its token. `emailed` says whether the install
- * also emailed it, which it does only when it is configured to send email.
+ * invitee's hands: the server keeps only a hash of its token. `emailStatus` says whether the
+ * install also emailed it: `sent`, `failed`, or `not-configured` when it sends no email
+ * (`emailed` is true only for `sent`).
  */
 export function inviteMember(workspaceId, { email, role }) {
   return apiFetch(invitesPath(workspaceId), { method: "POST", body: JSON.stringify({ email, role }) });

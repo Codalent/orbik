@@ -95,7 +95,7 @@ export function NewPasswordForm({ kind }) {
         {/* The address, for a password manager to file the new password under. */}
         <input type="email" name="email" autoComplete="username" value={link.email ?? ""} readOnly hidden />
         <AuthField htmlFor="new-password" label="New password" error={errors.password?.message} errorId="new-password-error" hint="At least 8 characters." hintId="new-password-hint">
-          <Input id="new-password" type="password" autoComplete="new-password" aria-invalid={Boolean(errors.password)} aria-describedby={errors.password ? "new-password-error" : "new-password-hint"} {...register("password")} />
+          <Input id="new-password" type="password" autoComplete="new-password" autoFocus aria-invalid={Boolean(errors.password)} aria-describedby={errors.password ? "new-password-error" : "new-password-hint"} {...register("password")} />
         </AuthField>
         <AuthField htmlFor="confirm-password" label="Confirm password" error={errors.confirm?.message} errorId="confirm-password-error">
           <Input id="confirm-password" type="password" autoComplete="new-password" aria-invalid={Boolean(errors.confirm)} aria-describedby={errors.confirm ? "confirm-password-error" : undefined} {...register("confirm")} />

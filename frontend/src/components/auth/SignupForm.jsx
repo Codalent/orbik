@@ -9,6 +9,7 @@ import { useForm } from "react-hook-form";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { NeutralLoading } from "@/components/NeutralLoading";
+import { describeAccessError } from "@/lib/api/access";
 import { signup } from "@/lib/api/auth";
 import { useEdition } from "@/lib/api/edition";
 import { useExtensionSlots } from "@/lib/extensions/slots";
@@ -56,7 +57,7 @@ export function SignupForm() {
       router.replace("/workspaces/new");
     } catch (error) {
       setAttempt((count) => count + 1);
-      setError("root", { message: error?.message ?? "Signup failed. Try again." });
+      setError("root", { message: describeAccessError(error, "Signup failed. Try again.") });
     }
   }
 
@@ -82,7 +83,7 @@ export function SignupForm() {
       <form onSubmit={handleSubmit(submit)} noValidate className="space-y-5">
         {errors.root && <AuthError>{errors.root.message}</AuthError>}
         <AuthField htmlFor="signup-email" label="Email" error={errors.email?.message} errorId="signup-email-error">
-          <Input id="signup-email" type="email" autoComplete="email" aria-invalid={Boolean(errors.email)} aria-describedby={errors.email ? "signup-email-error" : undefined} {...register("email")} />
+          <Input id="signup-email" type="email" autoComplete="email" autoFocus aria-invalid={Boolean(errors.email)} aria-describedby={errors.email ? "signup-email-error" : undefined} {...register("email")} />
         </AuthField>
         <AuthField htmlFor="signup-password" label="Password" error={errors.password?.message} errorId="signup-password-error" hint="At least 8 characters." hintId="signup-password-hint">
           <Input id="signup-password" type="password" autoComplete="new-password" aria-invalid={Boolean(errors.password)} aria-describedby={errors.password ? "signup-password-error" : "signup-password-hint"} {...register("password")} />

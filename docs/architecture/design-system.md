@@ -357,7 +357,14 @@ Allow 300–600 MB of memory for the browser.
 **No model.** A worker without the reasoning provider's key (`ORBIK_AI_PROVIDER`; see
 [ai-execution.md](ai-execution.md)) still renders, observes and stores the
 assets; the run ends as `state: "observed"` with the proposal skipped (`PROVIDER_NOT_CONFIGURED`),
-and a system already stored is left exactly as it was.
+and a system already stored is left exactly as it was. The run still succeeds — nothing went wrong
+in it — so its result carries a `note` ("Rendered 5 pages; the proposal was skipped") and
+`incomplete: true`, and every list of runs shows the note beside "finished" (`outcome` in
+`GET …/runs`, `latestRun` in the Agents overview, `activity` on Home). A run that found the styling
+unchanged, or the site not yet crawled, carries a note too; one whose graphics language alone was
+not described carries a note without `incomplete`. A run recorded before the note existed is given
+the same words from its `synthesis.status` when it is listed (`runNote` in
+`backend/src/repositories/runRepository.js`).
 
 The upload route is the one session route whose body is not JSON (`BRAND_UPLOAD_PATH` in
 `middleware/security.js`); it keeps the session, the CSRF header and the browser policy. Behind
