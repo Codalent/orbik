@@ -477,7 +477,8 @@ function LibraryStep({ step, home, ai, primary, onChanged }) {
   } else if (wait?.kind === "failed" && isAiUnavailableError(detail.error)) {
     sentence = aiUnavailableText("the Library cannot be written", { isAdmin: ai.isAdmin, reason: detail.error?.message });
   } else if (wait) {
-    sentence = `${wait.title}. ${wait.detail}`;
+    // Where the detail already says the knowledge base cannot be written, the title would say it twice.
+    sentence = wait.kind === "ai" || wait.kind === "plan" ? wait.detail : `${wait.title}. ${wait.detail}`;
   } else {
     sentence = `Orbik writes it on its own: ${writes}.`;
   }
