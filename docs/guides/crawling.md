@@ -7,14 +7,16 @@ Library, search, Ask, llms.txt and the brand — works from what the crawl keeps
 
 1. Create a workspace: give it a **Workspace name**, then the **Website URL** it is about, and
    press **Create workspace**.
-2. On **Home**, the first step is **Connect your website**. **Start first crawl** opens the
-   **Crawler** page, which is also listed under **Agents** in the workspace's rail.
-3. **Start crawling from** is filled in with the workspace's website. Change it if the crawl should
-   begin somewhere else on the same site. Orbik finds sitemaps through robots.txt and the usual
+2. On **Home**, the first step is **Connect your website**. **Start first crawl** starts the crawl
+   from the workspace's website and opens the **Crawler** page, which is also listed under
+   **Agents** in the workspace's rail. The crawl is queued, starts within a minute, and the page
+   follows it without a reload. If it cannot start — the month's crawl budget is used up, say — the
+   step says why.
+3. To begin somewhere else on the same site, or to list sitemaps first, press **Choose the start
+   address or add sitemaps first** instead. On the Crawler's set-up, **Start crawling from** is
+   filled in with the workspace's website. Orbik finds sitemaps through robots.txt and the usual
    locations; only if yours live somewhere unusual, open **Add sitemap URLs** and list them, one
-   per line.
-4. Press **Start crawling this site**. The crawl is queued, starts within a minute, and the page
-   follows it without a reload.
+   per line. Press **Start crawling this site**.
 
 Setting up and starting crawls needs the member role or above. A read-only member sees the
 crawl's results but not the controls.

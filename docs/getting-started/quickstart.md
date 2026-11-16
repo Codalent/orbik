@@ -58,9 +58,11 @@ whose setup checklist walks through the rest of this page.
 
 ## 5. Crawl your site
 
-On **Home**, **Connect your website** has **Start first crawl**, which opens the Crawler. Check the
-address under **Start crawling from** and press **Start crawling this site**. The crawl starts
-within a minute.
+On **Home**, **Connect your website** has **Start first crawl**: it starts the crawl from the
+workspace's website and opens the Crawler, where you can watch it. The crawl starts within a
+minute. To begin somewhere else on the site, or to list sitemaps first, press **Choose the start
+address or add sitemaps first** instead: the Crawler's set-up has **Start crawling from** and
+**Start crawling this site**.
 
 The crawler identifies itself as [OrbikBot](../orbikbot.md), obeys your `robots.txt` and paces its
 requests. When the crawl finishes, every page is copied word for word into the Library under

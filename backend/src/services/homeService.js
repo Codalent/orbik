@@ -161,7 +161,8 @@ export function createHomeService({
       const counted = (group) => steps.filter((step) => step.group === group && step.permitted);
       const essentials = counted("essential");
       const recommended = counted("recommended");
-      const wanting = attentionRows(latestRuns);
+      const broken = brokenPages(crawl);
+      const wanting = attentionRows(latestRuns, broken);
 
       return {
         workspace: { id: id.toHexString(), name: workspace.name, websiteUrl: workspace.websiteUrl ?? null, role: workspace.role },
@@ -195,7 +196,7 @@ export function createHomeService({
             pages: crawl.urls?.pages ?? crawl.urls?.total ?? 0,
             crawling: Boolean(crawl.activeRun) || Boolean(crawl.queued),
             lastCrawl: crawl.latestRun
-              ? { status: crawl.latestRun.status, startedAt: crawl.latestRun.startedAt, finishedAt: crawl.latestRun.finishedAt, error: crawl.latestRun.error }
+              ? { status: crawl.latestRun.status, startedAt: crawl.latestRun.startedAt, finishedAt: crawl.latestRun.finishedAt, error: crawl.latestRun.error, broken }
               : null,
             nextCrawlAt: crawl.site?.nextCrawlAt ?? null,
             budget: crawl.budget,
@@ -213,6 +214,7 @@ export function createHomeService({
             startedAt: run.startedAt ? run.startedAt.toISOString() : null,
             finishedAt: run.finishedAt ? run.finishedAt.toISOString() : null,
             startedBy: personOf(run.startedBy),
+            note: runNote(run),
           })),
         },
       };
@@ -278,9 +280,9 @@ function websiteFacts(crawl, firstCrawl, personOf) {
     host: hostOf(seedUrl),
     configured: Boolean(crawl.site),
     queued: Boolean(crawl.queued),
-    budget: crawl.budget
-      ? { unlimited: crawl.budget.unlimited, allowance: crawl.budget.allowance, remaining: crawl.budget.remaining, resetsAt: crawl.budget.resetsAt }
-      : null,
+    // The month as the crawl page reports it, whole, so whatever it says about the budget — a
+    // month with no allowance told apart from one that was spent — reaches the step's words.
+    budget: crawl.budget ? { ...crawl.budget } : null,
     // The same two figures the activity monitor shows for a crawl: URLs found, pages fetched.
     discovered: run?.counters?.urlsDiscovered ?? 0,
     fetched: run ? (run.counters?.pagesFetched ?? 0) + (run.counters?.pagesNotModified ?? 0) : 0,
@@ -376,25 +378,64 @@ function teamFacts(members, invites, firstMember, firstInvite, personOf) {
   return { state: STEP_STATES.notStarted, detail };
 }
 
+/** The crawler, whose broken pages are a reason to look at it. */
+const CRAWLER_AGENT_SLUG = "crawler";
+
 /**
- * The agents that want somebody's attention: their newest run failed. All of them, newest failure
- * first, for the caller to cut to the top few.
+ * How many pages the last finished crawl found answering with an error — the Crawler page's
+ * "Broken" — or 0. Read from the newest crawl only once it has finished: a crawl in progress has
+ * counted part of the site, and one that failed is a failure, said as one.
  */
-function attentionRows(latestRuns) {
-  return latestRuns
-    .filter((row) => row.agentSlug && !PRIVATE_AGENTS.has(row.agentSlug) && row.status === "failed")
-    .map((row) => ({ agentSlug: row.agentSlug, failedRun: { finishedAt: iso(row.finishedAt), error: row.error } }))
-    .sort((left, right) => String(right.failedRun.finishedAt ?? "").localeCompare(String(left.failedRun.finishedAt ?? "")));
+function brokenPages(crawl) {
+  const run = crawl.latestRun;
+  if (!run || run.status !== "succeeded") return 0;
+  const broken = Number(run.counters?.pagesBroken ?? 0);
+  return Number.isFinite(broken) && broken > 0 ? broken : 0;
 }
 
 /**
- * How many agents want attention, and how many of them failed: the same count, now that a failed
- * run is the only reason one does. Both are kept so the page reads one shape.
+ * What wants somebody's attention: every agent whose newest run failed, newest failure first, and
+ * the crawler when its last crawl found broken pages — first of all, since it is about the site
+ * itself. All of them, for the caller to cut to the top few.
  */
+function attentionRows(latestRuns, broken) {
+  const failed = latestRuns
+    .filter((row) => row.agentSlug && !PRIVATE_AGENTS.has(row.agentSlug) && row.status === "failed")
+    .map((row) => ({ agentSlug: row.agentSlug, failedRun: { finishedAt: iso(row.finishedAt), error: row.error } }))
+    .sort((left, right) => String(right.failedRun.finishedAt ?? "").localeCompare(String(left.failedRun.finishedAt ?? "")));
+  return broken ? [{ agentSlug: CRAWLER_AGENT_SLUG, failedRun: null, brokenPages: broken }, ...failed] : failed;
+}
+
+/** How many agents want attention, and how many of them because their newest run failed. */
 function attentionTotals(rows) {
   return {
     agents: rows.length,
-    failed: rows.length,
+    failed: rows.filter((row) => row.failedRun).length,
+  };
+}
+
+/** The longest note a run's line on Home carries. */
+const NOTE_LENGTH = 240;
+
+/**
+ * What a run wants said beside how it ended, or null: a note the run recorded on its result
+ * (`note`, or `outcome.note`), or else a part of it that was skipped, as a result records one
+ * (`{status: "skipped", reason: {code, message}}` under any key, like the Design system agent's
+ * `synthesis`). Read defensively: a result carries whatever its agent wrote.
+ *
+ * @returns {{text: string|null, code: string|null, message: string|null}|null}
+ */
+function runNote(run) {
+  const result = run.result && typeof run.result === "object" ? run.result : null;
+  if (!result) return null;
+  const text = [result.note, result.outcome?.note].find((value) => typeof value === "string" && value.trim());
+  if (text) return { text: text.trim().slice(0, NOTE_LENGTH), code: null, message: null };
+  const skipped = Object.values(result).find((value) => value && typeof value === "object" && value.status === "skipped" && value.reason);
+  if (!skipped) return null;
+  return {
+    text: null,
+    code: typeof skipped.reason.code === "string" ? skipped.reason.code : null,
+    message: typeof skipped.reason.message === "string" ? skipped.reason.message.slice(0, NOTE_LENGTH) : null,
   };
 }
 

@@ -6,9 +6,13 @@ import { Check, ChevronDown, CircleAlert, Lock, LoaderCircle } from "lucide-reac
 
 import { Button, buttonVariants } from "@/components/ui/button";
 import { ConnectAiStep } from "./ConnectAiStep";
-import { STEP_STATE, STEP_TITLES, WAITS_FOR, ago, doneLine, plural, whoCanDo } from "@/lib/home/home";
-import { isUnlimited } from "@/lib/crawl/budget";
+import { STEP_STATE, STEP_TITLES, WAITS_FOR, ago, crawlBudgetWords, doneLine, plural, whoCanDo } from "@/lib/home/home";
+import { setAgentWorking } from "@/lib/api/agentSetup";
+import { aiUnavailableText, isAiUnavailableError, useAiAvailability } from "@/lib/ask/ai";
 import { cn } from "@/lib/utils";
+
+/** The agent that writes the Library, whose switch the "Library written" step can turn on. */
+const KNOWLEDGE_AGENT_SLUG = "business-knowledge-base";
 
 /**
  * The setup checklist at the top of Home: **Set up {workspace}**, how many essentials are done,
@@ -29,9 +33,12 @@ import { cn } from "@/lib/utils";
  * @param {string|null} props.myEmail the signed-in person's address, to say "you"
  * @param {(change: object) => Promise<void>} props.onPreferences saves a skip or the hidden state
  * @param {() => Promise<void>} props.onRetryCrawl asks for the crawl again
+ * @param {(configured: boolean) => Promise<void>} props.onStartCrawl starts the first crawl from the
+ *   workspace's website and goes to the Crawler; throws the API's refusal
  * @param {() => void} props.onChanged re-reads Home
  */
-export function SetupChecklist({ home, myEmail, onPreferences, onRetryCrawl, onChanged }) {
+export function SetupChecklist({ home, myEmail, onPreferences, onRetryCrawl, onStartCrawl, onChanged }) {
+  const ai = useAiAvailability();
   const workspaceId = home.workspace.id;
   const essentials = home.steps.filter((step) => step.group === "essential");
   const recommended = home.steps.filter((step) => step.group === "recommended");
@@ -65,7 +72,7 @@ export function SetupChecklist({ home, myEmail, onPreferences, onRetryCrawl, onC
   if (complete && !shown) {
     const left = home.progress.recommended.left;
     return (
-      <section aria-label="Setup" className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-xl border border-orb-line bg-orb-raised/40 px-4 py-2.5">
+      <section id="home-setup" aria-label="Setup" className="scroll-mt-4 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-xl border border-orb-line bg-orb-raised/40 px-4 py-2.5">
         <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-orb-lime/15 text-orb-lime">
           <Check aria-hidden="true" className="size-3.5" />
         </span>
@@ -81,7 +88,7 @@ export function SetupChecklist({ home, myEmail, onPreferences, onRetryCrawl, onC
   }
 
   return (
-    <section aria-labelledby="home-setup-title" className="rounded-xl border border-orb-line bg-orb-raised/40">
+    <section id="home-setup" aria-labelledby="home-setup-title" className="scroll-mt-4 rounded-xl border border-orb-line bg-orb-raised/40">
       <div className="flex flex-wrap items-start gap-x-4 gap-y-2 px-5 pt-5">
         <div className="min-w-0 flex-1">
           <h2 id="home-setup-title" className="font-display text-xl font-bold tracking-[-0.015em] text-orb-white [overflow-wrap:anywhere]">
@@ -113,7 +120,9 @@ export function SetupChecklist({ home, myEmail, onPreferences, onRetryCrawl, onC
             onToggle={() => toggle(step.id)}
             home={home}
             myEmail={myEmail}
+            ai={ai}
             onRetryCrawl={onRetryCrawl}
+            onStartCrawl={onStartCrawl}
             onChanged={onChanged}
           />
         ))}
@@ -143,6 +152,7 @@ export function SetupChecklist({ home, myEmail, onPreferences, onRetryCrawl, onC
                 onToggle={() => toggle(step.id)}
                 home={home}
                 myEmail={myEmail}
+                ai={ai}
                 busy={busy}
                 onSkip={(skipped) => save(skipped ? { skip: [step.id] } : { unskip: [step.id] })}
                 onChanged={onChanged}
@@ -161,9 +171,9 @@ export function SetupChecklist({ home, myEmail, onPreferences, onRetryCrawl, onC
  * The connector to the next tile is drawn by this row, as in the crawl's setup guide, because only
  * this row knows where its own tile ends.
  */
-function StepRow({ step, number, last, open, primary = false, onToggle, home, myEmail, busy, onSkip, onRetryCrawl, onChanged }) {
+function StepRow({ step, number, last, open, primary = false, onToggle, home, myEmail, ai, busy, onSkip, onRetryCrawl, onStartCrawl, onChanged }) {
   const title = STEP_TITLES[step.id] ?? step.id;
-  const status = statusLine(step, myEmail);
+  const status = statusLine(step, myEmail, ai);
   const bodyId = `home-step-${step.id}`;
   const muted = step.state === STEP_STATE.notPermitted || step.state === STEP_STATE.skipped;
 
@@ -186,7 +196,7 @@ function StepRow({ step, number, last, open, primary = false, onToggle, home, my
         </button>
         {open && (
           <div id={bodyId} className="mt-3 min-w-0 space-y-3">
-            <StepBody step={step} home={home} primary={primary} onRetryCrawl={onRetryCrawl} onChanged={onChanged} />
+            <StepBody step={step} home={home} ai={ai} primary={primary} onRetryCrawl={onRetryCrawl} onStartCrawl={onStartCrawl} onChanged={onChanged} />
             {onSkip && step.state !== STEP_STATE.done && step.permitted && (
               <Button type="button" variant="ghost" size="sm" disabled={busy} onClick={() => onSkip(step.state !== STEP_STATE.skipped)} className="text-orb-muted">
                 {step.state === STEP_STATE.skipped ? "Bring it back" : "Skip"}
@@ -225,7 +235,7 @@ function toneOf(state) {
 }
 
 /** The one line under a step's title: where it stands, in words. */
-function statusLine(step, myEmail) {
+function statusLine(step, myEmail, ai) {
   const detail = step.detail ?? {};
   if (step.state === STEP_STATE.done) {
     if (step.id === "ai") return `Connected · ${detail.client ?? "your AI"} last called ${ago(detail.lastUsedAt)}`;
@@ -248,8 +258,13 @@ function statusLine(step, myEmail) {
     }
   }
   if (step.state === STEP_STATE.attention) return detail.error?.message ? "Needs attention" : "The last attempt failed";
-  if (step.waitsFor) return `Waits for ${WAITS_FOR[step.waitsFor] ?? "the step before"}`;
+  if (step.id === "website" && crawlBudgetWords(detail.budget).blocked) return "No crawl budget";
+  // What the Library is waiting for, most actionable first: a switch somebody can turn on, then
+  // AI the install does not have, then the step before it.
   if (step.id === "library" && detail.working === false) return "Paused — the Library agent is not set to work";
+  if (step.id === "library" && !ai.reasoning) return "Waits for AI to be available";
+  if (step.waitsFor) return `Waits for ${WAITS_FOR[step.waitsFor] ?? "the step before"}`;
+  if (step.id === "library") return "Starts on its own within a few minutes";
   return "Not started";
 }
 
@@ -263,7 +278,7 @@ function ActionLink({ href, primary, children }) {
 }
 
 /** What an open step says and offers, by step. */
-function StepBody({ step, home, primary, onRetryCrawl, onChanged }) {
+function StepBody({ step, home, ai, primary, onRetryCrawl, onStartCrawl, onChanged }) {
   const id = home.workspace.id;
   const detail = step.detail ?? {};
   const done = step.state === STEP_STATE.done;
@@ -271,65 +286,34 @@ function StepBody({ step, home, primary, onRetryCrawl, onChanged }) {
   const libraryHref = `/workspaces/${id}/library`;
 
   switch (step.id) {
-    case "website": {
-      // With no monthly limit there is no balance worth quoting in a sentence about cost.
-      const budget = detail.budget && !isUnlimited(detail.budget)
-        ? `${detail.budget.remaining.toLocaleString()} of your ${detail.budget.allowance.toLocaleString()} pages this month`
-        : null;
-      if (step.state === STEP_STATE.attention) {
-        return (
-          <>
-            <p className={text}>{detail.error?.message ?? "The last crawl did not finish."}</p>
-            <div className="flex flex-wrap gap-2">
-              {step.permitted && <Button type="button" size="sm" onClick={onRetryCrawl}>Crawl again</Button>}
-              <ActionLink href={`/workspaces/${id}/agents/crawler`}>Open the Crawler</ActionLink>
-            </div>
-          </>
-        );
-      }
-      return (
-        <>
-          <p className={text}>
-            {done
-              ? `Orbik keeps ${detail.host ?? "your site"} up to date on a schedule; the Crawler page shows what it found.`
-              : `Orbik reads ${detail.host ?? "your site"} page by page, obeying robots.txt. Each page fetched costs one page of crawl budget${budget ? ` — ${budget} left` : ""}.`}
-          </p>
-          {step.state === STEP_STATE.notStarted && step.permitted
-            ? <ActionLink href={`/workspaces/${id}/agents/crawler`} primary={primary}>Start first crawl</ActionLink>
-            : <ActionLink href={`/workspaces/${id}/agents/crawler`}>{step.state === STEP_STATE.inProgress ? "Watch the crawl" : "Open the Crawler"}</ActionLink>}
-        </>
-      );
-    }
-    case "structure":
+    case "website":
+      return <WebsiteStep step={step} home={home} primary={primary} onRetryCrawl={onRetryCrawl} onStartCrawl={onStartCrawl} />;
+    case "structure": {
+      // Proposals are made by the Library agent, so only while it is at work and AI is available;
+      // Orbik's default is always there to choose.
+      const library = home.steps.find((other) => other.id === "library");
+      const proposes = library?.detail?.working !== false && ai.reasoning;
       return (
         <>
           <p className={text}>
             {done
               ? "The Library's top-level folders are chosen. Rename, add or move them in the Library; every link follows."
               : step.waitsFor
-                ? "Once the first crawl has finished, Orbik reads your site and proposes two or three ways to organise the Library. You pick one and confirm."
+                ? proposes
+                  ? "Once the first crawl has finished, Orbik reads your site and proposes two or three ways to organise the Library. You pick one and confirm."
+                  : "Once the first crawl has finished, you choose the Library's top-level folders — Orbik's default, changed as you like — and confirm."
                 : detail.suggestion === "ready"
                   ? "Orbik read your site and proposed ways to organise the Library's top-level folders. Pick one, change it if you like, and confirm. The agent writes nothing until you do."
-                  : "Choose the Library's top-level folders — Orbik's default, or a structure it proposes from your site — change them if you like, and confirm. The agent writes nothing until you do."}
+                  : proposes
+                    ? "Choose the Library's top-level folders — Orbik's default, or a structure it proposes from your site — change them if you like, and confirm. The agent writes nothing until you do."
+                    : "Choose the Library's top-level folders — Orbik's default, changed as you like — and confirm. Orbik proposes structures from your site only while the Library agent is set to work and AI is available."}
           </p>
           {!step.waitsFor && <ActionLink href={libraryHref} primary={primary && !done}>{done ? "Open the Library" : "Choose folders"}</ActionLink>}
         </>
       );
+    }
     case "library":
-      return (
-        <>
-          <p className={text}>
-            {done
-              ? `Orbik wrote the overview and ${plural(detail.files, "file")} around it, and rewrites them when your site changes.`
-              : step.state === STEP_STATE.attention
-                ? detail.error?.message ?? "The last write did not finish. It is tried again when your site next changes."
-                : detail.working === false
-                  ? "The Library agent is paused, so nothing is written. Set it to work at the foot of the Library's explorer."
-                  : "Orbik does this itself — there is nothing for you to do. It writes the overview first, then the folders around it, from the pages your site links to most."}
-          </p>
-          <ActionLink href={libraryHref} primary={primary && detail.working === false}>Open the Library</ActionLink>
-        </>
-      );
+      return <LibraryStep step={step} home={home} ai={ai} primary={primary} onChanged={onChanged} />;
     case "ai":
       return (
         <>
@@ -348,7 +332,9 @@ function StepBody({ step, home, primary, onRetryCrawl, onChanged }) {
             {done
               ? "Orbik derived your design system — colours, type and logo — from your site. Pin any value you know better."
               : step.state === STEP_STATE.attention
-                ? detail.error?.message ?? "The last derivation did not finish."
+                ? isAiUnavailableError(detail.error)
+                  ? aiUnavailableText("your design system cannot be derived", { isAdmin: ai.isAdmin })
+                  : detail.error?.message ?? "The last derivation did not finish."
                 : "Orbik can render a few of your pages and derive your colours, type and logo, so your own AI can draw on-brand."}
           </p>
           <ActionLink href={`/workspaces/${id}/brand`}>Open Brand</ActionLink>
@@ -368,4 +354,149 @@ function StepBody({ step, home, primary, onRetryCrawl, onChanged }) {
     default:
       return null;
   }
+}
+
+/**
+ * Connect your website. Before the first crawl its button starts that crawl from the workspace's
+ * website — the address the person gave when they created it — and opens the Crawler to watch it;
+ * the Crawler's set-up page is one link away for a different start address or sitemaps. A refusal
+ * (no budget left, say) is shown here, in the API's words.
+ */
+function WebsiteStep({ step, home, primary, onRetryCrawl, onStartCrawl }) {
+  const [starting, setStarting] = useState(false);
+  const [failure, setFailure] = useState(null);
+  const id = home.workspace.id;
+  const detail = step.detail ?? {};
+  const text = "max-w-[62ch] text-sm leading-relaxed text-orb-gray";
+  const crawlerHref = `/workspaces/${id}/agents/crawler`;
+  const host = detail.host ?? "your site";
+  const { blocked, cost } = crawlBudgetWords(detail.budget);
+
+  async function start() {
+    setStarting(true);
+    setFailure(null);
+    try {
+      // On success this goes to the Crawler, so the button says "Starting…" until the page changes.
+      await onStartCrawl(Boolean(detail.configured));
+    } catch (error) {
+      setFailure(error?.message ?? "The crawl could not be started. Try again.");
+      setStarting(false);
+    }
+  }
+
+  if (step.state === STEP_STATE.attention) {
+    return (
+      <>
+        <p className={text}>{detail.error?.message ?? "The last crawl did not finish."}</p>
+        {blocked && <p className={text}>{blocked}</p>}
+        <div className="flex flex-wrap gap-2">
+          {step.permitted && <Button type="button" size="sm" disabled={Boolean(blocked)} onClick={onRetryCrawl}>Crawl again</Button>}
+          <ActionLink href={crawlerHref}>Open the Crawler</ActionLink>
+        </div>
+      </>
+    );
+  }
+  if (step.state === STEP_STATE.done) {
+    return (
+      <>
+        <p className={text}>{`Orbik keeps ${host} up to date on a schedule; the Crawler page shows what it found.`}</p>
+        <ActionLink href={crawlerHref}>Open the Crawler</ActionLink>
+      </>
+    );
+  }
+  if (step.state !== STEP_STATE.notStarted || !step.permitted) {
+    return (
+      <>
+        <p className={text}>{`Orbik reads ${host} page by page, obeying robots.txt.`}</p>
+        <ActionLink href={crawlerHref}>{step.state === STEP_STATE.inProgress ? "Watch the crawl" : "Open the Crawler"}</ActionLink>
+      </>
+    );
+  }
+  return (
+    <>
+      <p className={text}>
+        {blocked
+          ?? `Orbik reads ${host} page by page, starting from ${detail.seedUrl ?? "its home page"} and obeying robots.txt.${cost ? ` Each page fetched costs one page of crawl budget — ${cost}.` : ""}`}
+      </p>
+      {failure && <p role="alert" className="max-w-[62ch] text-sm text-orb-coral">{failure}</p>}
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+        <Button
+          type="button"
+          size="sm"
+          variant={primary ? "default" : "outline"}
+          disabled={starting || Boolean(blocked) || !detail.seedUrl}
+          onClick={start}
+        >
+          {starting ? "Starting…" : "Start first crawl"}
+        </Button>
+        <Link href={crawlerHref} className="text-sm text-orb-gray underline-offset-4 hover:text-orb-white hover:underline">
+          Choose the start address or add sitemaps first
+        </Link>
+      </div>
+    </>
+  );
+}
+
+/**
+ * Library written: Orbik does it, so the step says what it is waiting for — the agent being set
+ * to work (with the switch, for whoever may turn it on), AI the install does not have, the folders
+ * being chosen — or that it is writing, or done. Read from the Library's own setup state on the
+ * Home read and from what the install says about AI; nothing here decides it.
+ */
+function LibraryStep({ step, home, ai, primary, onChanged }) {
+  const [busy, setBusy] = useState(false);
+  const [failure, setFailure] = useState(null);
+  const id = home.workspace.id;
+  const detail = step.detail ?? {};
+  const text = "max-w-[62ch] text-sm leading-relaxed text-orb-gray";
+  const libraryHref = `/workspaces/${id}/library`;
+  const paused = detail.working === false;
+  const writes = "the overview first, then the folders around it, from the pages your site links to most";
+
+  async function setToWork() {
+    setBusy(true);
+    setFailure(null);
+    try {
+      await setAgentWorking(id, KNOWLEDGE_AGENT_SLUG, true);
+      onChanged();
+    } catch (error) {
+      setFailure(error?.message ?? "The Library agent could not be set to work. Try again.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  let sentence;
+  if (step.state === STEP_STATE.done) {
+    sentence = `Orbik wrote the overview and ${plural(detail.files, "file")} around it, and rewrites them when your site changes.`;
+  } else if (step.state === STEP_STATE.inProgress) {
+    sentence = `Orbik is writing it: ${writes}.`;
+  } else if (step.state === STEP_STATE.attention) {
+    sentence = isAiUnavailableError(detail.error)
+      ? aiUnavailableText("the Library cannot be written", { isAdmin: ai.isAdmin })
+      : detail.error?.message ?? "The last write did not finish. It is tried again when your site next changes.";
+  } else if (paused) {
+    sentence = `The Library agent is paused, so nothing is written. Set to work, it writes the Library once the folders are chosen — ${writes} — and rewrites it whenever a crawl finds a change.`;
+  } else if (!ai.reasoning) {
+    sentence = `${aiUnavailableText("the Library cannot be written", { isAdmin: ai.isAdmin })} Your pages are still copied into the Library's Sources, word for word.`;
+  } else if (step.waitsFor) {
+    sentence = `Orbik writes it on its own once the folders are chosen: ${writes}.`;
+  } else {
+    sentence = `Orbik starts writing it on its own within a few minutes: ${writes}.`;
+  }
+
+  return (
+    <>
+      <p className={text}>{sentence}</p>
+      {failure && <p role="alert" className="max-w-[62ch] text-sm text-orb-coral">{failure}</p>}
+      <div className="flex flex-wrap gap-2">
+        {paused && step.permitted && step.state !== STEP_STATE.done && (
+          <Button type="button" size="sm" variant={primary ? "default" : "outline"} disabled={busy} onClick={setToWork}>
+            {busy ? "Setting to work…" : "Set the Library agent to work"}
+          </Button>
+        )}
+        <ActionLink href={libraryHref}>Open the Library</ActionLink>
+      </div>
+    </>
+  );
 }
