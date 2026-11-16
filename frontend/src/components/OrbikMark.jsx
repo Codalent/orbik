@@ -1,7 +1,7 @@
 /**
  * Orbik logo mark (the ringed planet). Its box is 224 × 154, so size it by height and let the width
- * follow. It fills with currentColor so the lime follows the theme token (lighter on dark, darker on
- * light); the original artwork's fill is #C8F81F, which app/icon.svg keeps.
+ * follow. It fills with currentColor: give it `text-orb-logo`, which is lime on the dark theme and
+ * ink on the light one; the original artwork's fill is #C8F81F, which app/icon.svg keeps.
  */
 export function OrbikMark({ className = "h-5 w-auto" }) {
   return (

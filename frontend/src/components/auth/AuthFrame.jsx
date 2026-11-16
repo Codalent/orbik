@@ -37,7 +37,7 @@ export function AuthFrame({ children, footer }) {
         aria-label="Orbik home"
         className="shrink-0 rounded-md transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/70"
       >
-        <OrbikLogo className="h-5 w-auto text-orb-lime" />
+        <OrbikLogo className="h-5 w-auto text-orb-logo" />
       </a>
       {children}
       {footer && <div className="max-w-md text-center text-xs text-orb-muted">{footer}</div>}
@@ -50,7 +50,7 @@ function AuthBackdrop() {
   return (
     <div aria-hidden="true" className="pointer-events-none fixed inset-0 -z-10">
       <div className="absolute inset-0 bg-[radial-gradient(55%_45%_at_50%_0%,color-mix(in_oklab,var(--color-orb-lime)_9%,transparent),transparent_75%)]" />
-      <OrbikMark className="absolute -bottom-24 -right-28 h-[26rem] w-auto text-orb-lime opacity-[0.04] sm:-bottom-16 sm:-right-16" />
+      <OrbikMark className="absolute -bottom-24 -right-28 h-[26rem] w-auto text-orb-logo opacity-[0.04] sm:-bottom-16 sm:-right-16" />
     </div>
   );
 }

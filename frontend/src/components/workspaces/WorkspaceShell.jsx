@@ -147,7 +147,7 @@ function WorkspaceChrome({ children }) {
           {/* The workspace sits beside the mark because it is what everything below belongs to:
               the rail, the sidebar and the page all change with it. */}
           <header className="flex h-11 shrink-0 items-center gap-2 px-4">
-            <OrbikLogo className="h-[18px] w-auto shrink-0 text-orb-lime" />
+            <OrbikLogo className="h-[18px] w-auto shrink-0 text-orb-logo" />
             <span aria-hidden="true" className="ml-1 h-4 w-px bg-orb-line" />
             <div className="min-w-0 max-w-64">
               <WorkspaceSwitcher workspaces={data.items} selectedWorkspaceId={data.selectedWorkspaceId} onSelect={select} disabled={busy} />

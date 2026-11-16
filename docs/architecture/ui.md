@@ -26,6 +26,17 @@ The accents carry fixed meanings. Do not use one for decoration where it could b
 | orange | Wants a look: a choice waiting, an invite pending |
 | coral | Failed, destructive, needs reconnecting |
 
+Lime has two forms on the light theme, because the brand's #B9F227 cannot be read as text on white:
+
+- **A lime fill** with text on it — a main button — is `bg-primary text-primary-foreground`
+  (`<Button>`'s default), never `bg-orb-lime text-orb-black`. Dark or light, it is the brand lime
+  with ink on it.
+- **Lime text, icons, dots and tints** are `orb-lime`, which on the light theme is a deeper leaf green.
+
+The Orbik logo and mark take `text-orb-logo`: lime on the dark theme, ink on the light one. The
+workspace's initial in its tile takes `bg-monogram text-monogram-foreground`: lime on the dark
+theme, grey on the light one, where the lime is kept for what to press.
+
 ## Type
 
 `text-title` for a page's h1, `text-base font-semibold` for a section's h2, `text-sm` for body,

@@ -47,7 +47,7 @@ export function HomeHeader({ home, hidden, onShowSetup }) {
       <div className="flex flex-wrap items-start gap-x-4 gap-y-3">
         <span
           aria-hidden="true"
-          className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-orb-lime font-display text-xl font-bold text-orb-black shadow-[0_0_0_4px_color-mix(in_oklab,var(--color-orb-lime)_14%,transparent)]"
+          className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-monogram font-display text-xl font-bold text-monogram-foreground shadow-[0_0_0_4px_color-mix(in_oklab,var(--color-monogram)_14%,transparent)]"
         >
           {initialOf(name)}
         </span>
@@ -214,7 +214,7 @@ function OrbitBackdrop() {
   return (
     <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10">
       <div className="absolute inset-0 bg-[radial-gradient(60%_90%_at_100%_0%,color-mix(in_oklab,var(--color-orb-lime)_10%,transparent),transparent_70%)]" />
-      <OrbikMark className="absolute -right-10 -top-6 h-52 w-auto text-orb-lime opacity-[0.045] md:right-8" />
+      <OrbikMark className="absolute -right-10 -top-6 h-52 w-auto text-orb-logo opacity-[0.045] md:right-8" />
     </div>
   );
 }

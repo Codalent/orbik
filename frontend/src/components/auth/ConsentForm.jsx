@@ -315,7 +315,7 @@ function ConnectionMark({ name }) {
         {initial}
       </span>
       <ArrowLeftRight className="size-4 text-orb-muted" />
-      <span className="flex size-11 items-center justify-center rounded-xl border border-orb-lime/40 bg-orb-lime/10 text-orb-lime">
+      <span className="flex size-11 items-center justify-center rounded-xl border border-orb-lime/40 bg-orb-lime/10 text-orb-logo">
         <OrbikMark className="h-5 w-auto" />
       </span>
     </span>
