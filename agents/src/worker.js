@@ -10,6 +10,7 @@ import { ensureAgentIndexes } from "./db/indexes.js";
 import { retireBrandGuides } from "./library/retireBrandGuides.js";
 import { parseAgentEnvironment } from "./config/env.js";
 import { createRuntime } from "./runtime/index.js";
+import { recordAiAvailability } from "./aiAvailability.js";
 
 /**
  * Long-running agent worker.
@@ -22,6 +23,8 @@ const config = parseAgentEnvironment(process.env);
 // Which provider the reasoning calls go to, and whether its key is set: never the key itself.
 log(config.aiProviderConfigured ? "info" : "warn", "ai.provider", { provider: config.aiProvider, configured: config.aiProviderConfigured });
 const database = await connectMongo(config);
+// The same two answers, for the API to tell the web app (`GET /v1/edition`, `ai`).
+await recordAiAvailability({ database, config, logger: log });
 await ensureAgentIndexes(database);
 // Before the first job is claimed; the API and the scheduler run the same list.
 await runMigrations({ database, logger: log });

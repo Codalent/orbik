@@ -71,6 +71,7 @@ import { createAgentOverviewService } from "./services/agentOverviewService.js";
 import { createAgentOverviewRouter } from "./routes/agentOverviewRoutes.js";
 import { createAiCallHooks, createExtensionHost } from "@orbik/extensions";
 import { createEditionRouter } from "./routes/editionRoutes.js";
+import { createAiAvailabilityReader } from "./services/aiAvailability.js";
 import { createSetupService } from "./services/setupService.js";
 import { createEmailSender } from "./services/email.js";
 import { createInstallAdmins } from "./services/installAdmin.js";
@@ -321,7 +322,14 @@ export function createApp({ config, database, readiness, extensions = createExte
   app.use(createHealthRouter(readiness));
   // devbar, the development toolbar, when ORBIK_DEVBAR is on: no session, the API's CORS only.
   if (devbar) app.use(DEVBAR_PATH, devbar.handle);
-  app.use(createEditionRouter({ extensions, config, setupRequired: () => setupService.required(), passwordReset: passwordResetService.selfService ? "email" : "admin", signInWith: googleSignIn ? ["google"] : [] }));
+  app.use(createEditionRouter({
+    extensions,
+    config,
+    setupRequired: () => setupService.required(),
+    passwordReset: passwordResetService.selfService ? "email" : "admin",
+    signInWith: googleSignIn ? ["google"] : [],
+    aiAvailability: createAiAvailabilityReader({ database, searchConfigured: Boolean(retrieval) }),
+  }));
   app.use(createSessionMiddleware(config, log));
   app.use(createAuthRouter({
     config,

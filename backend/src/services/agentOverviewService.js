@@ -48,7 +48,17 @@ export function createAgentOverviewService({ workspaceRepository, agentOverviewR
           return {
             agentSlug: slug,
             latestRun: run
-              ? { id: run.id, status: run.status, trigger: run.trigger, startedAt: iso(run.startedAt), finishedAt: iso(run.finishedAt), error: run.error }
+              ? {
+                id: run.id,
+                status: run.status,
+                trigger: run.trigger,
+                startedAt: iso(run.startedAt),
+                finishedAt: iso(run.finishedAt),
+                error: run.error,
+                // A run that succeeded without its main result says so (`runNote`).
+                ...(run.note ? { note: run.note } : {}),
+                ...(run.incomplete ? { incomplete: true } : {}),
+              }
               : null,
             // Only a switch that is on has a next run; a paused agent's old due time means nothing.
             schedule: schedule

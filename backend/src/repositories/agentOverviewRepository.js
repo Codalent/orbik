@@ -1,5 +1,7 @@
 import { toObjectId } from "@orbik/core";
 
+import { runNote } from "./runRepository.js";
+
 /**
  * The reads behind the Agents overview that no other repository answers in one query: each
  * agent's newest run in a workspace, and every agent's on/off switch in it.
@@ -33,6 +35,11 @@ export function createAgentOverviewRepository(collections) {
             startedAt: { $first: "$startedAt" },
             finishedAt: { $first: "$finishedAt" },
             error: { $first: "$error" },
+            // Only what a note is worked out from: a result can be large.
+            note: { $first: "$result.note" },
+            incomplete: { $first: "$result.incomplete" },
+            synthesis: { $first: "$result.synthesis.status" },
+            rendered: { $first: "$result.summary.rendered" },
           },
         },
       ]).toArray();
@@ -44,6 +51,7 @@ export function createAgentOverviewRepository(collections) {
         startedAt: row.startedAt ?? null,
         finishedAt: row.finishedAt ?? null,
         error: row.error ? { code: row.error.code, message: row.error.message } : null,
+        ...runNote({ note: row.note, incomplete: row.incomplete, synthesis: { status: row.synthesis }, summary: { rendered: row.rendered } }),
       }));
     },
 
