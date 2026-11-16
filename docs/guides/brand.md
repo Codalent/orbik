@@ -131,7 +131,9 @@ What the operator of an install needs for the Brand page:
 - **A reasoning key** for the proposal: `ORBIK_ANTHROPIC_API_KEY`, or `ORBIK_OPENAI_API_KEY` when
   that is the only one set (see [Configuration](../self-hosting/configuration.md)). Without one a
   run still renders the pages and stores what it observed, with your logos and images, and records
-  that the proposal was skipped. The brand chat needs it too.
+  that the proposal was skipped: the agent's page says so before a run, and its recent runs, the
+  Agents overview and Home list such a run as having proposed nothing rather than as plainly
+  finished. The brand chat needs it too.
 - **`ORBIK_ASSET_URL_SECRET`** to sign image links. The Docker install generates one on first
   start. Without Docker, set it in `backend/.env` (`openssl rand -base64 48`). Without it every
   other MCP tool still answers, and the brand tools say `ASSET_LINKS_NOT_CONFIGURED` where a link

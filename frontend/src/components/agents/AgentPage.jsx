@@ -11,6 +11,7 @@ import { Pill } from "@/components/ui/pill";
 import { Skeleton } from "@/components/ui/skeleton";
 import { IndexStatus } from "@/components/ask/IndexStatus";
 import { RunProgress } from "./RunProgress";
+import { useAiAvailability } from "@/lib/agents/aiAvailability";
 import { buildAgentRows } from "@/lib/agents/registry";
 import { RUN_STATUS_LABELS, TERMINAL_RUN_STATUSES } from "@/lib/agents/runEvents";
 import { useAgentWork } from "@/lib/agents/useAgentWork";
@@ -96,6 +97,10 @@ export function AgentHead({ workspaceId, agentSlug, onAgent, onFinished, ...rest
  * @param {{summary: string, finishedAt?: string|null, note?: React.ReactNode}|null} [props.lastResult]
  *   what the agent's last finished run reported, from the dashboard's own read
  * @param {string|null} [props.error] a failure of the dashboard's own read, said with the agent's
+ * @param {{need: "required"|"partial", consequence: string}|null} [props.ai] what the agent needs a
+ *   model for: `required` when a run cannot do anything without one (Run now and Set to work are
+ *   then disabled while `ai.reasoning` is false), `partial` when it still does part of its work;
+ *   `consequence` says what that means, to follow "so"
  */
 export function AgentHeadView({
   work,
@@ -120,8 +125,13 @@ export function AgentHeadView({
   meta = null,
   lastResult = null,
   error = null,
+  ai = null,
 }) {
   const canRun = useCan("member", workspaceId);
+  const availability = useAiAvailability();
+  // Said before anybody presses Run: a run that needs a model would only fail for the lack of one.
+  const aiNotice = ai && availability.reasoningOff ? availability.unavailable(ai.consequence) : null;
+  const aiBlocked = Boolean(aiNotice && ai.need === "required");
   const identity = agentIdentity(agentSlug);
   const { agent, setup, run, events, complete, busy, inFlight, working } = work;
   const runs = work.runs ?? [];
@@ -134,11 +144,16 @@ export function AgentHeadView({
   const foldedRun = visibleRun && complete && run.status === "succeeded";
   const result = ready && lastResult?.summary ? lastResult : null;
 
+  // The schedule, never the run: a run in flight has its own pill and panel, and a sentence about
+  // the schedule must not read as one about the run.
   const sentence = !ready
     ? null
     : working
-      ? workingMessage ?? `Runs ${cadence} in Orbik Cloud, and only rewrites what your site actually changed.`
-      : pausedMessage ?? `Set it to work and it runs ${cadence}, updating only what changed. Or run it now.`;
+      ? workingMessage ?? `On a schedule: runs ${cadence}, and only rewrites what your site actually changed. Pause takes it off the schedule.`
+      : pausedMessage ?? (manual
+        ? `Not on a schedule: runs only when you press Run now. Set to work runs it ${cadence}, updating only what changed.`
+        : `Not on a schedule. Set to work runs it ${cadence}, updating only what changed.`);
+  const titles = switchTitles(cadence);
 
   const metaItems = [
     lastRunAt ? (
@@ -168,15 +183,20 @@ export function AgentHeadView({
           <>
             {manual && runControls}
             {manual && (
-              <Button type="button" size="sm" variant="outline" onClick={runInput ? () => work.runWith(runInput) : work.runNow} disabled={busy || inFlight || !ready}>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={runInput ? () => work.runWith(runInput) : work.runNow}
+                disabled={busy || inFlight || !ready || aiBlocked}
+                title={aiBlocked ? aiNotice : titles.run}
+              >
                 <RefreshCw className={inFlight ? "size-3.5 animate-spin" : "size-3.5"} />
                 {inFlight ? "Running…" : "Run now"}
               </Button>
             )}
             {switchable && (
-              <Button type="button" size="sm" variant={working ? "outline" : "default"} onClick={work.toggleWorking} disabled={busy || !ready}>
-                {working ? <><Pause className="size-3.5" /> Pause</> : <><Play className="size-3.5" /> Set to work</>}
-              </Button>
+              <SwitchButton working={working} onClick={work.toggleWorking} disabled={busy || !ready} blocked={aiBlocked ? aiNotice : null} cadence={cadence} />
             )}
             {actions}
           </>
@@ -198,15 +218,21 @@ export function AgentHeadView({
         </div>
       )}
 
+      {aiNotice && (
+        <div role="status" className="rounded-lg border border-orb-orange/30 bg-orb-orange/5 px-4 py-2.5 text-compact text-orb-orange" data-testid="ai-unavailable">
+          {aiNotice}
+        </div>
+      )}
+
       {(result || foldedRun) && (
         <LastRunStrip result={result} run={foldedRun ? run : null}>
-          {foldedRun && <RunProgress run={run} events={events} complete={complete} onCancel={canRun ? work.stop : undefined} />}
+          {foldedRun && <RunProgress run={run} events={events} complete={complete} onCancel={canRun ? work.stop : undefined} consequence={ai?.consequence} />}
         </LastRunStrip>
       )}
 
       {visibleRun && !foldedRun && (
         <Panel className={cn(run.status === "failed" && "border-orb-coral/40")}>
-          <RunProgress run={run} events={events} complete={complete} onCancel={canRun ? work.stop : undefined} />
+          <RunProgress run={run} events={events} complete={complete} onCancel={canRun ? work.stop : undefined} consequence={ai?.consequence} />
         </Panel>
       )}
     </div>
@@ -214,9 +240,47 @@ export function AgentHeadView({
 }
 
 /**
- * How the agent stands, in a pill: running while a run is in flight, otherwise set to work or
- * paused (or not set up, when it has nothing to work from), and a second pill when the newest
- * finished run failed — the one thing that should catch the eye from across the room.
+ * What Run now, Set to work and Pause do, for the buttons' `title`: Set to work puts the agent on
+ * its schedule, Run now runs it once and leaves the schedule as it is, and Pause takes it off the
+ * schedule without touching what it already wrote.
+ *
+ * @param {string} cadence how often the schedule fires, in words ("once a week")
+ */
+export function switchTitles(cadence) {
+  return {
+    run: "Runs the agent once, now. Its schedule stays as it is.",
+    work: `Puts the agent on its schedule: it runs ${cadence} until you pause it. Run now runs it once.`,
+    pause: "Takes the agent off its schedule. What it already wrote is kept, and Run now still runs it once.",
+  };
+}
+
+/**
+ * The Set to work / Pause switch, with what each does in its `title`.
+ *
+ * Setting to work is refused while AI is unavailable to an agent that cannot work without it
+ * (`blocked` is then why); pausing never is.
+ */
+export function SwitchButton({ working, onClick, disabled, blocked = null, cadence = "once a week" }) {
+  const titles = switchTitles(cadence);
+  return (
+    <Button
+      type="button"
+      size="sm"
+      variant={working ? "outline" : "default"}
+      onClick={onClick}
+      disabled={disabled || Boolean(blocked && !working)}
+      title={working ? titles.pause : blocked ?? titles.work}
+    >
+      {working ? <><Pause className="size-3.5" /> Pause</> : <><Play className="size-3.5" /> Set to work</>}
+    </Button>
+  );
+}
+
+/**
+ * How the agent stands, in a pill: running while a run is in flight, otherwise set to work or not
+ * (or not set up, when it has nothing to work from), and a second pill when the newest finished
+ * run failed — the one thing that should catch the eye from across the room. The Agents overview's
+ * cards use the same words.
  */
 export function AgentStatus({ ready, notReadyLabel, working, inFlight, failed, switchable }) {
   return (
@@ -226,7 +290,7 @@ export function AgentStatus({ ready, notReadyLabel, working, inFlight, failed, s
       ) : !ready ? (
         <Pill tone="muted">{notReadyLabel}</Pill>
       ) : switchable ? (
-        working ? <Pill tone="lime" dot>Set to work</Pill> : <Pill tone="neutral" dot>Paused</Pill>
+        working ? <Pill tone="lime" dot>Set to work</Pill> : <Pill tone="neutral" dot>Not set to work</Pill>
       ) : null}
       {failed && !inFlight && <Pill tone="coral" dot>Last run failed</Pill>}
     </span>
@@ -251,7 +315,10 @@ function LastRunStrip({ result, run, children }) {
       {result.note && <span className="mt-1 block">{result.note}</span>}
     </span>
   ) : (
-    <span className="min-w-0 flex-1 text-orb-muted">Last run{run?.finishedAt ? `, ${formatDate(run.finishedAt)}` : ""}: finished</span>
+    <span className="min-w-0 flex-1 text-orb-muted">
+      Last run{run?.finishedAt ? `, ${formatDate(run.finishedAt)}` : ""}: finished
+      {run?.outcome?.note && <span className={run.outcome.incomplete ? "text-orb-orange" : undefined}> · {run.outcome.note}</span>}
+    </span>
   );
   // Joined by hand rather than with `cn`, which reads the size and the colour as two `text-`
   // classes in conflict and keeps only the second.
