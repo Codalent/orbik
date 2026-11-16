@@ -384,14 +384,14 @@ function teamFacts(members, invites, firstMember, firstInvite, personOf) {
 const CRAWLER_AGENT_SLUG = "crawler";
 
 /**
- * How many pages the last finished crawl found answering with an error — the Crawler page's
- * "Broken" — or 0. Read from the newest crawl only once it has finished: a crawl in progress has
- * counted part of the site, and one that failed is a failure, said as one.
+ * How many of the site's pages answered with an error when last fetched — the Crawler page's
+ * "Broken", the same figure from the same read (`urls.broken`) — or 0. An API that does not count
+ * it falls back to the newest crawl's own count, once that crawl has finished.
  */
 function brokenPages(crawl) {
+  const counted = crawl.urls?.broken;
   const run = crawl.latestRun;
-  if (!run || run.status !== "succeeded") return 0;
-  const broken = Number(run.counters?.pagesBroken ?? 0);
+  const broken = Number(counted ?? (run?.status === "succeeded" ? run.counters?.pagesBroken : 0) ?? 0);
   return Number.isFinite(broken) && broken > 0 ? broken : 0;
 }
 

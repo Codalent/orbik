@@ -16,9 +16,9 @@ import { cn } from "@/lib/utils";
  *
  * The status is worked out from the same Home read as everything under it, in order of what a
  * person would want to hear first: a failed run, then something moving, then that the site has
- * not been crawled, then the pages the last crawl found broken, then that nothing needs attention.
- * The last means exactly what the "Needs attention" list below says — no agent's newest run failed
- * and the last crawl found no broken page — and claims nothing else.
+ * not been crawled, then the site's broken pages (as the Crawler counts them), then that nothing
+ * needs attention. The last means exactly what the "Needs attention" list below says — no agent's
+ * newest run failed and no crawled page answered with an error — and claims nothing else.
  *
  * The ask bar opens the Ask panel the shell already holds, and a suggested question asks itself.
  * Both are offered only once there is something to ask about: until the site is crawled and its
@@ -172,7 +172,7 @@ function statusOf(home) {
   if (website.crawling) return { tone: "live", label: "Crawling now" };
   if (library.writing) return { tone: "live", label: "Writing the Library" };
   if (!website.configured) return { tone: "idle", label: "Not crawled yet" };
-  if (broken) return { tone: "attention", label: `${plural(broken, "broken page")} on the last crawl` };
+  if (broken) return { tone: "attention", label: plural(broken, "broken page") };
   return { tone: "ok", label: "Nothing needs attention" };
 }
 

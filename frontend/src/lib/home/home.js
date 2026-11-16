@@ -1,4 +1,4 @@
-import { isUnlimited } from "@/lib/crawl/budget";
+import { BUDGET_STATE, budgetStateOf, crawlBlockedReason } from "@/lib/crawl/budget";
 import { personFromEmail } from "@/lib/format";
 
 /**
@@ -95,31 +95,24 @@ export function plural(count, one, many = `${one}s`) {
  * What this month's crawl budget allows, in the checklist's words: why a crawl cannot start, or
  * what it costs. A month with no limit says nothing about a budget at all.
  *
- * A month whose allowance is nothing is told apart from one that was spent: the first is what the
- * workspace's plan includes and will not change next month, the second renews on a date.
+ * Why it cannot start is the Crawler's own sentence (`crawlBlockedReason`), which tells a month
+ * whose allowance is nothing — the plan includes no crawl pages — from one that was spent.
  *
- * @param {{unlimited?: boolean, allowance: number|null, remaining: number|null, resetsAt?: string}|null} budget
+ * @param {object|null} budget the month as the API reports it
  * @returns {{blocked: string|null, cost: string|null}} `blocked` when no page can be fetched;
  *   otherwise `cost`, the balance to quote, or null with no limit
  */
 export function crawlBudgetWords(budget) {
-  if (!budget || isUnlimited(budget)) return { blocked: null, cost: null };
+  if (!budget) return { blocked: null, cost: null };
+  const blocked = crawlBlockedReason(budget);
+  if (blocked) return { blocked, cost: null };
+  if (budgetStateOf(budget) !== BUDGET_STATE.available) return { blocked: null, cost: null };
   const allowance = budget.allowance ?? 0;
   const remaining = budget.remaining ?? 0;
-  if (remaining > 0) {
-    return {
-      blocked: null,
-      cost: allowance >= remaining
-        ? `${remaining.toLocaleString()} of your ${allowance.toLocaleString()} pages this month left`
-        : `${plural(remaining, "page")} left this month`,
-    };
-  }
-  if (allowance === 0) {
-    return { blocked: "This workspace's plan includes no crawl pages, so its site cannot be crawled.", cost: null };
-  }
-  const renews = budget.resetsAt ? new Date(budget.resetsAt).toLocaleDateString(undefined, { dateStyle: "medium" }) : null;
   return {
-    blocked: `This month's crawl budget of ${plural(allowance, "page")} is used up${renews ? `; it renews on ${renews}` : ""}.`,
-    cost: null,
+    blocked: null,
+    cost: allowance >= remaining
+      ? `${remaining.toLocaleString()} of your ${allowance.toLocaleString()} pages this month left`
+      : `${plural(remaining, "page")} left this month`,
   };
 }
