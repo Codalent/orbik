@@ -1,14 +1,18 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ChevronRight, FileText, Folder } from "lucide-react";
 
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { getCrawlTree } from "@/lib/api/crawl";
 import { describeFrequency } from "@/lib/crawl/format";
 import { cn } from "@/lib/utils";
 
 /** Children fetched per branch, and per press of "show more". */
 const PAGE_SIZE = 20;
+
+/** The most rows a read in place asks for: the API's ceiling for one branch. */
+const MAX_IN_PLACE = 200;
 
 /**
  * The columns, in order. One per property, so a row reads across like a ledger line and the
@@ -19,14 +23,17 @@ const COLUMNS = Object.freeze([
   // The path has no width: in a fixed layout it takes whatever the numbered columns leave, and
   // a path longer than that is cut with an ellipsis rather than pushing the numbers off the
   // table. Every other column is sized for its widest plausible value.
+  //
+  // `hint` is what a column counts, for the words that are not self-explanatory: shown when the
+  // heading is hovered or focused.
   { key: "path", label: "Path", align: "left", width: null },
-  { key: "pages", label: "Pages", align: "right", width: "4.5rem" },
-  { key: "status", label: "Status", align: "right", width: "4.5rem" },
-  { key: "broken", label: "Broken", align: "right", width: "4.5rem" },
-  { key: "noindex", label: "Noindex", align: "right", width: "4.75rem" },
-  { key: "orphan", label: "Orphan", align: "right", width: "4.5rem" },
-  { key: "uncrawled", label: "Not crawled", align: "right", width: "6rem" },
-  { key: "recrawl", label: "Recrawl", align: "left", width: "7rem" },
+  { key: "pages", label: "Pages", align: "right", width: "4.5rem", hint: "Pages under this folder, duplicates folded in." },
+  { key: "status", label: "Status", align: "right", width: "4.5rem", hint: "The HTTP status the page answered with. On a folder, the worst status under it, when that is an error." },
+  { key: "broken", label: "Broken", align: "right", width: "4.5rem", hint: "Pages that answered with an error (4xx or 5xx) when last fetched." },
+  { key: "noindex", label: "Noindex", align: "right", width: "4.75rem", hint: "Pages search engines are told not to index, or cannot: a noindex tag or header, a canonical naming another page, a redirect or an error." },
+  { key: "orphan", label: "Orphan", align: "right", width: "4.5rem", hint: "Pages no other page on the site links to; only the sitemap names them. Counted once a crawl has seen the whole site." },
+  { key: "uncrawled", label: "Not crawled", align: "right", width: "6rem", hint: "Pages found in a sitemap or a link but not fetched yet: they wait for the next crawl, or for crawl pages when the month's are spent." },
+  { key: "recrawl", label: "Recrawl", align: "left", width: "7rem", hint: "How often the page is fetched again. Manual: only when somebody asks, with Crawl now in the page's panel or a Fresh crawl. \"varies\": the folder holds pages of several kinds; open it to see each one's. Choose with Set crawl frequencies." },
 ]);
 
 /**
@@ -58,6 +65,8 @@ const COLUMNS = Object.freeze([
  * @param {(target: {kind: "page", urlHash: string} | {kind: "folder", path: string}) => void}
  *   [props.onToggle] adds or removes one row from the selection
  * @param {string|number} [props.refreshKey] change it to reload every open branch
+ * @param {string|number} [props.liveVersion] change it to read the top level again in place,
+ *   keeping open branches open: how the table follows a crawl while it runs
  * @param {boolean} [props.embedded] omit the section heading, for use inside a panel
  */
 export function CrawlTree({
@@ -67,6 +76,7 @@ export function CrawlTree({
   selection,
   onToggle,
   refreshKey = 0,
+  liveVersion = 0,
   embedded = false,
 }) {
   const selectable = Boolean(selection && onToggle);
@@ -117,7 +127,7 @@ export function CrawlTree({
                     column.key === "path" && !selectable && "pl-4",
                   )}
                 >
-                  {column.label}
+                  {column.hint ? <ColumnHint label={column.label} hint={column.hint} /> : column.label}
                 </th>
               ))}
             </tr>
@@ -128,6 +138,7 @@ export function CrawlTree({
               path="/"
               depth={0}
               open
+              version={liveVersion}
               selectedHash={selectedHash}
               onSelect={onSelect}
               selection={selectable ? selection : null}
@@ -151,9 +162,13 @@ export function CrawlTree({
  * Renders table rows straight into the shared body — not a nested table — so every level shares
  * one set of columns and the numbers stay aligned however deep the tree goes.
  */
-function Branch({ workspaceId, path, depth, open, selectedHash, onSelect, selection, onToggle, inherited }) {
+function Branch({ workspaceId, path, depth, open, selectedHash, onSelect, selection, onToggle, inherited, version = 0 }) {
   const [state, setState] = useState({ page: null, children: [], total: 0, loading: true, failed: false });
   const [loadedTo, setLoadedTo] = useState(0);
+  // How many children are on screen, for a read in place to ask for as many again; a ref, because
+  // the read is started by `version` and not by "show more".
+  const shown = useRef(0);
+  useEffect(() => { shown.current = loadedTo; }, [loadedTo]);
 
   /** Applies one page of children, appending so "show more" extends rather than redraws. */
   const receive = useCallback((result, skip) => {
@@ -170,14 +185,20 @@ function Branch({ workspaceId, path, depth, open, selectedHash, onSelect, select
   // The first page is loaded when the branch opens. Nothing is set synchronously here: the
   // starting state is already "loading", so the effect only starts the request and lets the
   // response update state, rather than re-rendering once on the way in.
+  //
+  // A new `version` reads the branch again in place, as many rows as are shown, while what is on
+  // screen stays: rows are keyed by their segment, so a folder somebody opened stays open. A read
+  // that fails then leaves the rows already shown rather than replacing them with an error.
   useEffect(() => {
     if (!open) return undefined;
     let active = true;
-    getCrawlTree(workspaceId, { path, limit: PAGE_SIZE, skip: 0 })
+    const again = version !== 0 && shown.current > 0;
+    const limit = again ? Math.min(MAX_IN_PLACE, Math.max(PAGE_SIZE, shown.current)) : PAGE_SIZE;
+    getCrawlTree(workspaceId, { path, limit, skip: 0 })
       .then((result) => { if (active) receive(result, 0); })
-      .catch(() => { if (active) setState((current) => ({ ...current, loading: false, failed: true })); });
+      .catch(() => { if (active && !again) setState((current) => ({ ...current, loading: false, failed: true })); });
     return () => { active = false; };
-  }, [open, path, receive, workspaceId]);
+  }, [open, path, receive, workspaceId, version]);
 
   /** Loads the next page, or retries the first after a failure. */
   function loadMore(skip) {
@@ -412,6 +433,20 @@ function RecrawlCell({ child }) {
           ? <span className="text-orb-orange" title="Crawled only when you ask">Manual</span>
           : <span className="text-orb-gray">{describeFrequency(hours)}</span>}
     </td>
+  );
+}
+
+/**
+ * A column heading whose word needs explaining: dotted, and the explanation on hover or focus.
+ */
+function ColumnHint({ label, hint }) {
+  return (
+    <Tooltip>
+      <TooltipTrigger className="cursor-help border-b border-dotted border-orb-muted/60 font-medium focus-visible:outline-2 focus-visible:outline-orb-lime">
+        {label}
+      </TooltipTrigger>
+      <TooltipContent className="max-w-xs whitespace-normal text-left font-normal">{hint}</TooltipContent>
+    </Tooltip>
   );
 }
 

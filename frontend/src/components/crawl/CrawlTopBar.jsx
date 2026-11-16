@@ -10,7 +10,7 @@ import { Pill } from "@/components/ui/pill";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { describeNextCrawl, describeRunTiming } from "@/lib/crawl/format";
 import { hostOf } from "@/lib/format";
-import { QUEUED_PRESENTATION, RUN_PRESENTATION } from "./runPresentation";
+import { PARTIAL_PRESENTATION, QUEUED_PRESENTATION, RUN_PRESENTATION, ranOutOfPages } from "./runPresentation";
 
 /**
  * The one part of the crawl view that never scrolls away, drawn as every agent's head is
@@ -40,8 +40,13 @@ import { QUEUED_PRESENTATION, RUN_PRESENTATION } from "./runPresentation";
  * @param {() => void} [props.onEditSettings] opens the settings form
  * @param {() => void} props.onOpenLogs opens the crawl logs panel
  * @param {boolean} props.busy whether a request is in flight
+ * @param {string|null} [props.blockedReason] why no crawl can be asked for (the workspace has no
+ *   crawl pages to spend); the start buttons are disabled and this is said under them
+ * @param {number|null} [props.sitePages] the pages a fresh crawl would fetch, for its explanation
+ * @param {boolean} [props.limited] whether the month's crawl pages are limited, so the buttons'
+ *   explanations mention what they cost only where something is counted against a ceiling
  */
-export function CrawlTopBar({ site, activeRun, latestRun, progress, queued: requested = false, onCrawlNow, onFreshCrawl, onSetFrequencies, onClearData, onEditSettings, onOpenLogs, busy }) {
+export function CrawlTopBar({ site, activeRun, latestRun, progress, queued: requested = false, onCrawlNow, onFreshCrawl, onSetFrequencies, onClearData, onEditSettings, onOpenLogs, busy, blockedReason = null, sitePages = null, limited = false }) {
   // A fresh crawl fetches every page, which on a large site is a real spend of the monthly
   // budget, so it takes two presses: the first turns the button into the question, the second
   // answers it. The question expires on its own rather than sitting armed under a stray click.
@@ -59,7 +64,8 @@ export function CrawlTopBar({ site, activeRun, latestRun, progress, queued: requ
     return () => clearTimeout(timer);
   }, [clearArmed]);
   const run = activeRun ?? latestRun;
-  const presentation = run ? RUN_PRESENTATION[run.status] : null;
+  const partial = !activeRun && ranOutOfPages(run);
+  const presentation = run ? (partial ? PARTIAL_PRESENTATION : RUN_PRESENTATION[run.status]) : null;
   const live = Boolean(activeRun);
   // Queued is either a run that exists but has not begun, or a request the scheduler has not
   // yet turned into a run. Both mean "it is coming", and both keep the button honest.
@@ -71,7 +77,7 @@ export function CrawlTopBar({ site, activeRun, latestRun, progress, queued: requ
   const status = queued
     ? <Pill tone="orange" dot pulse aria-live="polite">{QUEUED_PRESENTATION.label}</Pill>
     : presentation
-      ? <Pill tone={PILL_TONE[run.status] ?? "neutral"} dot pulse={live} aria-live={live ? "polite" : undefined}>{presentation.label}</Pill>
+      ? <Pill tone={partial ? "orange" : PILL_TONE[run.status] ?? "neutral"} dot pulse={live} aria-live={live ? "polite" : undefined}>{presentation.label}</Pill>
       : <Pill tone="muted">{site.enabled ? "Not crawled yet" : "Paused"}</Pill>;
 
   return (
@@ -109,15 +115,25 @@ export function CrawlTopBar({ site, activeRun, latestRun, progress, queued: requ
                 </>
               )
             )}
+            {/* A visit, not a crawl of every page: each one fetches only what is due, and a page on
+                Manual is never due on a timer. Saying "Next crawl in 7 days" beside a column of
+                "Manual" read as a contradiction, so the line says what the visit is. */}
             {site.nextCrawlAt && !live && !queued && (
               <>
                 <span aria-hidden="true">·</span>
-                <span>Next {describeNextCrawl(site.nextCrawlAt)}</span>
+                <Tooltip>
+                  <TooltipTrigger className="cursor-help border-b border-dotted border-orb-line text-left focus-visible:outline-2 focus-visible:outline-orb-lime">
+                    Next visit {describeNextCrawl(site.nextCrawlAt)}
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-xs">
+                    Orbik visits the site on its own to check the sitemaps for new pages. A visit fetches new pages and pages whose crawl frequency has come round; pages on Manual are fetched again only when you ask.
+                  </TooltipContent>
+                </Tooltip>
               </>
             )}
           </>
         )}
-        actions={<CrawlActions {...{ latestRun, live, queued, armed, setArmed, clearArmed, setClearArmed, onCrawlNow, onFreshCrawl, onSetFrequencies, onClearData, onEditSettings, onOpenLogs, busy }} />}
+        actions={<CrawlActions {...{ latestRun, live, queued, armed, setArmed, clearArmed, setClearArmed, onCrawlNow, onFreshCrawl, onSetFrequencies, onClearData, onEditSettings, onOpenLogs, busy, blockedReason, sitePages, limited }} />}
       />
     </div>
   );
@@ -130,8 +146,12 @@ const PILL_TONE = Object.freeze({ running: "lime", succeeded: "lime", failed: "c
  * The crawl's buttons, on the right of the head: logs, settings, frequencies, clearing, a fresh
  * crawl and Crawl now. The two that cannot be undone or that spend the whole budget ask twice.
  */
-function CrawlActions({ latestRun, live, queued, armed, setArmed, clearArmed, setClearArmed, onCrawlNow, onFreshCrawl, onSetFrequencies, onClearData, onEditSettings, onOpenLogs, busy }) {
+function CrawlActions({ latestRun, live, queued, armed, setArmed, clearArmed, setClearArmed, onCrawlNow, onFreshCrawl, onSetFrequencies, onClearData, onEditSettings, onOpenLogs, busy, blockedReason, sitePages, limited }) {
+  // What a crawl costs is said only where pages are counted against a ceiling.
+  const cost = limited ? " Each page fetched uses one page of this month's crawl budget." : "";
+  const blocked = Boolean(blockedReason) && (Boolean(onCrawlNow) || Boolean(onFreshCrawl));
   return (
+    <div className="flex flex-col items-start gap-1.5 sm:items-end">
       <div className="flex flex-wrap items-center gap-2">
         <Button type="button" variant="ghost" size="sm" onClick={onOpenLogs}>
           <ScrollText aria-hidden="true" className="size-4" />
@@ -170,10 +190,15 @@ function CrawlActions({ latestRun, live, queued, armed, setArmed, clearArmed, se
           nothing, so it is not disabled while a crawl runs.
         */}
         {onSetFrequencies && latestRun && (
-          <Button type="button" variant="outline" size="sm" onClick={onSetFrequencies} disabled={busy}>
-            <CalendarClock aria-hidden="true" className="size-4" />
-            Set crawl frequencies
-          </Button>
+          <Tooltip>
+            <TooltipTrigger render={<Button type="button" variant="outline" size="sm" onClick={onSetFrequencies} disabled={busy} />}>
+              <CalendarClock aria-hidden="true" className="size-4" />
+              Set crawl frequencies
+            </TooltipTrigger>
+            <TooltipContent className="max-w-xs">
+              Choose how often pages are fetched again: daily, weekly, monthly, or Manual — only when you ask. Every page starts on Manual. Choosing fetches nothing by itself.
+            </TooltipContent>
+          </Tooltip>
         )}
 
         {onClearData && latestRun && !live && !queued && (
@@ -194,7 +219,7 @@ function CrawlActions({ latestRun, live, queued, armed, setArmed, clearArmed, se
               <Trash2 aria-hidden="true" className="size-4" />
               {clearArmed ? "Confirm: delete all crawl data" : "Clear crawl data"}
             </TooltipTrigger>
-            <TooltipContent>Delete every crawled page, its history and the crawl logs. Settings are kept. This cannot be undone.</TooltipContent>
+            <TooltipContent className="max-w-xs">Delete every crawled page, its history and the crawl logs, to read the site from scratch. The crawl settings are kept. This cannot be undone.</TooltipContent>
           </Tooltip>
         )}
 
@@ -206,7 +231,7 @@ function CrawlActions({ latestRun, live, queued, armed, setArmed, clearArmed, se
                   type="button"
                   variant={armed ? "default" : "outline"}
                   size="sm"
-                  disabled={busy}
+                  disabled={busy || blocked}
                   onClick={() => {
                     if (armed) { setArmed(false); onFreshCrawl(); } else setArmed(true);
                   }}
@@ -216,15 +241,28 @@ function CrawlActions({ latestRun, live, queued, armed, setArmed, clearArmed, se
               <RefreshCw aria-hidden="true" className="size-4" />
               {armed ? "Confirm: crawl every page" : "Fresh crawl"}
             </TooltipTrigger>
-            <TooltipContent>Fetch every page again in full, whatever its frequency. Uses crawl budget for the whole site.</TooltipContent>
+            <TooltipContent className="max-w-xs">
+              Fetch every page of the site again in full{sitePages ? ` (about ${sitePages.toLocaleString()})` : ""}, whatever its frequency, and nothing comes back as unchanged. For when much of the site has changed.{cost}
+            </TooltipContent>
           </Tooltip>
         )}
 
         {onCrawlNow && (
-          <Button type="button" size="sm" onClick={onCrawlNow} disabled={busy || live || queued}>
-            {queued ? "Queued…" : live ? "Crawling…" : "Crawl now"}
-          </Button>
+          <Tooltip>
+            <TooltipTrigger render={<Button type="button" size="sm" onClick={onCrawlNow} disabled={busy || live || queued || blocked} />}>
+              {queued ? "Queued…" : live ? "Crawling…" : "Crawl now"}
+            </TooltipTrigger>
+            <TooltipContent className="max-w-xs">
+              Fetch what is due now: pages never fetched yet, pages somebody asked for, and pages whose crawl frequency has come round. Pages on Manual are not fetched again; Fresh crawl fetches everything.{cost}
+            </TooltipContent>
+          </Tooltip>
         )}
       </div>
+      {/* A disabled button says nothing about why, and its tooltip cannot be opened, so the reason
+          is written under the buttons. */}
+      {blocked && !live && (
+        <p className="max-w-sm text-xs text-orb-orange sm:text-right">{blockedReason}</p>
+      )}
+    </div>
   );
 }

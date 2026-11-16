@@ -16,6 +16,18 @@ export const RUN_PRESENTATION = Object.freeze({
 });
 
 /**
+ * A crawl that finished without fetching everything it found, because the month's crawl pages ran
+ * out (`pagesSkippedNoBudget` on its counters). Not "Completed": the pages it left wait for the
+ * next crawl, and the run must not read as if it had read the whole site.
+ */
+export const PARTIAL_PRESENTATION = Object.freeze({ label: "Stopped: out of crawl pages", tone: "text-orb-orange", dot: "bg-orb-orange" });
+
+/** Whether a finished run left pages unfetched for want of crawl pages. */
+export function ranOutOfPages(run) {
+  return Boolean(run) && run.status === "succeeded" && (run.counters?.pagesSkippedNoBudget ?? 0) > 0;
+}
+
+/**
  * A crawl that has been asked for and has not begun: waiting for the scheduler's next pass, or for
  * the sites ahead of it. Its own colour, because "it is coming" is neither running nor finished.
  */

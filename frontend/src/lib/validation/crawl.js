@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { canonicalizePublicUrl, workspaceUrlSchema } from "./workspace";
+import { canonicalizePublicUrl } from "./workspace";
 
 /**
  * How often one route pattern, or one page, is recrawled, as the choices a person can make.
@@ -29,6 +29,24 @@ export function intervalToFrequency(intervalHours) {
   const option = PATTERN_FREQUENCIES.find((entry) => entry.intervalHours === intervalHours);
   return option ? option.value : "";
 }
+
+/**
+ * The address a crawl starts from, accepting a bare host: `orbik.io` is read as
+ * `https://orbik.io/`, which is what everybody who types one means. Anything already carrying a
+ * scheme is left to the shared rule, so `ftp://…` is still refused rather than rewritten.
+ */
+export function withHttps(value) {
+  const input = String(value ?? "").trim();
+  if (!input || /^[a-z][a-z0-9+.-]*:\/\//i.test(input)) return input;
+  return `https://${input.replace(/^\/+/, "")}`;
+}
+
+const seedUrlSchema = z.string().min(1, "Enter the address to start crawling from.").transform((value, context) => {
+  try { return canonicalizePublicUrl(withHttps(value)); } catch (error) {
+    context.addIssue({ code: "custom", message: error.message });
+    return z.NEVER;
+  }
+});
 
 /**
  * How many sitemaps one site may be told about by hand.
@@ -107,7 +125,7 @@ function requireSitemapsOnSeedHost(values, context) {
  * someone to guess.
  */
 export const crawlSetupSchema = z.object({
-  seedUrl: workspaceUrlSchema,
+  seedUrl: seedUrlSchema,
   sitemapUrls: sitemapUrlsField,
 }).strict().superRefine(requireSitemapsOnSeedHost);
 
@@ -135,6 +153,6 @@ export const crawlSetupSchema = z.object({
  * this one's totals — which also keeps a crawl's page count honest.
  */
 export const crawlSettingsSchema = z.object({
-  seedUrl: workspaceUrlSchema,
+  seedUrl: seedUrlSchema,
   sitemapUrls: sitemapUrlsField,
 }).strict().superRefine(requireSitemapsOnSeedHost);
