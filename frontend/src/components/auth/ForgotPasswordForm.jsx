@@ -64,6 +64,12 @@ export function ForgotPasswordForm() {
             If <span className="font-medium">{sentTo}</span> has an Orbik account, we&apos;ve emailed it a link to choose a new password.
           </p>
         </div>
+        {/* The answer is the same whether or not the address has an account, or the email went, so
+            that this page never tells anyone who is here; what to do if nothing arrives is said instead. */}
+        <p className="mt-4 text-sm text-orb-gray">
+          Nothing after a few minutes? Check the spam folder and the address, then{" "}
+          <button type="button" className={AUTH_LINK} onClick={() => setSentTo(null)}>try again</button>, or ask this Orbik&apos;s admin for a link.
+        </p>
         {foot}
       </AuthPanel>
     );

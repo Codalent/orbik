@@ -144,7 +144,8 @@ only an extension sets (below); core has no limit.
 
 - `GET /v1/workspaces/:id/members` — the owner and every member, with role and email.
 - `POST|GET /v1/workspaces/:id/members/invites`, `DELETE …/invites/:inviteId` — make (the link is
-  returned once), list and revoke invites; admin and up.
+  returned once, with `emailStatus`: `sent`, `failed` or `not-configured`), list and revoke
+  invites; admin and up.
 - `PATCH|DELETE /v1/workspaces/:id/members/:userId` — change a role or remove; admin and up.
 - `DELETE /v1/workspaces/:id/members/me` — leave; anyone but the owner.
 - `GET /v1/invites/:token`, `POST /v1/invites/:token/accept` — public: describe and accept; an

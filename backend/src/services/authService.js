@@ -84,7 +84,16 @@ export function createAuthService({
       });
     } catch (error) {
       verification.logger?.("warn", "auth.signup_verification_email_failed", { message: error?.message ?? "unknown" });
-      throw new AppError({ status: 502, code: "EMAIL_NOT_SENT", message: "The confirmation email could not be sent. Try again in a moment." });
+      // Nobody holds the link, so the pending signup is forgotten rather than left for a day.
+      await pending.deleteOne({ email, tokenHash: row.tokenHash }).catch(() => {});
+      // Most often the mail provider refused the address itself (a typo, a domain that takes no
+      // mail), so the answer says what a person can do about it; exposed, though it is a 502.
+      throw new AppError({
+        status: 502,
+        code: "EMAIL_NOT_SENT",
+        message: "The confirmation email could not be sent to that address. Check it and try again.",
+        expose: true,
+      });
     }
     return { verificationSent: true, email, expiresAt: expiresAt.toISOString() };
   }

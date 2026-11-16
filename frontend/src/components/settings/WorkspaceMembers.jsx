@@ -33,8 +33,9 @@ const ROLE_ITEMS = Object.fromEntries(MEMBER_ROLES.map((value) => [value, ROLE_L
  * withdraw the invites still open, change a member's role and take a member out; nobody changes or
  * removes the owner, so the owner's row has no controls. Everybody but the owner can leave.
  *
- * An invite is a link, shown once, which the person who made it sends themselves: nothing is
- * emailed. The link works once, for seven days, and only for the address it was made for.
+ * An invite is a link, shown once. An install that sends email also emails it, and the API says
+ * whether that went (`emailStatus`), so the card says whether the person who made it still has to
+ * send it themselves. The link works once, for seven days, and only for the address it was made for.
  *
  * The API is what enforces all of this; what is hidden here is only what would be refused.
  *
@@ -97,11 +98,19 @@ export function WorkspaceMembers({ workspaceId }) {
     }
   }
 
-  async function revoke(inviteId) {
-    setBusy(inviteId);
+  async function revoke(pending) {
+    if (!(await confirm({
+      title: `Withdraw the invite for ${pending.email}?`,
+      description: "Its link stops working at once. You can invite them again later.",
+      confirmLabel: "Withdraw invite",
+      destructive: true,
+    }))) return;
+    setBusy(pending.id);
     setActionError(null);
     try {
-      await membersApi.revokeInvite(workspaceId, inviteId);
+      await membersApi.revokeInvite(workspaceId, pending.id);
+      // The link just shown for this invite is dead now: take it off the screen.
+      setIssued((current) => (current?.invite?.id === pending.id ? null : current));
       await invitesRead.mutate();
     } catch (failure) {
       report(failure);
@@ -262,7 +271,7 @@ export function WorkspaceMembers({ workspaceId }) {
                     {" · "}expires {formatDate(pending.expiresAt, { time: false })}
                   </span>
                 </span>
-                <Button type="button" variant="ghost" size="sm" onClick={() => revoke(pending.id)} disabled={busy !== null} className="text-orb-muted">
+                <Button type="button" variant="ghost" size="sm" onClick={() => revoke(pending)} disabled={busy !== null} className="text-orb-muted">
                   {busy === pending.id ? "Withdrawing…" : "Withdraw"}
                 </Button>
               </li>
@@ -282,9 +291,7 @@ export function WorkspaceMembers({ workspaceId }) {
                 <div className="min-w-0 space-y-1">
                   <p className="text-sm font-semibold text-orb-white">Invite link for {issued.invite.email}, shown once</p>
                   <p className="text-xs leading-relaxed text-orb-gray">
-                    {issued.emailed
-                      ? "It has also been emailed to them; copy it if you would rather send it yourself."
-                      : "Nothing is emailed: copy the link and send it to them yourself."}{" "}
+                    {describeInviteEmail(issued)}{" "}
                     It works once, for that address only, until{" "}
                     {formatDate(issued.invite.expiresAt, { time: false })}. They join as {roleLabel(issued.invite.role)}.
                   </p>
@@ -361,6 +368,18 @@ function RoleSelect({ id, label, value, disabled, onChange, size = "sm" }) {
       </SelectContent>
     </Select>
   );
+}
+
+/**
+ * Whether the invite just made was emailed, from the API's `emailStatus`, as what the person who
+ * made it still has to do. An older API answers only `emailed`.
+ */
+function describeInviteEmail(issued) {
+  const status = issued.emailStatus ?? (issued.emailed ? "sent" : null);
+  if (status === "sent") return `It has been emailed to ${issued.invite.email}; you can also copy it and send it yourself.`;
+  if (status === "failed") return `It could not be emailed to ${issued.invite.email}, so copy the link and send it to them yourself.`;
+  if (status === "not-configured") return "This Orbik sends no email, so copy the link and send it to them yourself.";
+  return "Copy the link and send it to them yourself.";
 }
 
 /** How each role's pill is coloured: the owner in the accent, admins in the signal colour. */

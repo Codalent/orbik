@@ -51,8 +51,9 @@ created the workspace, and nobody can change or remove them.
 
 On **Settings → People**, under **Invite someone**, enter their email and a role and choose
 **Create invite link**. You get a link to send them. It works once, for that address, for seven
-days. If the install sends email, the link is emailed to them as well; either way you can copy it
-and send it yourself.
+days. If the install sends email, the link is emailed to them as well, and the card that shows the
+link says whether the email went; if it could not be sent, or the install sends no email, copy the
+link and send it yourself.
 
 When they open the link:
 
@@ -60,7 +61,8 @@ When they open the link:
 - if the address already has an account, they sign in and then accept;
 - if it has none, they choose a password, which creates their account and joins the workspace.
 
-An open invite shows as **Invited** in the list until it is accepted. **Withdraw** takes it back.
+An open invite shows as **Invited** in the list until it is accepted. **Withdraw** takes it back,
+after asking: its link stops working at once.
 
 ## Changing roles, removing and leaving
 

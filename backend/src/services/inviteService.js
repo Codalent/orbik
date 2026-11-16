@@ -147,12 +147,13 @@ export function createInviteService({
   }
 
   /**
-   * Emails an invite's link to its address when this install sends email. Whether it went is
-   * returned, and a failure is logged without the link: the person who made the invite has the
-   * link on screen and can send it themselves.
+   * Emails an invite's link to its address when this install sends email. What happened is
+   * returned — `sent`, `failed` (the provider refused it, or could not be reached) or
+   * `not-configured` — and a failure is logged without the link: the person who made the invite
+   * has the link on screen and can send it themselves.
    */
   async function emailInvite({ workspace, invite, url, inviter }) {
-    if (!sendEmail) return false;
+    if (!sendEmail) return "not-configured";
     const as = invite.role === "read-only" ? "a read-only member" : `${invite.role === "admin" ? "an" : "a"} ${invite.role}`;
     try {
       await sendEmail({
@@ -167,14 +168,14 @@ export function createInviteService({
           "If you were not expecting this, you can ignore it.",
         ].join("\n"),
       });
-      return true;
+      return "sent";
     } catch (error) {
       logger("warn", "workspace.invite_email_failed", {
         workspaceId: workspace._id.toHexString(),
         inviteId: invite._id.toHexString(),
         message: error?.message ?? "unknown",
       });
-      return false;
+      return "failed";
     }
   }
 
@@ -363,11 +364,9 @@ export function createInviteService({
       });
       const inviters = await emailsById([userId]);
       const url = `${config.frontendOrigins[0]}/invite/${token}`;
-      return {
-        invite: toInvite(invite, inviters),
-        url,
-        emailed: await emailInvite({ workspace, invite, url, inviter: inviters.get(String(userId)) ?? null }),
-      };
+      const emailStatus = await emailInvite({ workspace, invite, url, inviter: inviters.get(String(userId)) ?? null });
+      // `emailed` is the older answer, kept for a client that reads it.
+      return { invite: toInvite(invite, inviters), url, emailStatus, emailed: emailStatus === "sent" };
     },
 
     /** The workspace's pending invites, newest first. */

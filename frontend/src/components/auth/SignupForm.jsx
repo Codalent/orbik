@@ -9,6 +9,7 @@ import { useForm } from "react-hook-form";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { NeutralLoading } from "@/components/NeutralLoading";
+import { describeAccessError } from "@/lib/api/access";
 import { signup } from "@/lib/api/auth";
 import { useEdition } from "@/lib/api/edition";
 import { useExtensionSlots } from "@/lib/extensions/slots";
@@ -56,7 +57,7 @@ export function SignupForm() {
       router.replace("/workspaces/new");
     } catch (error) {
       setAttempt((count) => count + 1);
-      setError("root", { message: error?.message ?? "Signup failed. Try again." });
+      setError("root", { message: describeAccessError(error, "Signup failed. Try again.") });
     }
   }
 
