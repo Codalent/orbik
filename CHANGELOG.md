@@ -9,9 +9,24 @@ What changed in each release of Orbik. Releases are tagged `vX.Y.Z`; upgrading i
   guides, connecting your AI, self-hosting and a generated MCP tool reference, in the order
   `docs/nav.json` gives. The maintainers' design documents moved to `docs/architecture/`, and
   self-hosting is split into pages under `docs/self-hosting/`. `pnpm lint` checks every link.
+- **Install with an AI agent.** The self-hosting guide opens with a prompt to give an AI coding
+  agent (Claude Code, Codex, Cursor's agent): it checks Docker, chooses free ports, asks for the AI
+  keys, starts the install and hands over the setup link, leaving the account to the person.
 - **Setup.** The API's first-run banner prints the setup page's address with the code in it,
   `/setup?key=…`; opening it fills the code in and takes it off the address bar. Typing the code
-  still works.
+  still works. Once the first account is made, the log says so under the banner, so the link left
+  there no longer looks like the next step.
+- **Docker install.** `docker compose up` no longer prints `pull access denied … may require
+  'docker login'` for Orbik's own images, which it builds rather than pulls. Moving the install to
+  another port with `ORBIK_HTTP_PORT` alone now moves its address too (the setup link, invite
+  links and sign-in checks named port 8080 until `ORBIK_URL` was set as well). A second install on
+  the same machine gets its own containers, images and volumes with `COMPOSE_PROJECT_NAME`; before,
+  it took over the first one's. The bundled Qdrant no longer sends its own telemetry, so an
+  install sends nothing anywhere unless `ORBIK_TELEMETRY=on`. See
+  [docs/self-hosting](docs/self-hosting/README.md#when-port-8080-is-taken).
+- **Workspaces and crawling.** A website address typed without `https://` (`example.com`) is taken
+  to be HTTPS rather than refused, in the new-workspace form and the crawler's start address and
+  sitemaps.
 - **AI keys.** The OpenAI key is the required one: the embeddings behind search need it. The
   reasoning calls (the Library's knowledge base, Ask, llms.txt, the brand) run on Anthropic or
   OpenAI, chosen with `ORBIK_AI_PROVIDER`; unset, Anthropic when its key is set and OpenAI

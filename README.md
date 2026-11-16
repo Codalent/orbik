@@ -7,6 +7,10 @@ Your own AI reads all of it over MCP.
 
 ## Run it with Docker
 
+The easiest way: give [the install prompt](docs/self-hosting/README.md#with-an-ai-coding-agent) to
+an AI coding agent such as Claude Code, Codex or Cursor's agent, on the machine Orbik will run on.
+By hand:
+
 ```sh
 git clone https://github.com/Codalent/orbik.git
 cd orbik
@@ -219,6 +223,10 @@ On an Intel Mac, download `qdrant-x86_64-apple-darwin.tar.gz` instead; on x86_64
 ```sh
 cd ~/qdrant && ./qdrant    # REST on 6333, data in ~/qdrant/storage
 ```
+
+Qdrant reports anonymous telemetry to its makers unless told not to: set
+`telemetry_disabled: true` in `config/config.yaml` (or `QDRANT__TELEMETRY_DISABLED=true` in its
+environment). The Docker install does this for you.
 
 On a Linux box you will want it to survive a reboot. Write
 `/etc/systemd/system/qdrant.service` — adjusting the paths to where you unpacked it:
