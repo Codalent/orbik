@@ -209,7 +209,7 @@ export function LlmCallLog({ embedded = false }) {
   ) : null;
 
   const periodPhrase = periodLabel === "last hour" ? "last hour" : `last ${periodLabel}`;
-  const description = "Every request Orbik sends to a model, across all workspaces: what was sent, which model answered, what came back and what it cost.";
+  const description = "Every request Orbik sends to a model, across your workspaces: what was sent, which model answered, what came back and what it cost.";
   const workingNow = running > 0 && (
     <Pill tone="lime" dot pulse>
       {running === 1 ? "1 call working now" : `${formatCount(running)} calls working now`}

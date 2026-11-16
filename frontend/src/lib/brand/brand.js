@@ -178,3 +178,22 @@ export function formatBytes(bytes) {
   if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
+
+/**
+ * Why a derivation proposed no system, as one sentence: AI being unavailable in the shared words
+ * (`describeFailure` from `@/lib/agents/aiAvailability`, bound to the reader as `failure`), any
+ * other recorded reason in its own words, never with its code.
+ *
+ * @param {{synthesis?: {visual?: {reason?: object}, graphics?: {reason?: object}}}} attempt
+ * @param {(failure: object, consequence: string) => string} failure the reader's `failure` helper
+ * @param {string} [consequence] what it meant, to follow "so"
+ */
+export function proposalSkippedText(attempt, failure, consequence = "no system was proposed from them") {
+  const reason = attempt?.synthesis?.visual?.reason ?? attempt?.synthesis?.graphics?.reason ?? null;
+  if (!reason) return "No system was proposed.";
+  if (reason.code === "NO_ROUTE" || reason.code === "PROVIDER_NOT_CONFIGURED" || reason.code === "PLAN_LIMIT_REACHED") {
+    return failure(reason, consequence);
+  }
+  const message = typeof reason.message === "string" ? reason.message.trim().replace(/\.$/, "") : "";
+  return message ? `No system was proposed: ${message}.` : "No system was proposed.";
+}

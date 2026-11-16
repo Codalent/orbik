@@ -4,13 +4,14 @@ import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 
 import { Pill } from "@/components/ui/pill";
+import { useAiAvailability } from "@/lib/agents/aiAvailability";
 import { AGENT_STATUS } from "@/lib/agents/registry";
 import { ago, fromNow } from "@/lib/home/home";
 import { cn } from "@/lib/utils";
 
 /** The short word each state is shown as on a card, beside the agent's name. */
 const STATUS_PILL = Object.freeze({
-  [AGENT_STATUS.working]: { tone: "lime", text: "Working", dot: true, pulse: true },
+  [AGENT_STATUS.working]: { tone: "lime", text: "Running", dot: true, pulse: true },
   [AGENT_STATUS.idle]: { tone: "neutral", text: "Idle" },
   [AGENT_STATUS.failed]: { tone: "coral", text: "Failed", dot: true },
   [AGENT_STATUS.unconfigured]: { tone: "muted", text: "Not set up" },
@@ -38,11 +39,15 @@ const RUN_ENDING = Object.freeze({ succeeded: "finished", failed: "failed", canc
  * those words. The last run and the next run are the API's figures, as the overview read reports
  * them.
  *
+ * At rest the pill says what the agent's own page says: "Set to work" or "Not set to work" — never
+ * "Idle" beside a page that says something else. Running and a failed last run come first.
+ *
  * @param {object} props
  * @param {object} props.agent a row from `buildAgentRows`, with `summary`, `run`, `next`, `nextNote`,
  *   `facts` and `hint` added by the overview
  */
 export function AgentCard({ agent }) {
+  const ai = useAiAvailability();
   const Icon = agent.icon;
   const run = agent.run;
   const runFailed = run?.status === "failed";
@@ -57,14 +62,23 @@ export function AgentCard({ agent }) {
     : described === AGENT_STATUS.idle && runFailed
       ? AGENT_STATUS.failed
       : described;
-  const pill = STATUS_PILL[status];
+  const atRest = status === AGENT_STATUS.idle;
+  const restWords = agent.restWords ?? { on: "Set to work", off: "Not set to work" };
+  const pill = atRest && agent.scheduled && !agent.restWords
+    ? { tone: "lime", dot: true }
+    : STATUS_PILL[status];
   // The registry's own words only where the short one would understate it (a failure or a sync);
   // a row not set up says why in its hint line instead.
   const pillText = status !== described
     ? (running ? (run.status === "queued" ? "Queued" : "Running") : "Last run failed")
     : agent.label && (status === AGENT_STATUS.failed || status === AGENT_STATUS.working)
       ? capitalise(agent.label)
-      : pill.text;
+      : atRest
+        ? (agent.scheduled ? restWords.on : restWords.off)
+        : pill.text;
+  // A run that succeeded without its main result (`note`, `incomplete`): said under the run line,
+  // in orange, so it does not read as plainly finished.
+  const note = run?.status === "succeeded" && run.note ? run.note : null;
 
   return (
     <Link
@@ -96,12 +110,13 @@ export function AgentCard({ agent }) {
         <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2 border-t border-orb-line/70 pt-3 text-xs">
           <div className="min-w-[11rem] flex-1 space-y-0.5">
             <p className={runFailed ? "text-orb-coral" : running ? "text-orb-lime" : "text-orb-muted"}>{lastRunLine(agent)}</p>
+            {note && <p className={run.incomplete ? "text-orb-orange" : "text-orb-muted"}>{note}</p>}
             {nextLine(agent) && <p className="text-orb-gray">{nextLine(agent)}</p>}
           </div>
           <ArrowRight aria-hidden="true" className="size-3.5 shrink-0 text-orb-muted opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100 max-sm:hidden" />
         </div>
-        {runFailed && run.error?.message && (
-          <p className="mt-1.5 line-clamp-2 text-xs text-orb-coral/90">{run.error.message}</p>
+        {runFailed && run.error && (
+          <p className="mt-1.5 line-clamp-2 text-xs text-orb-coral/90">{ai.failure(run.error, "its last run could not finish")}</p>
         )}
       </div>
     </Link>

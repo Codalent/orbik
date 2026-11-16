@@ -25,7 +25,8 @@ docker run --rm -v orbik_qdrant-data:/data -v "$PWD":/backup alpine tar czf /bac
 docker compose start qdrant
 ```
 
-Restoring is the reverse with `tar xzf` into the volume. Without a Qdrant backup, a restored install
+The volume is `orbik_qdrant-data` unless you set `COMPOSE_PROJECT_NAME` (then `<that name>_qdrant-data`;
+`docker volume ls` lists them). Restoring is the reverse with `tar xzf` into the volume. Without a Qdrant backup, a restored install
 re-indexes the Library on its own over the next scheduler passes, if `ORBIK_OPENAI_API_KEY` is set.
 
 ## Upgrades

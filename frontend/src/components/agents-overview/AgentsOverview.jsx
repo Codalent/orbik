@@ -38,6 +38,19 @@ const UNCONFIGURED_HINT = Object.freeze({
 const DEFAULT_HINT = "Starts once your site has been crawled";
 
 /**
+ * What a card says for an agent that is set to work but has no time to give, because the work
+ * before it starts it rather than a clock.
+ */
+const STARTED_BY = Object.freeze({
+  "business-knowledge-base": "Writes after a crawl changes a page it reads",
+});
+
+/** What a card says for an agent not set to work, where "runs only when started" is not true. */
+const NOT_WORKING = Object.freeze({
+  "business-knowledge-base": "Writes nothing until it is set to work, in the Library",
+});
+
+/**
  * The Agents overview: every agent in the workspace on one page — what each does, whether it is
  * working, how its last run went and when it runs next.
  *
@@ -215,6 +228,8 @@ function withFigures(row, { crawl, catalog, overview, overviewFailed }) {
       next: !active && crawl?.site?.enabled !== false ? crawl?.site?.nextCrawlAt ?? null : null,
       facts: crawl?.site && crawl.urls ? plural(crawl.urls.pages ?? crawl.urls.total ?? 0, "page") : null,
       scheduled: Boolean(crawl?.site && crawl.site.enabled !== false),
+      // The crawler's own page says "Paused" for a site whose schedule is off; its card agrees.
+      restWords: { on: "Idle", off: "Paused" },
     };
   }
   const item = overview?.items?.find((entry) => entry.agentSlug === row.id) ?? null;
@@ -233,13 +248,13 @@ function withFigures(row, { crawl, catalog, overview, overviewFailed }) {
 
 /**
  * What a card says about its schedule when there is no next run to give: set to work but started by
- * the work before it rather than by a clock, or not set to work.
- * Nothing for an agent not set up, whose card says what it waits for instead.
+ * the work before it rather than by a clock, or not set to work (which the pill says; this says
+ * what that means). Nothing for an agent not set up, whose card says what it waits for instead.
  */
 function scheduleNote(row, schedule) {
   if (row.status === AGENT_STATUS.unconfigured) return null;
-  if (schedule?.working) return schedule.nextRunAt ? null : "Set to work";
-  return "Not set to work";
+  if (schedule?.working) return schedule.nextRunAt ? null : STARTED_BY[row.id] ?? "Runs after the work before it";
+  return NOT_WORKING[row.id] ?? "Runs only when started by hand";
 }
 
 /** The three groups, in the order the page shows them, each in the sidebar's order. */

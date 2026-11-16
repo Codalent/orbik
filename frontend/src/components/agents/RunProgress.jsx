@@ -4,6 +4,7 @@ import { AlertCircle, Check, CircleDashed, Loader2 } from "lucide-react";
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { useAiAvailability } from "@/lib/agents/aiAvailability";
 import { RUN_STATUS_LABELS, describeRunEvent } from "@/lib/agents/runEvents";
 import { cn } from "@/lib/utils";
 
@@ -19,16 +20,24 @@ import { cn } from "@/lib/utils";
  * @param {Array<object>} props.events progress events, oldest first
  * @param {boolean} props.complete whether the run has finished
  * @param {() => void} [props.onCancel] asks the run to stop
+ * @param {string} [props.consequence] what AI being unavailable meant for this run, to follow "so"
  */
-export function RunProgress({ run, events, complete, onCancel }) {
+export function RunProgress({ run, events, complete, onCancel, consequence = "this run could not finish" }) {
+  const ai = useAiAvailability();
   if (!run) return null;
 
   const failure = run.status === "failed" ? run.error : null;
+  // The failure is said once, below the steps, in words a person can act on; the log's own
+  // "failed" line says the same thing in the worker's words, so it is left out of the list.
+  const steps = failure ? events.filter((event) => event.type !== "failed") : events;
+  // A run is created queued and re-read only when it ends; once its first event has arrived it is
+  // running, whatever the copy on screen said when it was started.
+  const status = run.status === "queued" && events.length ? "running" : run.status;
 
   return (
     <section aria-label="Run progress" className="space-y-4">
       <header className="flex flex-wrap items-center justify-between gap-2">
-        <RunStatus run={run} />
+        <RunStatus status={status} />
         {!complete && onCancel && (
           <Button type="button" variant="outline" size="sm" onClick={onCancel} disabled={run.cancelRequested}>
             {run.cancelRequested ? "Stopping…" : "Cancel"}
@@ -37,9 +46,9 @@ export function RunProgress({ run, events, complete, onCancel }) {
       </header>
 
       <ol className="space-y-1.5" aria-label="Progress">
-        {events.map((event) => (
+        {steps.map((event) => (
           <li key={event.seq} className="flex items-start gap-2 text-sm">
-            <EventIcon event={event} isLast={event === events.at(-1)} complete={complete} />
+            <EventIcon event={event} isLast={event === steps.at(-1)} complete={complete} />
             <span className={cn(event.type === "failed" && "text-destructive")}>{describeRunEvent(event)}</span>
           </li>
         ))}
@@ -47,7 +56,7 @@ export function RunProgress({ run, events, complete, onCancel }) {
 
       {failure && (
         <Alert variant="destructive" role="alert">
-          <AlertDescription>{failure.message}</AlertDescription>
+          <AlertDescription>{ai.failure(failure, consequence)}</AlertDescription>
         </Alert>
       )}
     </section>
@@ -55,11 +64,11 @@ export function RunProgress({ run, events, complete, onCancel }) {
 }
 
 /** The run's current state, in the words a person would use. */
-function RunStatus({ run }) {
+function RunStatus({ status }) {
   return (
     <p className="flex items-center gap-2 text-sm font-medium" role="status">
-      {run.status === "running" && <Loader2 aria-hidden="true" className="size-4 animate-spin" />}
-      {RUN_STATUS_LABELS[run.status] ?? run.status}
+      {status === "running" && <Loader2 aria-hidden="true" className="size-4 animate-spin" />}
+      {RUN_STATUS_LABELS[status] ?? status}
     </p>
   );
 }

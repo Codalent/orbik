@@ -8,13 +8,14 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { PageHeader } from "@/components/ui/page-header";
 import { Pill } from "@/components/ui/pill";
+import { useAiAvailability } from "@/lib/agents/aiAvailability";
 import { describeRunEvent } from "@/lib/agents/runEvents";
-import { runPhases } from "@/lib/brand/brand";
+import { proposalSkippedText, runPhases } from "@/lib/brand/brand";
 import { formatDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 /** What the switch does, in each direction. */
-const PAUSE_LABEL = "Pause the agent: the system is left as it is";
+const PAUSE_LABEL = "Not set to work: the system is left as it is until the agent is run or set to work";
 const WORK_LABEL = "Set the agent to work: once a week it checks whether your site's styling changed, and derives the system again only if it did";
 
 /**
@@ -46,6 +47,7 @@ const WORK_LABEL = "Set the agent to work: once a week it checks whether your si
  */
 export function BrandAgentStrip({ work, brand, ready, description, canRun = true, onDerive, agentHref, onHistory }) {
   const { run, events, complete, inFlight, working, busy, setup } = work;
+  const ai = useAiAvailability();
   const phases = runPhases(events, complete);
   const failed = !inFlight && run?.status === "failed";
   const derived = Boolean(brand?.system);
@@ -77,7 +79,7 @@ export function BrandAgentStrip({ work, brand, ready, description, canRun = true
             ) : working ? (
               <Pill tone="lime" dot title={WORK_LABEL}>Agent set to work</Pill>
             ) : (
-              <Pill tone="neutral" dot title={PAUSE_LABEL}>Agent paused</Pill>
+              <Pill tone="neutral" dot title={PAUSE_LABEL}>Agent not set to work</Pill>
             )}
             {failed && <Pill tone="coral" dot>Last run failed</Pill>}
           </span>
@@ -127,10 +129,7 @@ export function BrandAgentStrip({ work, brand, ready, description, canRun = true
 
       {failed && run.error && (
         <Alert variant="destructive" role="alert">
-          <AlertDescription>
-            {run.error.message}
-            {run.error.code && <span className="ml-1.5 font-mono text-xs opacity-80">({run.error.code})</span>}
-          </AlertDescription>
+          <AlertDescription>{ai.failure(run.error, "the design system could not be derived")}</AlertDescription>
         </Alert>
       )}
       {!inFlight && derived && attemptAfter(brand) && (
@@ -138,8 +137,8 @@ export function BrandAgentStrip({ work, brand, ready, description, canRun = true
         // its answer could not be used. What is on the page is the system from before, and saying
         // so is the difference between "current" and "the last one that worked".
         <p role="status" className="rounded-lg border border-orb-orange/30 bg-orb-orange/5 px-4 py-2.5 text-compact text-orb-orange">
-          On {formatDate(brand.lastAttempt.at)} your site was rendered again but no new system was proposed
-          {attemptReason(brand.lastAttempt) && <>: {attemptReason(brand.lastAttempt)}</>}. This is the system derived on {formatDate(brand.derivedAt)}.
+          On {formatDate(brand.lastAttempt.at)} your site was rendered again.
+          {" "}{proposalSkippedText(brand.lastAttempt, ai.failure, "no new system was proposed")} This is the system derived on {formatDate(brand.derivedAt)}.
         </p>
       )}
       {!inFlight && run?.status === "succeeded" && run.result?.state === "unchanged" && (
@@ -154,10 +153,4 @@ export function BrandAgentStrip({ work, brand, ready, description, canRun = true
 /** Whether a derivation tried and proposed nothing after the system on screen was derived. */
 function attemptAfter(brand) {
   return Boolean(brand?.lastAttempt?.at && brand.derivedAt && new Date(brand.lastAttempt.at) > new Date(brand.derivedAt));
-}
-
-/** Why an attempt proposed nothing, in the words it recorded. */
-function attemptReason(attempt) {
-  const reason = attempt.synthesis?.visual?.reason ?? attempt.synthesis?.graphics?.reason ?? null;
-  return reason ? `${reason.message}${reason.code ? ` (${reason.code})` : ""}` : null;
 }

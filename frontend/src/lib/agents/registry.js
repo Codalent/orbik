@@ -1,7 +1,8 @@
-import { Bot, FileCode2, Palette, Waypoints } from "lucide-react";
+import { BookOpenText, Bot, FileCode2, Palette, Waypoints } from "lucide-react";
 
 import { DESIGN_SYSTEM_AGENT_SLUG } from "@/lib/brand/brand";
 import { LLMS_TXT_AGENT_SLUG } from "@/lib/knowledge/knowledge";
+import { LIBRARY_AGENT_SLUG } from "@/lib/library/library";
 
 /**
  * What an agent is doing, from the point of view of someone glancing at the sidebar.
@@ -24,11 +25,11 @@ export const AGENT_STATUS = Object.freeze({
  * never points at something that is not there — a navigation item is a promise that pressing it
  * takes you somewhere.
  *
- * Not every agent belongs here. The Business Knowledge Base is listed under Knowledge instead
- * (`@/lib/library/registry`), as the Library: people write in it too, so what somebody wants from
- * it is a place to read and edit rather than a job to watch. llms.txt is here, because nobody
- * edits it — it is read-only output on a schedule, and the question worth answering at a glance is
- * whether it has been rebuilt since the site changed.
+ * The Business Knowledge Base is here as an agent — whether it is set to work, whether its last
+ * write failed — and under Knowledge as the Library (`@/lib/library/registry`), the place people
+ * read and edit; both lead to the same page, which carries its switch. llms.txt is only here,
+ * because nobody edits it — it is read-only output on a schedule, and the question worth
+ * answering at a glance is whether it has been rebuilt since the site changed.
  *
  * `describe` turns whatever the API reports into the one thing a sidebar row shows beside the
  * agent's name: how the agent is doing. It is given the crawl, which is what every row's state
@@ -49,6 +50,17 @@ const AGENTS = Object.freeze([
       if (crawl.latestRun?.status === "failed") return { status: AGENT_STATUS.failed };
       return { status: AGENT_STATUS.idle };
     },
+  },
+  {
+    id: LIBRARY_AGENT_SLUG,
+    name: "Knowledge base",
+    // An open book with text: what this one writes is the Library's knowledge base.
+    icon: BookOpenText,
+    // The agent's route renders the Library, where its switch, its last write and its source
+    // ledger are; a link from the agent list stays among the agents.
+    href: (workspaceId) => `/workspaces/${workspaceId}/agents/${LIBRARY_AGENT_SLUG}`,
+    // It writes from the pages the crawler copied into Sources, so before a crawl it is not set up.
+    describe: describeCrawlReader,
   },
   {
     id: LLMS_TXT_AGENT_SLUG,

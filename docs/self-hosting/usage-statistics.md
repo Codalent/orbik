@@ -40,3 +40,11 @@ This is all it sends — every ping is also written to the scheduler's log (`tel
 
 No page, address, hostname, workspace name, email or key is read into it. The code that builds it
 is [`agents/src/telemetry.js`](../../agents/src/telemetry.js).
+
+## The services it runs with
+
+Qdrant, the search index, reports its own anonymous telemetry to Qdrant unless told not to. The
+Docker install tells it not to (`QDRANT__TELEMETRY_DISABLED` in `compose.yaml`), and its log says
+`Telemetry reporting disabled`. If you run Qdrant yourself instead, set
+`QDRANT__TELEMETRY_DISABLED=true` in its environment or `telemetry_disabled: true` in its
+`config.yaml`.

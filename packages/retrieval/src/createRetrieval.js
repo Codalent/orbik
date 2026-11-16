@@ -36,7 +36,8 @@ export function createRetrieval({ database, config, logger = log, callLog = null
         code: "EMBEDDING_NOT_CONFIGURED",
         message:
           "No embedding key is configured, so nothing can be indexed or searched. " +
-          "Set ORBIK_OPENAI_API_KEY in this process's environment.",
+          "Set ORBIK_OPENAI_API_KEY: in the .env beside compose.yaml for the Docker install " +
+          "(then run `docker compose up -d` again), or in backend/.env and agents/.env.",
       },
     };
   }
