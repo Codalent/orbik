@@ -115,7 +115,7 @@ export function Answer({ message, workspaceId, pending = false, latest = false, 
             {/* No AI to answer is said the same way everywhere: plainly, or with the setting for
                 the install's admin, who is the one person who can change it. */}
             {isAiUnavailableError(message.error)
-              ? aiUnavailableText("this was not answered", { isAdmin })
+              ? aiUnavailableText("this was not answered", { isAdmin, reason: message.error?.message })
               : message.error?.message ?? "This was not answered."}
           </AlertDescription>
         </Alert>

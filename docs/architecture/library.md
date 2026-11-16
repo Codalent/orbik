@@ -890,7 +890,7 @@ through the Library's rules.
 
 **It says when it cannot answer.** With `GET /v1/edition` reporting `ai.reasoning: false`, the
 panel says so above the box and disables it, rather than failing the first question; a turn that
-failed with `NO_ROUTE` or `PROVIDER_NOT_CONFIGURED` is worded the same way (`frontend/src/lib/ask/ai.js`):
+failed with `NO_ROUTE` or `PROVIDER_NOT_CONFIGURED` is worded the same way (`frontend/src/lib/agents/aiAvailability.js`, as every page words it):
 plainly for everyone, with the setting to change for the install's admin. Home's suggested
 questions (`askNow` in `askPanel.jsx`) are sent at once in a new conversation, and are offered only
 once the site has been crawled.
