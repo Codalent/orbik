@@ -25,6 +25,8 @@ function verificationNotFound() {
  *   extensions' `check` that may refuse an address, and `events`, told `account.created`
  * @param {{isAdmin: (user: object) => Promise<boolean>}} [dependencies.admins] whether an account
  *   administers the install, which the session reports so the web app can show the Admin page
+ * @param {import("mongodb").Collection} [dependencies.sessions] the session store's collection,
+ *   from which changing a password removes the account's other sessions
  */
 export function createAuthService({
   userRepository,
@@ -32,6 +34,7 @@ export function createAuthService({
   signup = { open: false, check: async () => {}, events: { emit: async () => {} } },
   admins = { isAdmin: async () => false },
   verification = null,
+  sessions = null,
 }) {
   // With ORBIK_SIGNUP_VERIFY_EMAIL on: where pending signups are kept, how the link is sent, and the
   // web app's address the link opens. Null when signup makes the account at once.
@@ -84,7 +87,16 @@ export function createAuthService({
       });
     } catch (error) {
       verification.logger?.("warn", "auth.signup_verification_email_failed", { message: error?.message ?? "unknown" });
-      throw new AppError({ status: 502, code: "EMAIL_NOT_SENT", message: "The confirmation email could not be sent. Try again in a moment." });
+      // Nobody holds the link, so the pending signup is forgotten rather than left for a day.
+      await pending.deleteOne({ email, tokenHash: row.tokenHash }).catch(() => {});
+      // Most often the mail provider refused the address itself (a typo, a domain that takes no
+      // mail), so the answer says what a person can do about it; exposed, though it is a 502.
+      throw new AppError({
+        status: 502,
+        code: "EMAIL_NOT_SENT",
+        message: "The confirmation email could not be sent to that address. Check it and try again.",
+        expose: true,
+      });
     }
     return { verificationSent: true, email, expiresAt: expiresAt.toISOString() };
   }
@@ -119,7 +131,13 @@ export function createAuthService({
     }
     return {
       authenticated: true,
-      user: { id: user._id.toHexString(), email: user.email, isAdmin: await admins.isAdmin(user) },
+      user: {
+        id: user._id.toHexString(),
+        email: user.email,
+        isAdmin: await admins.isAdmin(user),
+        // Whether there is a password to change: an account made by signing in with Google has none.
+        hasPassword: user.hasPassword ?? typeof user.passwordHash === "string",
+      },
       destination: workspace ? "workspace-home" : "workspace-onboarding",
       selectedWorkspaceId: workspace?._id.toHexString() ?? null,
     };
@@ -164,6 +182,49 @@ export function createAuthService({
     /** Invalidates the complete server-side session. */
     logout(session) {
       return destroySession(session);
+    },
+
+    /**
+     * Changes the signed-in account's password, given its current one. Every other session of the
+     * account is removed, as a reset does, and this one stays signed in. An account with no
+     * password (made by signing in with Google) has nothing to change: it gets one through
+     * Forgot password. Answers how many other sessions were signed out.
+     */
+    async changePassword({ userId, currentPassword, newPassword, request }) {
+      const user = await userRepository.findPasswordHashById(userId);
+      if (!user) {
+        throw new AppError({ status: 401, code: "AUTHENTICATION_REQUIRED", message: "Authentication is required." });
+      }
+      if (typeof user.passwordHash !== "string") {
+        throw new AppError({
+          status: 409,
+          code: "NO_PASSWORD",
+          message: "This account signs in with Google and has no password to change. Use Forgot password on the sign-in page to set one.",
+        });
+      }
+      let valid = false;
+      try {
+        valid = await argon2.verify(user.passwordHash, currentPassword);
+      } catch {
+        valid = false;
+      }
+      if (!valid) {
+        throw new AppError({
+          status: 400,
+          code: "CURRENT_PASSWORD_INCORRECT",
+          message: "That is not your current password.",
+          fields: [{ field: "currentPassword", code: "INCORRECT", message: "That is not your current password." }],
+        });
+      }
+      const passwordHash = await argon2.hash(newPassword, { type: argon2.argon2id });
+      if (!(await userRepository.setPasswordHash(user._id, passwordHash))) {
+        throw new AppError({ status: 401, code: "AUTHENTICATION_REQUIRED", message: "Authentication is required." });
+      }
+      // connect-mongo keeps a session under its identifier, the session's `userId` inside it.
+      const removed = sessions
+        ? await sessions.deleteMany({ "session.userId": user._id.toHexString(), _id: { $ne: request.sessionID } })
+        : { deletedCount: 0 };
+      return { changed: true, otherSessionsSignedOut: removed.deletedCount ?? 0 };
     },
 
     /**

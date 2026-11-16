@@ -39,11 +39,22 @@ export function createUserRepository(collection) {
       );
     },
 
-    /** Resolves a session user without exposing the password hash. */
+    /**
+     * Resolves a session user without exposing the password hash: only `hasPassword`, whether it
+     * has one (an account made by signing in with Google has none until it sets one).
+     */
     findActiveById(userId) {
       return collection.findOne(
         { _id: toObjectId(userId), status: "active" },
-        { projection: { email: 1, status: 1, selectedWorkspaceId: 1 } },
+        { projection: { email: 1, status: 1, selectedWorkspaceId: 1, hasPassword: { $eq: [{ $type: "$passwordHash" }, "string"] } } },
+      );
+    },
+
+    /** An active account's password hash, to check the current password before changing it. */
+    findPasswordHashById(userId) {
+      return collection.findOne(
+        { _id: toObjectId(userId), status: "active" },
+        { projection: { email: 1, passwordHash: 1 } },
       );
     },
 
@@ -98,7 +109,7 @@ export function createUserRepository(collection) {
       return collection.find({ _id: { $in: ids } }).project({ email: 1 }).toArray();
     },
 
-    /** Replaces an active account's password hash, for a password reset. */
+    /** Replaces an active account's password hash: a password reset, or a change by its owner. */
     async setPasswordHash(userId, passwordHash) {
       const result = await collection.updateOne(
         { _id: toObjectId(userId), status: "active" },

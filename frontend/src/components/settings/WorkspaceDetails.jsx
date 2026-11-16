@@ -14,6 +14,7 @@ import { Pill } from "@/components/ui/pill";
 import { useAuth } from "@/lib/auth/AuthProvider";
 import { WORKSPACES_PATH, deleteWorkspace, listWorkspaces, updateWorkspace } from "@/lib/api/workspaces";
 import { formatDate, hostOf } from "@/lib/format";
+import { withAssumedScheme } from "@/lib/validation/workspace";
 import { cn } from "@/lib/utils";
 import { workspaceHomePath } from "@/lib/workspaces/home";
 import { can, roleLabel, roleOf } from "@/lib/workspaces/roles";
@@ -112,7 +113,8 @@ function DetailsForm({ workspace, onDone, onCancel }) {
 
   const changes = {
     ...(name.trim() !== workspace.name ? { name } : {}),
-    ...(websiteUrl.trim() !== (workspace.websiteUrl ?? "") ? { websiteUrl: websiteUrl.trim() } : {}),
+    // A bare host (`example.com`) means https:// there, as the API reads it too.
+    ...(websiteUrl.trim() !== (workspace.websiteUrl ?? "") ? { websiteUrl: withAssumedScheme(websiteUrl) } : {}),
   };
   const changed = Object.keys(changes).length > 0;
 
@@ -153,7 +155,7 @@ function DetailsForm({ workspace, onDone, onCancel }) {
           {nameError && <p id="workspace-name-error" className="mt-1 text-xs text-orb-coral">{nameError}</p>}
         </Fact>
         <Fact label="Website" htmlFor="workspace-website" hint="The site this workspace is about. Crawls start here.">
-          <Input id="workspace-website" type="url" inputMode="url" value={websiteUrl} onChange={(event) => setWebsiteUrl(event.target.value)} aria-invalid={Boolean(websiteError)} aria-describedby={websiteError ? "workspace-website-error" : "workspace-website-hint"} autoComplete="off" />
+          <Input id="workspace-website" type="text" inputMode="url" autoCapitalize="none" spellCheck={false} placeholder="example.com" value={websiteUrl} onChange={(event) => setWebsiteUrl(event.target.value)} aria-invalid={Boolean(websiteError)} aria-describedby={websiteError ? "workspace-website-error" : "workspace-website-hint"} autoComplete="off" />
           {websiteError
             ? <p id="workspace-website-error" className="mt-1 text-xs text-orb-coral">{websiteError}</p>
             : <p id="workspace-website-hint" className="mt-1 text-xs text-orb-muted">The same site at a new address keeps everything crawled. A different site starts over: you are asked first.</p>}

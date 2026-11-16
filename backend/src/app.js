@@ -111,6 +111,7 @@ export function createApp({ config, database, readiness, extensions = createExte
     workspaceRepository,
     signup: { open: config.signup === "open", check: (attempt) => extensions.checkSignup(attempt), events: extensions },
     admins,
+    sessions: collections.sessions,
     verification: config.signup === "open" && config.signupVerifyEmail
       ? { collection: collections.signupVerifications, sendEmail, origin: config.frontendOrigins[0], logger: log }
       : null,

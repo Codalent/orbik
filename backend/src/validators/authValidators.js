@@ -95,3 +95,20 @@ export const validateNewPassword = [
   checkExact(checkSchema({ password: newPassword }), { message: message("UNKNOWN_FIELD", "Unknown fields are not allowed.") }),
   validateRequest,
 ];
+
+/**
+ * Validates a change of password by its owner: the current password, as login takes it, and a new
+ * one by the rule every new password follows.
+ */
+export const validateChangePassword = [
+  checkExact(checkSchema({
+    currentPassword: {
+      in: ["body"],
+      isString: { bail: true, errorMessage: message("TYPE", "Password must be text.") },
+      isLength: { options: { min: 1, max: 1024 }, errorMessage: message("LENGTH", "Enter your current password.") },
+      custom: { options: (value) => typeof value === "string" && Buffer.byteLength(value, "utf8") <= 1024, errorMessage: message("LENGTH", "Password must not exceed 1024 bytes.") },
+    },
+    newPassword: newPassword,
+  }), { message: message("UNKNOWN_FIELD", "Unknown fields are not allowed.") }),
+  validateRequest,
+];
