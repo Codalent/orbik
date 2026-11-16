@@ -37,6 +37,30 @@ export function canonicalizePublicUrl(value) {
   return canonical;
 }
 
+/**
+ * A website as people type it: `example.com` and `www.example.com` mean `https://` there. Input
+ * that names a scheme is left as it is, and anything that is not a host still fails the check
+ * that follows (`canonicalizePublicUrl`). The API does the same with a workspace's website.
+ */
+export function withAssumedScheme(value) {
+  const input = String(value ?? "").trim();
+  if (!input || /^[a-z][a-z0-9+.-]*:\/\//i.test(input)) return input;
+  return `https://${input.replace(/^\/\//, "")}`;
+}
+
+const WEBSITE_HINT = "Enter your website's public address, such as example.com.";
+
+/**
+ * A workspace's website, as the create wizard takes it: a full URL or a bare host. Separate from
+ * {@link workspaceUrlSchema}, which the crawl's start address uses and which wants a full URL.
+ */
+const websiteUrlSchema = z.string().trim().min(1, "Website URL is required.").transform((value, context) => {
+  try { return canonicalizePublicUrl(withAssumedScheme(value)); } catch (error) {
+    context.addIssue({ code: "custom", message: error.message === "Enter a complete public website URL." ? WEBSITE_HINT : error.message });
+    return z.NEVER;
+  }
+});
+
 /** Workspace-name form schema with canonical output. */
 const workspaceNameSchema = z.string().transform((value, context) => {
   try { return canonicalizeWorkspaceName(value); } catch (error) {
@@ -55,4 +79,4 @@ export const workspaceUrlSchema = z.string().min(1, "Website URL is required.").
 
 /** Completion schema that mirrors all API workspace fields. */
 /** Exact completion payload schema; unknown browser fields are rejected. */
-export const workspaceSchema = z.object({ name: workspaceNameSchema, websiteUrl: workspaceUrlSchema }).strict();
+export const workspaceSchema = z.object({ name: workspaceNameSchema, websiteUrl: websiteUrlSchema }).strict();

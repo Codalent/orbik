@@ -119,7 +119,9 @@ and structured answers plain-code agents ask for — goes to one provider, `ORBI
 (`anthropic` or `openai`; unset, Anthropic when `ORBIK_ANTHROPIC_API_KEY` is set and OpenAI
 otherwise), through that provider's table in `agents/src/ai/model/modelRouter.js`
 (`ANTHROPIC_ROUTES`, `OPENAI_ROUTES`; docs/architecture/ai-execution.md). The worker logs the choice
-at start (`ai.provider`). Without the chosen provider's key, model runs fail saying no AI provider
+at start (`ai.provider`) and records whether the provider's key and the embedding key are set in
+`system_state` (`_id: "ai"`), which the API reports as `ai: {reasoning, search}` in `GET /v1/edition`
+so pages can say AI is unavailable before a person presses Run. Without the chosen provider's key, model runs fail saying no AI provider
 is configured and the Library's write run is not started; without the OpenAI key, indexing is
 skipped with a recorded reason and the Library and ask pages say the index is not configured.
 Every page is still copied into the Library's source layer: that step calls no model. The API
@@ -144,7 +146,8 @@ only an extension sets (below); core has no limit.
 
 - `GET /v1/workspaces/:id/members` — the owner and every member, with role and email.
 - `POST|GET /v1/workspaces/:id/members/invites`, `DELETE …/invites/:inviteId` — make (the link is
-  returned once), list and revoke invites; admin and up.
+  returned once, with `emailStatus`: `sent`, `failed` or `not-configured`), list and revoke
+  invites; admin and up.
 - `PATCH|DELETE /v1/workspaces/:id/members/:userId` — change a role or remove; admin and up.
 - `DELETE /v1/workspaces/:id/members/me` — leave; anyone but the owner.
 - `GET /v1/invites/:token`, `POST /v1/invites/:token/accept` — public: describe and accept; an
@@ -193,7 +196,11 @@ way — or dismisses it. The install's admins are the addresses in `ORBIK_ADMIN_
 unset its first account; everyone else gets 404 from `/v1/admin/*`. **Forgot password** on the
 sign-in page emails a one-time `/reset-password/<token>` link (an hour, `password_resets`, only the
 hash stored); using it sets the password, deletes every other session of the account and signs
-this browser in. An install without email cannot send one, so the page says to ask the admin, who
+this browser in. Signed in, **Change password** in the account menu (`/account/password`, `POST
+/v1/auth/password` with `currentPassword` and `newPassword`, five tries per account a quarter hour)
+checks the current password, sets the new one and deletes the account's other sessions, keeping
+this one; the session's `user.hasPassword` is false for an account Google sign-in made, which has
+none to change. An install without email cannot send one, so the page says to ask the admin, who
 makes the link on the Admin page or with `pnpm --dir backend run reset:password -- --email …`.
 `GET /v1/edition` says which (`passwordReset`: `email` or `admin`), and the session's
 `user.isAdmin` whether to show the Admin page. The logo on every signed-out page links to

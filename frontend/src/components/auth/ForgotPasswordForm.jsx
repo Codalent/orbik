@@ -64,6 +64,12 @@ export function ForgotPasswordForm() {
             If <span className="font-medium">{sentTo}</span> has an Orbik account, we&apos;ve emailed it a link to choose a new password.
           </p>
         </div>
+        {/* The answer is the same whether or not the address has an account, or the email went, so
+            that this page never tells anyone who is here; what to do if nothing arrives is said instead. */}
+        <p className="mt-4 text-sm text-orb-gray">
+          Nothing after a few minutes? Check the spam folder and the address, then{" "}
+          <button type="button" className={AUTH_LINK} onClick={() => setSentTo(null)}>try again</button>, or ask this Orbik&apos;s admin for a link.
+        </p>
         {foot}
       </AuthPanel>
     );
@@ -74,7 +80,7 @@ export function ForgotPasswordForm() {
       <form onSubmit={handleSubmit(submit)} noValidate className="space-y-5">
         {errors.root && <AuthError>{errors.root.message}</AuthError>}
         <AuthField htmlFor="reset-email" label="Email" error={errors.email?.message} errorId="reset-email-error">
-          <Input id="reset-email" type="email" autoComplete="email" aria-invalid={Boolean(errors.email)} aria-describedby={errors.email ? "reset-email-error" : undefined} {...register("email")} />
+          <Input id="reset-email" type="email" autoComplete="email" autoFocus aria-invalid={Boolean(errors.email)} aria-describedby={errors.email ? "reset-email-error" : undefined} {...register("email")} />
         </AuthField>
         <Button className="h-10 w-full" type="submit" disabled={isSubmitting}>{isSubmitting ? "Sending…" : "Send reset link"}</Button>
       </form>

@@ -53,8 +53,9 @@ people join by invite.
 ## 4. Create a workspace
 
 A workspace is one website and everything Orbik knows about it. Give it a **Workspace name**,
-press **Continue**, enter the **Website URL** and press **Create workspace**. You land on **Home**,
-whose setup checklist walks through the rest of this page.
+press **Continue**, enter the **Website URL** (`example.com` is enough: `https://` is assumed) and
+press **Create workspace**. You land on **Home**, whose setup checklist walks through the rest of
+this page.
 
 ## 5. Crawl your site
 

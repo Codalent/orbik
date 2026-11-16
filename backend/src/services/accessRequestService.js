@@ -64,14 +64,15 @@ export function createAccessRequestService({
     };
   }
 
+  /** Sends one email: `sent`, `failed` (logged) or `not-configured`. */
   async function send(message, event) {
-    if (!sendEmail) return false;
+    if (!sendEmail) return "not-configured";
     try {
       await sendEmail(message);
-      return true;
+      return "sent";
     } catch (error) {
       logger("warn", event, { message: error?.message ?? "unknown" });
-      return false;
+      return "failed";
     }
   }
 
@@ -158,7 +159,7 @@ export function createAccessRequestService({
         { $set: { status: "approved", decidedAt: at, decidedBy: admin.email, approval: { tokenHash: hashToken(token), expiresAt } } },
       );
       const url = `${origin}/join/${token}`;
-      const emailed = await send({
+      const emailStatus = await send({
         to: row.email,
         subject: "Your Orbik access is ready",
         text: [
@@ -169,7 +170,7 @@ export function createAccessRequestService({
         ].join("\n"),
       }, "access.approval_email_failed");
       const updated = await requests.findOne({ _id: row._id });
-      return { request: toRow(updated), url, emailed };
+      return { request: toRow(updated), url, emailStatus, emailed: emailStatus === "sent" };
     },
 
     /** Dismisses a request; any link it had stops working. */

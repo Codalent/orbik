@@ -1,5 +1,6 @@
 import { AppError } from "../errors/appError.js";
 import { createWorkspaceAccessCheck, hasRole } from "./workspaceAccess.js";
+import { runNote } from "../repositories/runRepository.js";
 
 /**
  * The steps of a workspace's setup, in the order the Home page lists them.
@@ -214,7 +215,8 @@ export function createHomeService({
             startedAt: run.startedAt ? run.startedAt.toISOString() : null,
             finishedAt: run.finishedAt ? run.finishedAt.toISOString() : null,
             startedBy: personOf(run.startedBy),
-            note: runNote(run),
+            // `note` and `incomplete`: a run that succeeded without its main result says so.
+            ...runNote(run.result),
           })),
         },
       };
@@ -411,31 +413,6 @@ function attentionTotals(rows) {
   return {
     agents: rows.length,
     failed: rows.filter((row) => row.failedRun).length,
-  };
-}
-
-/** The longest note a run's line on Home carries. */
-const NOTE_LENGTH = 240;
-
-/**
- * What a run wants said beside how it ended, or null: a note the run recorded on its result
- * (`note`, or `outcome.note`), or else a part of it that was skipped, as a result records one
- * (`{status: "skipped", reason: {code, message}}` under any key, like the Design system agent's
- * `synthesis`). Read defensively: a result carries whatever its agent wrote.
- *
- * @returns {{text: string|null, code: string|null, message: string|null}|null}
- */
-function runNote(run) {
-  const result = run.result && typeof run.result === "object" ? run.result : null;
-  if (!result) return null;
-  const text = [result.note, result.outcome?.note].find((value) => typeof value === "string" && value.trim());
-  if (text) return { text: text.trim().slice(0, NOTE_LENGTH), code: null, message: null };
-  const skipped = Object.values(result).find((value) => value && typeof value === "object" && value.status === "skipped" && value.reason);
-  if (!skipped) return null;
-  return {
-    text: null,
-    code: typeof skipped.reason.code === "string" ? skipped.reason.code : null,
-    message: typeof skipped.reason.message === "string" ? skipped.reason.message.slice(0, NOTE_LENGTH) : null,
   };
 }
 

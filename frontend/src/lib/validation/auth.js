@@ -29,3 +29,10 @@ export const newPasswordSchema = z.object({
   password: newPassword,
   confirm: z.string(),
 }).strict().refine((values) => values.password === values.confirm, { path: ["confirm"], message: "The two passwords are not the same." });
+
+/** Changing a password: the current one, and the new one typed twice. */
+export const changePasswordSchema = z.object({
+  currentPassword: z.string().min(1, "Enter your current password.").max(1024, "Password is too long."),
+  newPassword: newPassword,
+  confirm: z.string(),
+}).strict().refine((values) => values.newPassword === values.confirm, { path: ["confirm"], message: "The two passwords are not the same." });

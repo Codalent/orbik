@@ -65,6 +65,7 @@ export function SignupDisabledForm() {
             id="access-email"
             type="email"
             autoComplete="email"
+            autoFocus
             aria-invalid={Boolean(errors.email)}
             aria-describedby={errors.email ? "access-email-error" : "access-email-hint"}
             {...register("email")}
