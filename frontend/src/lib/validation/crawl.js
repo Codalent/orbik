@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { canonicalizePublicUrl } from "./workspace";
+import { canonicalizePublicUrl, withAssumedScheme } from "./workspace";
 
 /**
  * How often one route pattern, or one page, is recrawled, as the choices a person can make.
@@ -32,17 +32,10 @@ export function intervalToFrequency(intervalHours) {
 
 /**
  * The address a crawl starts from, accepting a bare host: `orbik.io` is read as
- * `https://orbik.io/`, which is what everybody who types one means. Anything already carrying a
- * scheme is left to the shared rule, so `ftp://…` is still refused rather than rewritten.
+ * `https://orbik.io/`, as a workspace's website is (`withAssumedScheme`).
  */
-export function withHttps(value) {
-  const input = String(value ?? "").trim();
-  if (!input || /^[a-z][a-z0-9+.-]*:\/\//i.test(input)) return input;
-  return `https://${input.replace(/^\/+/, "")}`;
-}
-
 const seedUrlSchema = z.string().min(1, "Enter the address to start crawling from.").transform((value, context) => {
-  try { return canonicalizePublicUrl(withHttps(value)); } catch (error) {
+  try { return canonicalizePublicUrl(withAssumedScheme(value)); } catch (error) {
     context.addIssue({ code: "custom", message: error.message });
     return z.NEVER;
   }

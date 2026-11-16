@@ -1,6 +1,6 @@
 import { FINDING_KINDS } from "../repositories/crawlRepository.js";
 import { isCanonicalObjectId, parseBounded, parseChoice, plainObject, validationError } from "./shared.js";
-import { canonicalizePublicUrl } from "./workspaceValidators.js";
+import { canonicalizePublicUrl, withAssumedScheme } from "./workspaceValidators.js";
 
 /** Bounds mirrored from the crawler's own configuration validator. */
 const BOUNDS = Object.freeze({
@@ -19,18 +19,6 @@ const PAGE_LIMIT = Object.freeze({ min: 1, max: 200, fallback: 50 });
  * it has fetched a single page.
  */
 const MAX_SITEMAP_URLS = 20;
-
-/**
- * Reads a bare host as the HTTPS address it names (`orbik.io` → `https://orbik.io`), which is
- * what a person typing one into "Start crawling from" means. A value that already has a scheme is
- * left alone, so the shared rule still refuses `ftp://…` rather than this rewriting it.
- */
-function withHttps(value) {
-  if (typeof value !== "string") return value;
-  const input = value.trim();
-  if (!input || /^[a-z][a-z0-9+.-]*:\/\//i.test(input)) return input;
-  return `https://${input.replace(/^\/+/, "")}`;
-}
 
 /**
  * Validates a crawl configuration body.
@@ -54,7 +42,8 @@ export function validateCrawlSite(req, _res, next) {
   let seedUrl;
   if (body.seedUrl !== undefined) {
     try {
-      seedUrl = canonicalizePublicUrl(withHttps(body.seedUrl));
+      // A bare host (`orbik.io`) means https:// here too, as it does for a workspace's website.
+      seedUrl = canonicalizePublicUrl(withAssumedScheme(body.seedUrl));
     } catch (error) {
       fields.push({ field: "seedUrl", code: "INVALID", message: error.message });
     }
