@@ -81,8 +81,10 @@ export function AgentNavCompact({ agents, currentPath, overviewHref, className }
   ];
   if (!rows.length) return null;
 
+  // `relative`: each row's screen-reader label is absolutely placed, and one inside a scroller that
+  // is not positioned escapes it and widens the page, which then scrolls sideways.
   return (
-    <nav aria-label="Agents" className={cn("-mx-1 overflow-x-auto px-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden", className)}>
+    <nav aria-label="Agents" className={cn("relative -mx-1 overflow-x-auto px-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden", className)}>
       <ul className="flex w-max gap-1">
         {rows.map((agent) => {
           const here = currentPath === agent.href;
