@@ -6,6 +6,7 @@ import {
   validateActivityQuery,
   validateCrawlRequest,
   validateCrawlSite,
+  validateFindingsQuery,
   validateFrequencies,
   validateMarkdownQuery,
   validatePageQuery,
@@ -38,6 +39,8 @@ export function createCrawlRouter({ crawlService, csrfProtection }) {
   router.get(`${base}/runs`, requireAuthentication, validateWorkspaceScope, validateRunQuery, controller.listRuns);
   router.get(`${base}/pages`, requireAuthentication, validateWorkspaceScope, validatePageQuery, controller.listPages);
   router.get(`${base}/tree`, requireAuthentication, validateWorkspaceScope, validateTreeQuery, controller.tree);
+  // The pages behind one of the page's figures — broken, nothing links here, duplicate URLs.
+  router.get(`${base}/findings`, requireAuthentication, validateWorkspaceScope, validateFindingsQuery, controller.findings);
   router.get(`${base}/activity`, requireAuthentication, validateWorkspaceScope, validateActivityQuery, controller.activity);
   // Declared after `/pages` so the literal segment always wins over the parameter, whatever order
   // Express happens to match in.

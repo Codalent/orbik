@@ -103,29 +103,55 @@ export function createCrawlBudget({ database, limitsFor = processLimits, now = (
     /**
      * Reports what a workspace has left this month.
      *
+     * `state` names the month's situation, so that every reader words it the same way:
+     *
+     * - `unlimited` — no ceiling;
+     * - `available` — pages left to fetch;
+     * - `spent` — the month had pages and has none left;
+     * - `not-included` — the month's allowance is zero: the workspace's plan includes no crawl
+     *   pages at all (how a deployment pauses one). Nothing was spent, and waiting for the first of
+     *   the month changes nothing unless the plan does.
+     *
+     * `planAllowance` is what the workspace's plan sets today (null for none), which is what the
+     * next month opens with; `resumesAt` is when crawling can go on by itself — the next month,
+     * when that month will have pages — and null when it will not, or when nothing has stopped.
+     *
      * @param {object} options
      * @param {string|ObjectId} options.workspaceId the workspace to read
-     * @returns {Promise<{period: string, unlimited: boolean, allowance: number|null, consumed: number,
-     *   remaining: number|null, resetsAt: string}>} `allowance` and `remaining` are null when unlimited
+     * @returns {Promise<{period: string, state: "unlimited"|"available"|"spent"|"not-included",
+     *   unlimited: boolean, allowance: number|null, consumed: number, remaining: number|null,
+     *   planAllowance: number|null, resetsAt: string, resumesAt: string|null}>} `allowance` and
+     *   `remaining` are null when unlimited
      */
     async statusFor(options) {
       const { workspaceId } = perWorkspace(options, "statusFor");
       const current = now();
       const period = periodKeyFor(current);
+      const resetsAt = periodResetAt(current).toISOString();
       const subject = await workspaceFor(workspaceId);
       if (!subject) {
-        return { period, unlimited: false, allowance: 0, consumed: 0, remaining: 0, resetsAt: periodResetAt(current).toISOString() };
+        return { period, state: BUDGET_STATE.notIncluded, unlimited: false, allowance: 0, consumed: 0, remaining: 0, planAllowance: 0, resetsAt, resumesAt: null };
       }
 
       const document = await ensurePeriod(subject, period, current);
       const unlimited = isUnlimited(document);
+      const allowance = unlimited ? null : document?.allowance ?? 0;
+      const remaining = unlimited ? null : document?.remaining ?? 0;
+      const state = budgetState({ allowance, remaining });
+      const { monthlyCrawlPages } = await limitsFor(subject);
+      const planAllowance = Number.isSafeInteger(monthlyCrawlPages) && monthlyCrawlPages >= 0 ? monthlyCrawlPages : null;
+      const stopped = state === BUDGET_STATE.spent || state === BUDGET_STATE.notIncluded;
       return {
         period,
+        state,
         unlimited,
-        allowance: unlimited ? null : document?.allowance ?? 0,
+        allowance,
         consumed: document?.consumed ?? 0,
-        remaining: unlimited ? null : document?.remaining ?? 0,
-        resetsAt: periodResetAt(current).toISOString(),
+        remaining,
+        planAllowance,
+        resetsAt,
+        // Only a promise that will be kept: next month resumes crawling only if its plan has pages.
+        resumesAt: stopped && planAllowance !== 0 ? resetsAt : null,
       };
     },
 
@@ -310,6 +336,28 @@ function perWorkspace(options, method) {
     throw new TypeError(`crawlBudget.${method} takes a workspaceId: the crawl budget is kept per workspace, not per account.`);
   }
   return options ?? {};
+}
+
+/** The situations a month's budget can be in, as `statusFor` reports them in `state`. */
+export const BUDGET_STATE = Object.freeze({
+  unlimited: "unlimited",
+  available: "available",
+  spent: "spent",
+  notIncluded: "not-included",
+});
+
+/**
+ * Names a month's situation from its allowance and what is left of it: no ceiling, pages left,
+ * pages spent, or an allowance of zero — a plan that includes no crawling, which is not the same
+ * thing as a month that used its pages up and must not be worded as one.
+ *
+ * @param {{allowance: number|null, remaining: number|null, unlimited?: boolean}} month
+ * @returns {"unlimited"|"available"|"spent"|"not-included"}
+ */
+export function budgetState(month) {
+  if (!month || month.unlimited === true || month.allowance === null || month.allowance === undefined) return BUDGET_STATE.unlimited;
+  if ((month.remaining ?? 0) > 0) return BUDGET_STATE.available;
+  return month.allowance > 0 ? BUDGET_STATE.spent : BUDGET_STATE.notIncluded;
 }
 
 /**

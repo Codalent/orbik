@@ -28,8 +28,10 @@ import { crawlSettingsSchema, crawlSetupSchema } from "@/lib/validation/crawl";
  * @param {string} props.defaultSeedUrl the workspace's own website, used when no site exists yet
  * @param {(settings: object) => Promise<void>} props.onSave persists the settings
  * @param {() => void} [props.onCancel] leaves editing without saving; absent during first setup
+ * @param {string|null} [props.blockedReason] why the first crawl cannot be asked for (the workspace
+ *   has no crawl pages to spend); its button is disabled and this is said beside it
  */
-export function CrawlSettingsForm({ site, defaultSeedUrl, onSave, onCancel }) {
+export function CrawlSettingsForm({ site, defaultSeedUrl, onSave, onCancel, blockedReason = null }) {
   const isFirstSetup = !site;
   const savedSitemaps = site?.sitemapUrls ?? [];
   const { register, handleSubmit, setError, formState: { errors, isSubmitting } } = useForm({
@@ -63,17 +65,23 @@ export function CrawlSettingsForm({ site, defaultSeedUrl, onSave, onCancel }) {
 
       <div className="space-y-2">
         <Label htmlFor="crawl-seed-url">Start crawling from</Label>
+        {/* Text with a URL keyboard rather than `type="url"`: a bare `example.com` is accepted and
+            read as https://, which the browser's own URL check would have marked invalid. */}
         <Input
           id="crawl-seed-url"
-          type="url"
-          placeholder="https://example.com"
+          type="text"
+          inputMode="url"
+          autoComplete="url"
+          autoCapitalize="none"
+          spellCheck={false}
+          placeholder="example.com"
           aria-invalid={Boolean(errors.seedUrl)}
           aria-describedby={errors.seedUrl ? "crawl-seed-url-error" : "crawl-seed-url-hint"}
           {...register("seedUrl")}
         />
         {errors.seedUrl
           ? <p id="crawl-seed-url-error" className="text-sm text-destructive">{errors.seedUrl.message}</p>
-          : <p id="crawl-seed-url-hint" className="text-sm text-orb-muted">Every crawl begins here and follows links and sitemaps outward.</p>}
+          : <p id="crawl-seed-url-hint" className="text-sm text-orb-muted">Every crawl begins here and follows links and sitemaps outward. An address without https:// is read as one.</p>}
       </div>
 
       <SitemapField
@@ -88,6 +96,15 @@ export function CrawlSettingsForm({ site, defaultSeedUrl, onSave, onCancel }) {
         crawl budget rather than anything a single site can state; and a subdomain is a separate
         site that belongs in its own workspace.
       */}
+
+      {/*
+        On first setup the button comes straight after the address, where a person who only wants
+        to start can see it without scrolling; what a crawl does is explained underneath, for
+        whoever wants to read it first.
+      */}
+      {isFirstSetup && (
+        <SubmitRow isFirstSetup onCancel={onCancel} isSubmitting={isSubmitting} blockedReason={blockedReason} />
+      )}
 
       {isFirstSetup ? <CrawlSetupGuide /> : (
         <>
@@ -105,15 +122,30 @@ export function CrawlSettingsForm({ site, defaultSeedUrl, onSave, onCancel }) {
         </>
       )}
 
-      <div className="flex justify-end gap-3">
+      {!isFirstSetup && <SubmitRow onCancel={onCancel} isSubmitting={isSubmitting} />}
+    </form>
+  );
+}
+
+/**
+ * The form's buttons. On first setup the one button starts the first crawl, and when the
+ * workspace has no crawl pages it is disabled with the reason beside it, rather than queueing a
+ * crawl that could fetch nothing.
+ */
+function SubmitRow({ isFirstSetup = false, onCancel, isSubmitting, blockedReason = null }) {
+  const blocked = isFirstSetup && Boolean(blockedReason);
+  return (
+    <div className={isFirstSetup ? "space-y-2" : "flex justify-end gap-3"}>
+      <div className="flex flex-wrap items-center gap-3">
         {onCancel && (
           <Button type="button" variant="ghost" onClick={onCancel} disabled={isSubmitting}>Cancel</Button>
         )}
-        <Button type="submit" disabled={isSubmitting}>
+        <Button type="submit" disabled={isSubmitting || blocked} aria-describedby={blocked ? "crawl-start-blocked" : undefined}>
           {isSubmitting ? "Saving…" : isFirstSetup ? "Start crawling this site" : "Save settings"}
         </Button>
       </div>
-    </form>
+      {blocked && <p id="crawl-start-blocked" className="text-sm text-orb-orange">{blockedReason}</p>}
+    </div>
   );
 }
 

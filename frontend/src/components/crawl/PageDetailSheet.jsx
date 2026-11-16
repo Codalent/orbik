@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { crawlPagePath, getCrawlPageMarkdown, recrawlPages, setCrawlPageSchedule } from "@/lib/api/crawl";
+import { BUDGET_REFUSALS } from "@/lib/crawl/budget";
 import { describeFrequency } from "@/lib/crawl/format";
 import { PATTERN_FREQUENCIES, frequencyToInterval, intervalToFrequency } from "@/lib/validation/crawl";
 import { cn } from "@/lib/utils";
@@ -162,8 +163,10 @@ function Schedule({ page, schedule, onChange, onRecrawl, editable = true }) {
     setNotice(null);
     try {
       await action();
-    } catch {
-      setNotice(failure);
+    } catch (error) {
+      // A crawl refused because the workspace has no crawl pages says so, rather than "try again",
+      // which would not help.
+      setNotice(BUDGET_REFUSALS.has(error?.code) ? error.message : failure);
     } finally {
       setBusy(false);
     }
