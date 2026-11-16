@@ -49,6 +49,7 @@ import {
 import { runHeadline } from "@/lib/library/runActivity";
 import { VIEWS } from "@/lib/library/workspaceTabs";
 import { cn } from "@/lib/utils";
+import { useShortcut } from "@/lib/keyboard";
 
 /** The two files every Library has keep their own icons wherever a rename puts them. */
 const ROLE_ICONS = Object.freeze({ [LIBRARY_ROLES.overview]: House, [LIBRARY_ROLES.index]: ListTree });
@@ -97,6 +98,7 @@ export function LibraryExplorer({ mode, onMode, onHide, expanded, onToggle, onCo
   const chosen = top.filter((node) => !isFixedFolder(node.path));
   const fixed = top.filter((node) => isFixedFolder(node.path));
   const branch = { expanded, onToggle, onLoadBranch, activePath };
+  const switcherShortcut = useShortcut("o");
 
   return (
     <nav
@@ -107,7 +109,7 @@ export function LibraryExplorer({ mode, onMode, onHide, expanded, onToggle, onCo
         <button type="button" aria-pressed={mode === "files"} aria-label="Files" title="Files" onClick={() => onMode("files")} className={ICON_BUTTON}>
           <Files aria-hidden="true" className="size-4" />
         </button>
-        <button type="button" aria-label="Search or jump to a file (⌘O)" title="Search or jump to… ⌘O" onClick={library.openSwitcher} className={ICON_BUTTON}>
+        <button type="button" aria-label={`Search or jump to a file${switcherShortcut ? ` (${switcherShortcut})` : ""}`} title={`Search or jump to…${switcherShortcut ? ` ${switcherShortcut}` : ""}`} onClick={library.openSwitcher} className={ICON_BUTTON}>
           <Search aria-hidden="true" className="size-4" />
         </button>
         <button type="button" aria-pressed={mode === "bookmarks"} aria-label="Bookmarks" title="Bookmarks" onClick={() => onMode("bookmarks")} className={ICON_BUTTON}>
@@ -169,6 +171,7 @@ export function LibraryExplorer({ mode, onMode, onHide, expanded, onToggle, onCo
  */
 export function LibraryExplorerStrip({ onShow }) {
   const library = useLibrary();
+  const switcherShortcut = useShortcut("o");
   return (
     <div role="toolbar" aria-label="Explorer" aria-orientation="vertical" className="hidden w-11 shrink-0 flex-col items-center gap-1 border-r border-orb-line pt-2 md:flex">
       <button type="button" aria-label="Show the explorer" title="Show the explorer" onClick={() => onShow()} className={ICON_BUTTON}>
@@ -177,7 +180,7 @@ export function LibraryExplorerStrip({ onShow }) {
       <button type="button" aria-label="Files" title="Files" onClick={() => onShow("files")} className={ICON_BUTTON}>
         <Files aria-hidden="true" className="size-4" />
       </button>
-      <button type="button" aria-label="Search or jump to a file (⌘O)" title="Search or jump to… ⌘O" onClick={library.openSwitcher} className={ICON_BUTTON}>
+      <button type="button" aria-label={`Search or jump to a file${switcherShortcut ? ` (${switcherShortcut})` : ""}`} title={`Search or jump to…${switcherShortcut ? ` ${switcherShortcut}` : ""}`} onClick={library.openSwitcher} className={ICON_BUTTON}>
         <Search aria-hidden="true" className="size-4" />
       </button>
       <button type="button" aria-label="Bookmarks" title="Bookmarks" onClick={() => onShow("bookmarks")} className={ICON_BUTTON}>

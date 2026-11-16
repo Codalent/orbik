@@ -37,6 +37,7 @@ import { useLibrary } from "./libraryContext";
 import { libraryNodePath } from "@/lib/api/library";
 import { LIBRARY_LIMITS, entryRoleOf, isFixedFolder, isSourcePath, writingStatus } from "@/lib/library/library";
 import { cn } from "@/lib/utils";
+import { useShortcut } from "@/lib/keyboard";
 
 /**
  * One Library node in a tab: read from the API, and shown as what it is.
@@ -216,6 +217,7 @@ function FileView({ pane, tab, node, focused, idPrefix }) {
   const lockLabel = node.locked ? "Unlock: let agents write here again" : "Lock: keep agents out";
   const runWrite = library.work.inFlight ? library.phases.writes.find((write) => write.path === node.path) ?? null : null;
   const edit = () => library.setTabEditing(pane.id, tab.id, true);
+  const editShortcut = useShortcut("e");
 
   return (
     <>
@@ -224,7 +226,7 @@ function FileView({ pane, tab, node, focused, idPrefix }) {
         {library.canEdit && (
           <>
             <ModeSwitch editing={false} onReading={() => {}} onEditing={edit} />
-            <button type="button" aria-label="Edit" title="Edit (⌘E)" onClick={edit} className={cn(PANE_ICON_BUTTON, "sm:hidden")}>
+            <button type="button" aria-label="Edit" title={editShortcut ? `Edit (${editShortcut})` : "Edit"} onClick={edit} className={cn(PANE_ICON_BUTTON, "sm:hidden")}>
               <Pencil aria-hidden="true" className="size-4" />
             </button>
           </>

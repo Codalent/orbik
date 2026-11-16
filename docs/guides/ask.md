@@ -5,12 +5,17 @@ source under every answer. Members can also have it save to the Library and rear
 
 ## Opening it
 
-Press **Ask** in the workspace's rail, the **Ask ⌘J** button at the top of the page, or ⌘J (Ctrl+J
-elsewhere). The panel opens at the right and stays open, with its conversation, as you move between
-pages. **Conversations** lists earlier ones and **New conversation** starts afresh.
+Press **Ask** in the workspace's rail, the **Ask** button at the top of the page, or ⌘J on a Mac
+(Ctrl+J on Windows and Linux; the button shows the one for your computer). The panel opens at the
+right and stays open, with its conversation, as you move between pages. **Conversations** lists
+earlier ones and **New conversation** starts afresh. Escape, or ⌘J again, closes it.
 
-From the Library's quick switcher (⌘O), Cmd+Enter puts what you typed in Ask's box. A link to
-`/workspaces/<id>/ask?q=<question>` opens the panel with that question in its box.
+Once the site has been crawled, **Home** offers a few questions to start with; pressing one asks it
+at once, in a new conversation. Before the first crawl Home says that Ask answers from your site
+and points at the step that crawls it.
+
+From the Library's quick switcher (⌘O, or Ctrl+O), ⌘Enter (Ctrl+Enter) puts what you typed in Ask's
+box. A link to `/workspaces/<id>/ask?q=<question>` opens the panel with that question in its box.
 
 ## What it answers from
 
@@ -25,7 +30,8 @@ an answer can point at the part of a page that says it.
   question, it says **Nothing indexed answers this** and lists what it searched for. It never fills
   the gap from what a model knows about companies like yours.
 - It knows which page you are on, and on the Library which file. That is shown above the box, and
-  you can take it off before sending.
+  you can take it off before sending. It is a hint for what "this" and "here" mean, not a limit:
+  Ask searches the whole workspace either way.
 
 ## Saving and rearranging
 
@@ -55,7 +61,9 @@ fonts or design tokens, or say what to change. See [Brand](brand.md).
   nothing.
 - **A model for the answer.** Each question is an agent run, made with the reasoning provider's
   key: `ORBIK_ANTHROPIC_API_KEY`, or `ORBIK_OPENAI_API_KEY` when that is the only one set (or
-  `ORBIK_AI_PROVIDER=openai`). Without it, questions fail saying no AI provider is configured. Every call is listed under
+  `ORBIK_AI_PROVIDER=openai`). Without it, the panel says that AI is not available before anything
+  is typed (the install's admin is told which setting to change), and Home does not offer
+  questions. Every call is listed under
   **Settings** → **AI calls**.
 
 Both keys are set as described in [Configuration](../self-hosting/configuration.md).

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 import useSWR from "swr";
 import {
+  AlertCircle,
   ArrowUp,
   FileUp,
   History,
@@ -26,7 +27,8 @@ import { uploadBrandFile } from "@/lib/api/brand";
 import { carriesFiles, useFileDrag } from "@/lib/brand/useFileDrag";
 import { useRevalidateWorkspace } from "@/lib/api/cache";
 import { useRunEvents } from "@/lib/agents/useRunEvents";
-import { ASK_SHORTCUT, useAskPanel } from "@/lib/ask/askPanel";
+import { useAiAvailability, aiUnavailableText } from "@/lib/ask/ai";
+import { useAskPanel, useAskShortcut } from "@/lib/ask/askPanel";
 import { cn } from "@/lib/utils";
 import { formatDate } from "@/lib/format";
 import { useCan } from "@/lib/workspaces/roles";
@@ -61,6 +63,12 @@ const BRAND_STARTERS = Object.freeze([
   { label: "Change a colour or a font", text: "Our primary colour is " },
 ]);
 
+/** Open layers that take Escape themselves: while one is on screen, Escape is theirs. */
+const LAYERS = '[role="dialog"], [role="alertdialog"], [role="menu"], [role="listbox"]';
+
+/** Fields where Escape means something to the field: cancel an edit, close a suggestion list. */
+const EDITABLE = 'input, textarea, select, [contenteditable=""], [contenteditable="true"]';
+
 /** Statuses a turn can be left in while its run is still going. */
 const IN_FLIGHT = Object.freeze(["queued", "running"]);
 
@@ -86,9 +94,12 @@ function rememberThread(workspaceId, conversationId) {
   }
 }
 
-/** Ways in for a person who has not asked anything yet: one of each thing the panel does. */
+/**
+ * Ways in for a person who has not asked anything yet: one of each thing the panel does. A whole
+ * question is sent when pressed; one that ends where the person is meant to go on is put in the box.
+ */
 const STARTERS = Object.freeze([
-  { label: "What do we sell, and to whom?", text: "What do we sell, and to whom?" },
+  { label: "What do we sell, and to whom?", text: "What do we sell, and to whom?", send: true },
   { label: "Save a note to the Library", text: "Save this to the Library: ", writes: true },
   { label: "Tidy up the Library", text: "Look at how the Library is arranged and suggest a tidier structure.", writes: true },
 ]);
@@ -118,6 +129,9 @@ export function AskPanel({ workspaceId, pageName = null }) {
   // A read-only person's Ask answers but cannot save or rearrange (the API runs the read-only
   // variant for them), so the panel does not offer to.
   const canWrite = useCan("member", workspaceId);
+  // Without a reasoning provider no question can be answered: said before anything is typed.
+  const ai = useAiAvailability();
+  const shortcut = useAskShortcut();
 
   const [conversation, setConversation] = useState(null);
   const [question, setQuestion] = useState("");
@@ -130,6 +144,7 @@ export function AskPanel({ workspaceId, pageName = null }) {
   // it off for a page, and moving to another page turns it back on.
   const [withContext, setWithContext] = useState(true);
   const box = useRef(null);
+  const panelNode = useRef(null);
   const scroller = useRef(null);
   const picker = useRef(null);
   // Files attached to the next message: uploaded already, or on their way. Each chip is one.
@@ -176,26 +191,30 @@ export function AskPanel({ workspaceId, pageName = null }) {
   }, [workspaceId]);
 
   // The conversation that was open when the panel was last used, reopened the first time it opens.
-  // The shell keys the panel by workspace, so a workspace switch starts this over.
+  // The shell keys the panel by workspace, so a workspace switch starts this over. Anything the
+  // person does before it arrives — a question sent, a thread opened, a new one started — wins
+  // over it, so a question asked the moment the panel opens is not replaced by an older thread.
   const restored = useRef(false);
+  const superseded = useRef(false);
   useEffect(() => {
     if (!panel?.open || restored.current) return undefined;
     restored.current = true;
     const stored = rememberedThread(workspaceId);
     if (!stored) return undefined;
     api.getConversation(workspaceId, stored)
-      .then((response) => show(response.conversation))
+      .then((response) => { if (!superseded.current) show(response.conversation); })
       // A thread deleted elsewhere, or one from before a reset, is simply forgotten.
       .catch(() => rememberThread(workspaceId, null));
     return undefined;
   }, [panel?.open, workspaceId, show]);
 
-  // A question put in the box from elsewhere — the Library's quick switcher, an `/ask?q=` link.
+  // A question put in the box from elsewhere — the Library's quick switcher, an `/ask?q=` link —
+  // or asked from elsewhere, which is sent by the effect below rather than left in the box.
   const [draftSeq, setDraftSeq] = useState(0);
   const draft = panel?.draft;
   if (draft && draft.seq !== draftSeq) {
     setDraftSeq(draft.seq);
-    setQuestion(draft.text);
+    if (!draft.send) setQuestion(draft.text);
     setShowHistory(false);
   }
 
@@ -203,6 +222,41 @@ export function AskPanel({ workspaceId, pageName = null }) {
   useEffect(() => {
     if (panel?.open) box.current?.focus();
   }, [panel?.open, draftSeq]);
+
+  // A question asked from elsewhere — Home's suggested questions — is sent at once, in a new
+  // conversation. While another answer is still coming, or with no AI to answer, it is put in the
+  // box instead, where the person can see it and why it was not sent.
+  const askedSeq = useRef(0);
+  useEffect(() => {
+    if (!draft?.send || draft.seq === askedSeq.current) return;
+    askedSeq.current = draft.seq;
+    askNow(draft.text);
+    // Only a new question asked from elsewhere starts this; `askNow` reads the state as it is now.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draft]);
+
+  // Escape closes the panel from anywhere on the page, not only from inside it — unless something
+  // on top of the page is open and takes Escape itself (a dialog, a menu, a list of options), or
+  // the cursor is in a field of the page, where Escape belongs to the field. Those handlers that
+  // mark the key as handled (`preventDefault`) are respected too.
+  const setPanelOpen = panel?.setOpen;
+  const isOpen = Boolean(panel?.open);
+  useEffect(() => {
+    if (!isOpen || !setPanelOpen) return undefined;
+    function onKeyDown(event) {
+      if (event.key !== "Escape" || event.defaultPrevented || event.isComposing) return;
+      const node = panelNode.current;
+      const target = event.target instanceof Element ? event.target : null;
+      if (!node?.contains(target)) {
+        if (target?.closest(EDITABLE)) return;
+        if ([...document.querySelectorAll(LAYERS)].some((layer) => !node?.contains(layer))) return;
+      }
+      event.preventDefault();
+      setPanelOpen(false);
+    }
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [isOpen, setPanelOpen]);
 
   // While a message is in flight the run's events are the progress. When it finishes the
   // conversation is re-read, which is when the answer — and the list of what it changed — is
@@ -281,21 +335,24 @@ export function AskPanel({ workspaceId, pageName = null }) {
    * @param {object} [options]
    * @param {string|null} [options.section] where on the Brand page files were dropped
    * @param {object[]} [options.attached] files just uploaded for this message, beside the chips
+   * @param {boolean} [options.fresh] in a new conversation, whatever thread is open
    */
-  async function send(text, { section = null, attached = [] } = {}) {
+  async function send(text, { section = null, attached = [], fresh = false } = {}) {
     const ready = [...files.filter((file) => file.id), ...attached].filter((file, index, all) => all.findIndex((other) => other.id === file.id) === index);
     const asked = String(text ?? "").trim() || (ready.length ? filesOnly(ready.length) : "");
     if (!asked || pending || busy) return;
     if (files.some((file) => file.uploading)) return;
+    superseded.current = true;
     setBusy(true);
     setError(null);
     setShowHistory(false);
+    const thread = fresh ? null : conversation;
     const base = withContext ? context : onBrand ? { page: "Brand", route: pathname } : null;
     const sentContext = base && section ? { ...base, section } : base;
     const attachments = ready.map((file) => file.id);
     try {
-      const response = conversation
-        ? await api.askFollowUp(workspaceId, conversation.id, asked, sentContext, attachments)
+      const response = thread
+        ? await api.askFollowUp(workspaceId, thread.id, asked, sentContext, attachments)
         : await api.startConversation(workspaceId, asked, sentContext, attachments);
       setQuestion("");
       setFiles([]);
@@ -313,8 +370,18 @@ export function AskPanel({ workspaceId, pageName = null }) {
     }
   }
 
+  /** Asks a question from elsewhere at once, or puts it in the box when it cannot be sent now. */
+  function askNow(text) {
+    if (pending || busy || !ai.reasoning) {
+      setQuestion(text);
+      return;
+    }
+    send(text, { fresh: true });
+  }
+
   /** Starts afresh. The old thread stays in the history. */
   function startNew() {
+    superseded.current = true;
     setConversation(null);
     setPending(null);
     setSteps([]);
@@ -326,6 +393,7 @@ export function AskPanel({ workspaceId, pageName = null }) {
 
   /** Opens one thread from the history. */
   async function openThread(conversationId) {
+    superseded.current = true;
     setBusy(true);
     setError(null);
     try {
@@ -372,18 +440,13 @@ export function AskPanel({ workspaceId, pageName = null }) {
 
   return (
     <aside
+      ref={panelNode}
       aria-label="Ask"
       onDragOver={(event) => { if (takesFiles && carriesFiles(event)) event.preventDefault(); }}
       onDrop={(event) => {
         if (!takesFiles || !carriesFiles(event)) return;
         event.preventDefault();
         dropFiles(event.dataTransfer.files, "chat");
-      }}
-      onKeyDown={(event) => {
-        if (event.key === "Escape" && !event.defaultPrevented) {
-          event.preventDefault();
-          panel.setOpen(false);
-        }
       }}
       className={cn(
         // Below `md` the panel covers the page: a column beside it would leave both unreadable.
@@ -444,7 +507,7 @@ export function AskPanel({ workspaceId, pageName = null }) {
           type="button"
           variant="ghost"
           size="icon-sm"
-          aria-label={`Close Ask (${ASK_SHORTCUT})`}
+          aria-label={shortcut ? `Close Ask (${shortcut})` : "Close Ask"}
           className="text-orb-muted hover:text-orb-white"
           onClick={() => panel.setOpen(false)}
         >
@@ -494,11 +557,15 @@ export function AskPanel({ workspaceId, pageName = null }) {
                   )}
                 </div>
                 <ul className="space-y-1.5">
-                  {(onBrand ? (canWrite ? BRAND_STARTERS : []) : STARTERS.filter((starter) => canWrite || !starter.writes)).map((starter) => (
+                  {(!ai.reasoning ? [] : onBrand ? (canWrite ? BRAND_STARTERS : []) : STARTERS.filter((starter) => canWrite || !starter.writes)).map((starter) => (
                     <li key={starter.label}>
                       <button
                         type="button"
                         onClick={() => {
+                          if (starter.send) {
+                            send(starter.text);
+                            return;
+                          }
                           setQuestion(starter.text);
                           if (starter.attach) picker.current?.click();
                           else box.current?.focus();
@@ -549,6 +616,13 @@ export function AskPanel({ workspaceId, pageName = null }) {
         onSubmit={(event) => { event.preventDefault(); send(question); }}
         className="shrink-0 space-y-2 border-t border-orb-line p-3"
       >
+        {/* Said before anything is typed: a question asked now could only fail. */}
+        {!ai.reasoning && (
+          <p role="status" className="flex items-start gap-2 text-xs leading-relaxed text-orb-gray">
+            <AlertCircle aria-hidden="true" className="mt-px size-3.5 shrink-0 text-orb-orange" />
+            <span>{aiUnavailableText(onBrand ? "Ask cannot answer or change the brand" : "Ask cannot answer questions or change the Library", { isAdmin: ai.isAdmin })}</span>
+          </p>
+        )}
         {error && (
           <Alert variant="destructive" role="alert">
             <AlertDescription>{error}</AlertDescription>
@@ -556,19 +630,29 @@ export function AskPanel({ workspaceId, pageName = null }) {
         )}
         {context && withContext && (
           <p className="flex items-center gap-1.5 text-2xs text-orb-muted">
-            <span className="inline-flex min-w-0 items-center gap-1 rounded-md border border-orb-line py-0.5 pl-2 pr-0.5">
+            {/* What the chip is, said where it is: it is sent with the question as a hint, and
+                takes nothing out of what is searched. On the Brand page the page is what makes
+                the brand chat answer, so it stays, and there is nothing to remove. */}
+            <span
+              title={contextHint(context, onBrand)}
+              className={cn("inline-flex min-w-0 items-center gap-1 rounded-md border border-orb-line py-0.5 pl-2", onBrand ? "pr-2" : "pr-0.5")}
+            >
               <span className="truncate">
+                <span className="sr-only">Asking from: </span>
                 {context.page ?? "This page"}
                 {context.libraryPath ? ` · ${context.libraryPath}` : ""}
               </span>
-              <button
-                type="button"
-                aria-label="Don’t send where I am"
-                onClick={() => setWithContext(false)}
-                className="grid size-4 shrink-0 place-items-center rounded hover:bg-orb-raised hover:text-orb-white"
-              >
-                <X aria-hidden="true" className="size-3" />
-              </button>
+              {!onBrand && (
+                <button
+                  type="button"
+                  aria-label="Ask without this page"
+                  title="Ask without this page"
+                  onClick={() => setWithContext(false)}
+                  className="grid size-4 shrink-0 place-items-center rounded hover:bg-orb-raised hover:text-orb-white"
+                >
+                  <X aria-hidden="true" className="size-3" />
+                </button>
+              )}
             </span>
           </p>
         )}
@@ -597,7 +681,7 @@ export function AskPanel({ workspaceId, pageName = null }) {
             maxLength={MAX_QUESTION}
             placeholder={onBrand && canWrite ? "Say what to change, or drop a file…" : conversation ? "Reply…" : canWrite ? "Ask, save, or rearrange…" : "Ask a question…"}
             aria-label="Message"
-            disabled={Boolean(pending)}
+            disabled={Boolean(pending) || !ai.reasoning}
             className={cn(
               "block max-h-48 min-h-[4.5rem] w-full resize-none bg-transparent px-3 py-2.5 pr-11 text-sm text-orb-white outline-none placeholder:text-orb-muted disabled:opacity-60",
               takesFiles && "pb-10",
@@ -624,7 +708,7 @@ export function AskPanel({ workspaceId, pageName = null }) {
                 title="Attach logos, a brand guide, fonts or design tokens"
                 className="absolute bottom-2 left-2 text-orb-muted hover:text-orb-white"
                 onClick={() => picker.current?.click()}
-                disabled={Boolean(pending) || files.length >= MAX_FILES}
+                disabled={Boolean(pending) || !ai.reasoning || files.length >= MAX_FILES}
               >
                 <Paperclip aria-hidden="true" />
               </Button>
@@ -635,17 +719,32 @@ export function AskPanel({ workspaceId, pageName = null }) {
             size="icon-sm"
             aria-label="Send"
             className="absolute bottom-2 right-2"
-            disabled={busy || Boolean(pending) || files.some((file) => file.uploading) || (!question.trim() && !files.some((file) => file.id))}
+            disabled={busy || Boolean(pending) || !ai.reasoning || files.some((file) => file.uploading) || (!question.trim() && !files.some((file) => file.id))}
           >
             <ArrowUp aria-hidden="true" />
           </Button>
         </div>
         <p className="text-2xs text-orb-muted">
-          {pending ? "Working…" : takesFiles ? `Enter to send · drop files anywhere on the page · ${ASK_SHORTCUT}` : `Enter to send · ${ASK_SHORTCUT} to open and close`}
+          {pending
+            ? "Working…"
+            : (takesFiles
+              ? ["Enter to send", "drop files anywhere on the page", shortcut]
+              : ["Enter to send", shortcut && `${shortcut} to open and close`]).filter(Boolean).join(" · ")}
         </p>
       </form>
     </aside>
   );
+}
+
+/**
+ * What the page chip means, for its tooltip. True to what is sent: the page (and on the Library the
+ * file on screen) goes with the question as a hint for "this" and "here", and the search covers the
+ * whole workspace with or without it.
+ */
+function contextHint(context, onBrand) {
+  if (onBrand) return "Asked from the Brand page, so the brand chat answers: it reads the brand and can change it.";
+  const what = context.libraryPath ? "the page and the Library file you are on" : "the page you are on";
+  return `Sent with your question: ${what}, so “this” and “here” mean what is on screen. Ask searches the whole workspace either way; remove it to ask without pointing at this page.`;
 }
 
 /** The history: every conversation in this workspace, most recently used first. */

@@ -7,7 +7,7 @@ import useSWR from "swr";
 
 import { AskPanel } from "@/components/ask/AskPanel";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { ASK_SHORTCUT, AskPanelProvider, useAskPanel } from "@/lib/ask/askPanel";
+import { AskPanelProvider, useAskPanel, useAskShortcut } from "@/lib/ask/askPanel";
 import { OrbikLogo } from "@/components/OrbikLogo";
 import { NeutralLoading } from "@/components/NeutralLoading";
 import { buildAgentRows } from "@/lib/agents/registry";
@@ -18,6 +18,7 @@ import { extensionApi, useExtensionSlots } from "@/lib/extensions/slots";
 import { buildKnowledgeRows } from "@/lib/library/registry";
 import { LIBRARY_SWITCHER_EVENT } from "@/lib/library/workspaceTabs";
 import { useAuth } from "@/lib/auth/AuthProvider";
+import { useShortcut } from "@/lib/keyboard";
 import { ProtectedRoute } from "@/lib/auth/ProtectedRoute";
 import { AppSidebar } from "./AppSidebar";
 import { ThemeSwitch } from "./ThemeSwitch";
@@ -45,6 +46,9 @@ export function WorkspaceShell({ children }) {
 function WorkspaceChrome({ children }) {
   const auth = useAuth();
   const ask = useAskPanel();
+  // The shortcuts as this platform writes them: ⌘ on Apple devices, Ctrl elsewhere.
+  const askShortcut = useAskShortcut();
+  const switcherShortcut = useShortcut("o");
   const params = useParams();
   const router = useRouter();
   const pathname = usePathname();
@@ -157,7 +161,7 @@ function WorkspaceChrome({ children }) {
                 >
                   <Search aria-hidden="true" className="size-3.5" />
                   <span>Search or jump to…</span>
-                  <kbd className="rounded-[5px] border border-orb-line px-1.5 font-sans text-2xs">⌘O</kbd>
+                  {switcherShortcut && <kbd className="rounded-[5px] border border-orb-line px-1.5 font-sans text-2xs">{switcherShortcut}</kbd>}
                 </button>
               )}
               {/* Ask opens from here as well as the rail, with its shortcut beside it, because it is
@@ -176,7 +180,7 @@ function WorkspaceChrome({ children }) {
                 >
                   <MessagesSquare aria-hidden="true" className="size-3.5" />
                   <span>Ask</span>
-                  <kbd className="rounded-[5px] border border-orb-line px-1.5 font-sans text-2xs">{ASK_SHORTCUT}</kbd>
+                  {askShortcut && <kbd className="rounded-[5px] border border-orb-line px-1.5 font-sans text-2xs">{askShortcut}</kbd>}
                 </button>
               )}
               {/* The theme sits in the bar rather than the account menu, where it was not found. */}

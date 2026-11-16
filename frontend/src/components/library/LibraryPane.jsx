@@ -11,6 +11,7 @@ import { LibraryStructureChoice } from "./LibraryStructureChoice";
 import { useLibrary } from "./libraryContext";
 import { VIEWS, activeTab, locationOf } from "@/lib/library/workspaceTabs";
 import { cn } from "@/lib/utils";
+import { useShortcut } from "@/lib/keyboard";
 
 /** How the page's own views are named on a tab. */
 const VIEW_LABELS = Object.freeze({
@@ -219,6 +220,7 @@ function Tab({ pane, tab, selected, focused }) {
 function EmptyView({ pane, tab, focused }) {
   const library = useLibrary();
   const closed = library.layout.closed.length;
+  const switcherShortcut = useShortcut("o");
   return (
     <>
       {tab && <ViewHeader pane={pane} tab={tab} title="New tab" />}
@@ -227,7 +229,7 @@ function EmptyView({ pane, tab, focused }) {
           <h2 className="font-display text-lg font-bold text-orb-white">No file is open</h2>
           <div className="grid grid-cols-[auto_auto] gap-x-5 gap-y-2 text-compact">
             <button type="button" onClick={library.openSwitcher} className="text-left text-orb-white hover:text-orb-cyan">Go to file</button>
-            <kbd className="font-sans text-orb-muted">⌘O</kbd>
+            <kbd className="font-sans text-orb-muted">{switcherShortcut}</kbd>
             {library.canEdit && (
               <>
                 <button type="button" onClick={() => library.startCreate("file")} disabled={library.busy} className="text-left text-orb-white hover:text-orb-cyan disabled:opacity-50">New file</button>

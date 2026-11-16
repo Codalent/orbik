@@ -871,8 +871,10 @@ thing a model must never be told by mistake.
 
 ## Ask: a chat over the index
 
-A panel that opens at the right of every workspace page — from **Ask** in the rail, the **Ask ⌘J**
-button in the header, or ⌘J / Ctrl+J — and stays open, with its conversation, as the person moves
+A panel that opens at the right of every workspace page — from **Ask** in the rail, the **Ask**
+button in the header, or ⌘J / Ctrl+J (each shown as the platform writes it, `frontend/src/lib/keyboard.js`)
+— and closes with the same keys or Escape from anywhere on the page unless a dialog, a menu or a
+field of the page takes Escape itself. It stays open, with its conversation, as the person moves
 between pages (`frontend/src/components/ask/AskPanel.jsx`, state in `frontend/src/lib/ask/askPanel.jsx`).
 Below `md` it covers the page. `/workspaces/:id/ask` is kept for links: it opens the panel, with a
 `?q=` question in its box, and moves to where the workspace opens for that person — Home while setup they can do is unfinished, the Library after (idea 029). It does three things: answers from
@@ -881,8 +883,17 @@ Library — new folders, moves, renames, the order folders are shown in, deletio
 
 **It knows where the person is.** Each message carries `context` — the page's name, its route,
 and on the Library the file or folder on screen (`?path=`) — shown as a chip above the box that
-the person can dismiss. "Save this here" and "move this file" resolve against it. It is a hint;
-every path in it still goes through the Library's rules.
+the person can dismiss (its tooltip says so; on the Brand page it stays, since it is what makes the
+brand chat answer). "Save this here" and "move this file" resolve against it. It is a hint, not a
+filter — search covers the whole workspace with or without it — and every path in it still goes
+through the Library's rules.
+
+**It says when it cannot answer.** With `GET /v1/edition` reporting `ai.reasoning: false`, the
+panel says so above the box and disables it, rather than failing the first question; a turn that
+failed with `NO_ROUTE` or `PROVIDER_NOT_CONFIGURED` is worded the same way (`frontend/src/lib/ask/ai.js`):
+plainly for everyone, with the setting to change for the install's admin. Home's suggested
+questions (`askNow` in `askPanel.jsx`) are sent at once in a new conversation, and are offered only
+once the site has been crawled.
 
 **It writes as the person.** The definition declares `writesAs: "person"` (a field of the
 definition, `AGENT_WRITERS` in `@orbik/protocol`; every other agent is `agent`). The run executor
