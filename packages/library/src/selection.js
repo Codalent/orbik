@@ -376,7 +376,7 @@ function messageFor(reason, { page, siteSize, ceiling, listing = null }) {
     case SELECTION_REASONS.siteWide:
       return page.depth === 0
         ? "The home page."
-        : `Linked from ${inbound.toLocaleString("en-US")} of the site's ${siteSize.toLocaleString("en-US")} pages.`;
+        : `Linked from ${inbound.toLocaleString("en-US")} of the site's ${siteSize.toLocaleString("en-US")} pages with content.`;
     case SELECTION_REASONS.listed: {
       const others = listing ? listing.children.length - 1 : 0;
       const where = listing ? pathOf(listing.url) : "a page the navigation links to";

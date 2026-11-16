@@ -30,6 +30,7 @@ export function createSourceCoverageReader({ database }) {
   const markdown = database.collection(AGENT_COLLECTIONS.markdown);
   const state = database.collection(AGENT_COLLECTIONS.sourceNotes);
   const nodes = database.collection(AGENT_COLLECTIONS.libraryNodes);
+  const urls = database.collection(AGENT_COLLECTIONS.urls);
 
   return {
     /**
@@ -40,10 +41,11 @@ export function createSourceCoverageReader({ database }) {
      * @param {import("mongodb").ObjectId|null} [options.siteId] the crawl whose pages count
      * @returns {Promise<{pages: number, stored: number, notStored: number, failed: number,
      *   removed: number, pending: number, chosen: number, cited: number, uncited: number,
-     *   mirroredAt: string|null}>}
+     *   mirroredAt: string|null, crawl: {addresses: number, errors: number, notPages: number,
+     *   notFetched: number}}>}
      */
     async coverageOf({ workspaceId, siteId = null }) {
-      const [pages, buckets, cited] = await Promise.all([
+      const [pages, buckets, cited, crawl] = await Promise.all([
         siteId ? markdown.countDocuments({ siteId }) : 0,
         state
           .aggregate([
@@ -69,6 +71,7 @@ export function createSourceCoverageReader({ database }) {
           ])
           .toArray(),
         citedPages(nodes, workspaceId),
+        siteId ? crawledAddresses(urls, siteId) : null,
       ]);
 
       const row = buckets[0] ?? {};
@@ -92,6 +95,9 @@ export function createSourceCoverageReader({ database }) {
         cited: written,
         uncited: Math.max(0, chosen - written),
         mirroredAt: row.mirroredAt ? new Date(row.mirroredAt).toISOString() : null,
+        // What the crawl's own count of the site is made of, so "30 pages stored" beside a crawl
+        // that reports 68 can say where the other 38 went.
+        crawl: crawl ?? { addresses: 0, errors: 0, notPages: 0, notFetched: 0 },
       };
     },
   };
@@ -121,4 +127,50 @@ async function citedPages(nodes, workspaceId) {
     ])
     .toArray();
   return rows.map((row) => row._id);
+}
+
+/**
+ * The addresses the crawl knows for a site, the figure its own page reports as the site's pages,
+ * and why the ones that are not stored here are not.
+ *
+ * A crawl counts every address it found and did not fold into another as a duplicate: pages, but
+ * also addresses that answered with an error, files that are not pages (a `.md` twin of a page, a
+ * PDF), redirects and pages marked `noindex`. Only the pages with readable content are rendered to
+ * Markdown, and those are what `pages` above counts and Sources stores. The two figures are both
+ * right and count different things; without the difference spelt out they read as a contradiction.
+ *
+ * - `errors`: fetched, and answered 400 or above.
+ * - `notPages`: fetched, answered, and not a page to store — not indexable, which is how the
+ *   crawler records a non-HTML file, a redirect or `noindex`.
+ * - `notFetched`: found and not fetched yet, or not allowed to be.
+ */
+async function crawledAddresses(urls, siteId) {
+  const [row] = await urls
+    .aggregate([
+      { $match: { siteId, $or: [{ variantOf: null }, { variantOf: { $exists: false } }] } },
+      {
+        $group: {
+          _id: null,
+          addresses: { $sum: 1 },
+          errors: { $sum: { $cond: [{ $gte: ["$lastStatus", 400] }, 1, 0] } },
+          notPages: {
+            $sum: {
+              $cond: [
+                { $and: [{ $gt: ["$lastStatus", 0] }, { $lt: ["$lastStatus", 400] }, { $ne: ["$indexable", true] }] },
+                1,
+                0,
+              ],
+            },
+          },
+          notFetched: { $sum: { $cond: [{ $gt: ["$lastStatus", 0] }, 0, 1] } },
+        },
+      },
+    ])
+    .toArray();
+  return {
+    addresses: row?.addresses ?? 0,
+    errors: row?.errors ?? 0,
+    notPages: row?.notPages ?? 0,
+    notFetched: row?.notFetched ?? 0,
+  };
 }

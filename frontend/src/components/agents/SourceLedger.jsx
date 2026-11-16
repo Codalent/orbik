@@ -85,7 +85,7 @@ export function SourceLedger({
       >
         <ChevronDown aria-hidden="true" className={cn("size-4 shrink-0 text-orb-muted transition-transform", !open && "-rotate-90")} />
         <span className="flex-1">
-          Written from {counts.used.toLocaleString()} of your {total.toLocaleString()} pages
+          Written from {counts.used.toLocaleString()} of your {total.toLocaleString()} pages with content
           {counts.excluded > 0 && <>, {counts.excluded.toLocaleString()} left out</>}
         </span>
       </button>
