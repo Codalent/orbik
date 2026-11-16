@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { NeutralLoading } from "@/components/NeutralLoading";
 import { RunProgress } from "./RunProgress";
 import * as runsApi from "@/lib/api/runs";
+import { useAiAvailability } from "@/lib/agents/aiAvailability";
 import { TERMINAL_RUN_STATUSES } from "@/lib/agents/runEvents";
 import { useRunEvents } from "@/lib/agents/useRunEvents";
 import { useCan } from "@/lib/workspaces/roles";
@@ -27,6 +28,7 @@ export function AgentDashboard({ workspaceId, agentSlug }) {
   const [starting, setStarting] = useState(false);
   const [actionError, setError] = useState(null);
   const canRun = useCan("member", workspaceId);
+  const ai = useAiAvailability();
 
   // The catalog and the most recent run are cached reads: the catalog is shared with anything
   // else that lists agents, and the run is re-read when the tab is looked at again, which is how
@@ -121,6 +123,14 @@ export function AgentDashboard({ workspaceId, agentSlug }) {
   }
 
   const inFlight = run && !complete;
+  // An agent whose requirements name nothing but the crawl is executed by a model, and cannot run
+  // without one. One that names something else may be a plain-code runtime (the worker's own, or
+  // an extension's) that asks a model for a part of its work at most, so it is told, not stopped.
+  const modelOnly = (agent.runtimeRequirements ?? []).every((requirement) => requirement === "crawl-dataset");
+  const aiNotice = ai.reasoningOff
+    ? ai.unavailable(modelOnly ? `${agent.name} cannot run` : `the parts of ${agent.name} that ask a model are skipped`)
+    : null;
+  const aiBlocked = Boolean(aiNotice && modelOnly);
 
   return (
     <div className="space-y-6">
@@ -139,9 +149,14 @@ export function AgentDashboard({ workspaceId, agentSlug }) {
         <CardHeader>
           <CardTitle className="text-base">Run this agent</CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-3">
+          {aiNotice && (
+            <p role="status" className="rounded-lg border border-orb-orange/30 bg-orb-orange/5 px-4 py-2.5 text-compact text-orb-orange" data-testid="ai-unavailable">
+              {aiNotice}
+            </p>
+          )}
           {canRun ? (
-            <Button type="button" onClick={start} disabled={starting || Boolean(inFlight)}>
+            <Button type="button" onClick={start} disabled={starting || Boolean(inFlight) || aiBlocked} title={aiBlocked ? aiNotice : "Runs the agent once, now."}>
               {starting ? "Starting…" : "Run agent"}
             </Button>
           ) : (
@@ -153,7 +168,7 @@ export function AgentDashboard({ workspaceId, agentSlug }) {
       {run && (
         <Card>
           <CardContent className="pt-6">
-            <RunProgress run={run} events={events} complete={complete} onCancel={canRun ? stop : undefined} />
+            <RunProgress run={run} events={events} complete={complete} onCancel={canRun ? stop : undefined} consequence={`${agent.name} could not run`} />
           </CardContent>
         </Card>
       )}

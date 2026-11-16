@@ -12,7 +12,8 @@ import { NeutralLoading } from "@/components/NeutralLoading";
 import { brandPath } from "@/lib/api/brand";
 import { useAgentWork } from "@/lib/agents/useAgentWork";
 import { useAskPanel } from "@/lib/ask/askPanel";
-import { DESIGN_SYSTEM_AGENT_SLUG } from "@/lib/brand/brand";
+import { useAiAvailability } from "@/lib/agents/aiAvailability";
+import { DESIGN_SYSTEM_AGENT_SLUG, proposalSkippedText } from "@/lib/brand/brand";
 import { formatDate } from "@/lib/format";
 import { BrandAgentStrip } from "./BrandAgentStrip";
 import { BrandProvider, useBrand } from "./BrandContext";
@@ -59,6 +60,7 @@ export function BrandDashboard({ workspaceId }) {
   const { agent, readiness, inFlight, busy } = work;
   // Deriving, choosing pages, pinning and restoring are a member's; a read-only member reads it.
   const canEdit = useCan("member", workspaceId);
+  const ai = useAiAvailability();
   const ask = useAskPanel();
   const setAskOpen = ask?.setOpen;
 
@@ -128,8 +130,7 @@ export function BrandDashboard({ workspaceId }) {
               {brand?.lastAttempt ? (
                 <>
                   On {formatDate(brand.lastAttempt.at)} the pages were rendered and what they showed was stored, with your logos and images.
-                  The proposal was {brand.lastAttempt.synthesis?.status ?? "not written"}
-                  {attemptReason(brand.lastAttempt) && <>: {attemptReason(brand.lastAttempt)}</>}. What was collected is below.
+                  {" "}{proposalSkippedText(brand.lastAttempt, ai.failure)} What was collected is below.
                 </>
               ) : (
                 "The agent renders up to eight of your pages in a real browser, measures their colours, type, spacing and components, collects your logos and images, and proposes a system from what it measured. It takes a few minutes. Every value says whether it was observed on your site, derived from several values, or proposed to fill a gap."
@@ -206,13 +207,6 @@ function CorrectionStatus() {
       <AlertDescription>{error}</AlertDescription>
     </Alert>
   );
-}
-
-/** Why a derivation produced no proposal, in the words it recorded. */
-function attemptReason(attempt) {
-  const reason = attempt.synthesis?.visual?.reason ?? attempt.synthesis?.graphics?.reason ?? null;
-  if (!reason) return null;
-  return `${reason.message}${reason.code ? ` (${reason.code})` : ""}`;
 }
 
 /** The crawled site's host, for the page's description; "your site" before there is one. */

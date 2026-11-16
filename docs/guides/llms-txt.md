@@ -12,8 +12,14 @@ and then `##` sections of links, each with a line saying what the page covers. A
 ## Writing it
 
 Open **llms.txt** among the workspace's agents. The agent chooses from the pages your crawler has
-rendered, so crawl the site first (see [Crawling](crawling.md)). **Run now** writes the first file;
-**Set to work** has it run once a week from then on. Running it needs the **Member** role or above.
+rendered, so crawl the site first (see [Crawling](crawling.md)). **Run now** runs it once and writes
+the first file; **Set to work** puts it on its schedule, once a week from then on, and **Pause**
+takes it off again (the file it wrote is kept, and **Run now** still works). Running it needs the
+**Member** role or above.
+
+Every line of the file is written by a model, so the agent needs the install's reasoning provider
+(see [Configuration](../self-hosting/configuration.md)). Without one the page says that AI is not
+available and **Run now** and **Set to work** are turned off, rather than letting a run fail.
 
 A run:
 

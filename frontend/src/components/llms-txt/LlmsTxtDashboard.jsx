@@ -67,13 +67,15 @@ export function LlmsTxtDashboard({ workspaceId }) {
         error={error}
         notReadyMessage="This agent chooses from the pages your crawler has rendered. Crawl your site first, then run it."
         notReadyAction={<CrawlerLink workspaceId={workspaceId} />}
+        // Every line of the file is written by a model: without one a run can only fail.
+        ai={{ need: "required", consequence: "the llms.txt file cannot be written or updated" }}
       />
 
+      {/* Why it failed is said once, in the run under the head; this says what it means for the file. */}
       {failedRun && document && (
-        <Alert role="alert">
+        <Alert role="status">
           <AlertDescription>
-            The last run failed{failedRun.error?.message ? `: ${failedRun.error.message}` : "."} The file below is
-            the one written on {formatDate(document.updatedAt, { time: false })}.
+            The last run failed, so the file below is still the one written on {formatDate(document.updatedAt, { time: false })}.
           </AlertDescription>
         </Alert>
       )}

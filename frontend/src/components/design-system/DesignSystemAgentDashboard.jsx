@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { ArrowUpRight, CalendarClock, History, Layers, ListChecks, Palette, Pause, Play } from "lucide-react";
+import { ArrowUpRight, CalendarClock, History, Layers, ListChecks, Palette } from "lucide-react";
 import useSWR from "swr";
 
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -12,9 +12,10 @@ import { Pill } from "@/components/ui/pill";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
 import { StatTile } from "@/components/ui/stat-tile";
-import { AgentHeadView, AgentLimits, AgentPageSkeleton, AgentStats, AgentStatus, CrawlerLink } from "@/components/agents/AgentPage";
+import { AgentHeadView, AgentLimits, AgentPageSkeleton, AgentStats, AgentStatus, CrawlerLink, SwitchButton } from "@/components/agents/AgentPage";
 import { PagePicker } from "@/components/brand/PagePicker";
 import * as setupApi from "@/lib/api/agentSetup";
+import { useAiAvailability } from "@/lib/agents/aiAvailability";
 import { brandPath } from "@/lib/api/brand";
 import { RUN_STATUS_LABELS, TERMINAL_RUN_STATUSES } from "@/lib/agents/runEvents";
 import { useAgentWork } from "@/lib/agents/useAgentWork";
@@ -34,6 +35,9 @@ const LIMITS = Object.freeze([
   "The weekly check fingerprints your styling first; when nothing changed it stops in seconds without rendering or asking a model.",
   "It reads your site and never changes it.",
 ]);
+
+/** What a run does without a reasoning provider, to follow "AI is not available …, so". */
+const AI_CONSEQUENCE = "a run renders your pages and stores what they show, your logos and images with it, but proposes no design system";
 
 /** How a run was started, in the words the runs list uses. */
 const TRIGGERS = Object.freeze({ manual: "by hand", schedule: "on schedule", event: "after a crawl" });
@@ -55,6 +59,7 @@ const RUN_TONES = Object.freeze({ succeeded: "neutral", failed: "coral", cancell
 export function DesignSystemAgentDashboard({ workspaceId }) {
   const [editingPages, setEditingPages] = useState(false);
   const canEdit = useCan("member", workspaceId);
+  const ai = useAiAvailability();
   const brandRead = useSWR(brandPath(workspaceId));
   const work = useAgentWork({
     workspaceId,
@@ -95,8 +100,10 @@ export function DesignSystemAgentDashboard({ workspaceId }) {
         status={work.loading ? <Skeleton className="h-5 w-20 rounded-full bg-orb-raised/70" /> : (
           <AgentStatus ready={ready} notReadyLabel="Not set up" working={working} inFlight={inFlight} failed={lastFinished?.status === "failed"} switchable />
         )}
-        workingMessage={CADENCE}
-        pausedMessage="Paused: the system is left as it is until you run it or set it to work."
+        workingMessage={`On a schedule. ${CADENCE}`}
+        pausedMessage="Not on a schedule: the system is left as it is until you run it or set it to work."
+        // Rendering and measuring need no model; only the proposal does.
+        ai={{ need: "partial", consequence: AI_CONSEQUENCE }}
         notReadyMessage="This agent renders pages your crawler found. Crawl your site first, then run it."
         notReadyAction={<CrawlerLink workspaceId={workspaceId} />}
         actions={(
@@ -123,9 +130,9 @@ export function DesignSystemAgentDashboard({ workspaceId }) {
         <StatTile
           icon={CalendarClock}
           label="Schedule"
-          value={working ? "Weekly" : "Paused"}
+          value={working ? "Weekly" : "By hand"}
           tone={working ? "good" : null}
-          detail={working ? (setup?.nextRunAt ? `Next check ${fromNow(setup.nextRunAt)}` : "Checks once a week") : "Runs only when started by hand"}
+          detail={working ? (setup?.nextRunAt ? `Next check ${fromNow(setup.nextRunAt)}` : "Checks once a week") : "Not set to work: runs only when started"}
         />
       </AgentStats>
 
@@ -134,20 +141,18 @@ export function DesignSystemAgentDashboard({ workspaceId }) {
         <Panel className="flex flex-wrap items-start gap-x-6 gap-y-4">
           <dl className="grid min-w-[14rem] flex-1 grid-cols-[max-content_1fr] gap-x-6 gap-y-2 text-sm">
             <dt className="text-orb-muted">State</dt>
-            <dd className="text-orb-white">{working ? "Set to work" : "Paused"}</dd>
+            <dd className="text-orb-white">{working ? "Set to work" : "Not set to work"}</dd>
             <dt className="text-orb-muted">How often</dt>
             <dd className="text-orb-gray">{CADENCE}</dd>
             <dt className="text-orb-muted">Next check</dt>
-            <dd className="text-orb-gray">{working && setup?.nextRunAt ? `${formatDate(setup.nextRunAt)} (${fromNow(setup.nextRunAt)})` : working ? "At the scheduler's next pass" : "None while paused"}</dd>
+            <dd className="text-orb-gray">{working && setup?.nextRunAt ? `${formatDate(setup.nextRunAt)} (${fromNow(setup.nextRunAt)})` : working ? "At the scheduler's next pass" : "None: not set to work"}</dd>
             <dt className="text-orb-muted">Last run</dt>
             <dd className="text-orb-gray">
               {lastFinished ? `${formatDate(lastFinished.finishedAt ?? lastFinished.startedAt)} · ${(RUN_STATUS_LABELS[lastFinished.status] ?? lastFinished.status).toLowerCase()}` : "Never run"}
             </dd>
           </dl>
           {canEdit ? (
-            <Button type="button" size="sm" variant={working ? "outline" : "default"} onClick={work.toggleWorking} disabled={busy || !ready}>
-              {working ? <><Pause className="size-3.5" /> Pause</> : <><Play className="size-3.5" /> Set to work</>}
-            </Button>
+            <SwitchButton working={working} onClick={work.toggleWorking} disabled={busy || !ready} cadence="once a week (it derives again only when your styling changed)" />
           ) : (
             <p className="text-compact text-orb-muted">A member of this workspace sets it to work.</p>
           )}
@@ -191,7 +196,7 @@ export function DesignSystemAgentDashboard({ workspaceId }) {
         </SectionHeading>
         {runs.length ? (
           <RowList>
-            {runs.map((entry) => <RunRow key={entry.id} run={entry} ready={ready} />)}
+            {runs.map((entry) => <RunRow key={entry.id} run={entry} ready={ready} describeFailure={ai.failure} />)}
           </RowList>
         ) : (
           <EmptyState icon={History}>No runs yet. Run it now, or set it to work and it runs within the scheduler&apos;s next pass.</EmptyState>
@@ -238,17 +243,25 @@ export function DesignSystemAgentDashboard({ workspaceId }) {
   );
 }
 
-/** One run in the recent-runs list: how it ended, when and how it started, and what it rendered. */
-function RunRow({ run, ready }) {
+/**
+ * One run in the recent-runs list: how it ended, when and how it started, and what it rendered.
+ * A run that finished without proposing a system says so (`outcome.note`, with `incomplete`), in
+ * orange, rather than reading as plainly finished.
+ */
+function RunRow({ run, ready, describeFailure }) {
   const at = run.finishedAt ?? run.startedAt;
+  const incomplete = run.status === "succeeded" && Boolean(run.outcome?.incomplete);
+  // The note repeats the outcome line when nothing was rendered; it adds to it when pages were.
+  const note = run.status === "succeeded" && run.outcome?.note && run.outcome?.summary?.pages ? run.outcome.note : null;
   return (
     <li className="flex flex-wrap items-start gap-x-3 gap-y-1 px-3 py-2.5 sm:px-4">
-      <Pill tone={RUN_TONES[run.status] ?? "neutral"} dot={run.status === "running" || run.status === "queued"} pulse={run.status === "running"}>
-        {RUN_STATUS_LABELS[run.status] ?? run.status}
+      <Pill tone={incomplete ? "orange" : RUN_TONES[run.status] ?? "neutral"} dot={run.status === "running" || run.status === "queued"} pulse={run.status === "running"}>
+        {incomplete ? "No proposal" : RUN_STATUS_LABELS[run.status] ?? run.status}
       </Pill>
       <div className="min-w-[11rem] flex-1">
         <p className="text-compact text-orb-gray">{outcomeLine(run, ready)}</p>
-        {run.status === "failed" && run.error?.message && <p className="mt-0.5 text-xs text-orb-coral">{run.error.message}</p>}
+        {note && <p className={incomplete ? "mt-0.5 text-xs text-orb-orange" : "mt-0.5 text-xs text-orb-muted"}>{note}</p>}
+        {run.status === "failed" && run.error && <p className="mt-0.5 text-xs text-orb-coral">{describeFailure(run.error, "this run could not finish")}</p>}
       </div>
       <p className="text-xs text-orb-muted">
         {at ? formatDate(at) : "Not started"}
