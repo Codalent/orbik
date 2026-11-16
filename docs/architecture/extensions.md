@@ -240,6 +240,12 @@ root Turbopack resolves modules from and the most it compiles: left at this repo
 cannot find `next` itself, nor a deployment's package beside `orbik/`. Unset, it is this
 repository, as before.
 
+`NEXT_DIST_DIR` (optional, default `.next`) is the directory, relative to `frontend/`, that `next
+build` writes the web app into and `next start` serves it from. A deployment that builds on the
+machine it serves from can build into a fresh one (`.next-<release>`, which git ignores) while the
+running server keeps serving the old, then restart the server with the new value: set the same
+value for the build and for the server that serves it.
+
 ## A private repository around this one
 
 The shape Orbik's own cloud uses, and the one this seam was built for:
