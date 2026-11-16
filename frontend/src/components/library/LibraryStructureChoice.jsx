@@ -5,6 +5,7 @@ import { ArrowDown, ArrowUp, Check, FolderTree, Plus, RefreshCw, X } from "lucid
 
 import { Button } from "@/components/ui/button";
 import { FIELD, LABEL } from "./LibraryCreateDialog";
+import { aiUnavailableSentence } from "@/lib/library/agentWait";
 import { LIBRARY_LIMITS, slugifySegment } from "@/lib/library/library";
 import { cn } from "@/lib/utils";
 
@@ -32,14 +33,27 @@ const KEPT_NAMES = Object.freeze(new Set(["sources", "brand", "overview", "index
  * When no proposal came back — no model on this deployment, or a failed call — the default
  * structure is offered to start from instead, so the choice never depends on the model.
  *
+ * The step is the moment somebody decides how their Library will look, and the moment they expect
+ * it to start being written. So it says only what is needed to decide — what the folders are for,
+ * and that they can be changed — with the rules behind "How this works", and confirming sets the
+ * agent to work in the same press, said on the button, with a quieter way to confirm without
+ * starting. A first-time reader used to land in an empty folder with the agent still paused and
+ * the only way forward a small switch at the foot of the explorer.
+ *
  * @param {object} props
  * @param {object} props.structure the `structure` block of GET /library
  * @param {boolean} props.working whether the agent is set to work
  * @param {boolean} props.busy
- * @param {(groups: Array<object>) => Promise<void>} props.onChoose saves the choice; throws a readable message
+ * @param {(groups: Array<object>, options: {start: boolean}) => Promise<void>} props.onChoose saves
+ *   the choice, and sets the agent to work when `start`; throws a readable message
  * @param {() => Promise<void>} props.onSuggestAgain asks for new proposals
+ * @param {{availability: "available"|"unavailable"|"unknown", isAdmin: boolean}} [props.ai] whether
+ *   AI is there to propose and write with, and whether the reader is told the setting behind it
+ * @param {(() => void)|null} [props.onStartAgent] sets the agent to work, which is what asks for
+ *   proposals; null when it is already at work or the reader may not
+ * @param {string} [props.startsWithin] how soon a run starts once nothing stands in its way: "a minute"
  */
-export function LibraryStructureChoice({ structure, working, busy, onChoose, onSuggestAgain }) {
+export function LibraryStructureChoice({ structure, working, busy, onChoose, onSuggestAgain, onStartAgent = null, ai = null, startsWithin = "a minute" }) {
   const suggestion = structure.suggestion;
   const variants = suggestion?.status === "ready" ? suggestion.variants ?? [] : [];
   const options = [
@@ -83,9 +97,9 @@ export function LibraryStructureChoice({ structure, working, busy, onChoose, onS
     change(next);
   }
 
-  async function confirm() {
+  async function confirm({ start }) {
     if (problems.length || pending) return;
-    setPending(true);
+    setPending(start ? "start" : "save");
     setFailure(null);
     try {
       await onChoose(groups.map((group, index) => ({
@@ -93,7 +107,7 @@ export function LibraryStructureChoice({ structure, working, busy, onChoose, onS
         summary: group.summary.trim() || undefined,
         subjects: group.subjects,
         ...(index === 0 ? { start: true } : {}),
-      })));
+      })), { start });
     } catch (error) {
       setFailure(error?.message ?? "That structure could not be saved.");
     } finally {
@@ -105,21 +119,27 @@ export function LibraryStructureChoice({ structure, working, busy, onChoose, onS
     <section aria-labelledby="library-structure-title" className="min-h-0 flex-1 overflow-y-auto px-4 pb-10 pt-7 md:px-10">
       <div className="max-w-3xl">
         <p className="flex items-center gap-2 text-xs font-medium uppercase tracking-[0.12em] text-orb-lime">
-          <FolderTree aria-hidden="true" className="size-3.5" /> {rebuild ? "Rebuild" : "Before the first write"}
+          <FolderTree aria-hidden="true" className="size-3.5" /> {rebuild ? "Rebuild" : "Set up your Library"}
         </p>
         <h2 id="library-structure-title" className="mt-2 font-display text-title font-bold leading-tight tracking-[-0.015em] text-orb-white">
           Choose how your Library is organised
         </h2>
         <p className="mt-1.5 text-[0.9375rem] leading-relaxed text-orb-gray">
-          The agent writes into the top-level folders you choose here, and never adds, renames or removes one. Pick a
-          structure, change it if you like, and confirm. The numbers are part of the names, so the folders read in order;
-          you can rename any of them later, and every link follows.
-          {working
-            ? " The agent starts writing within a few minutes of confirming."
-            : " The agent is paused: set it to work with the switch at the foot of the explorer, and it writes into these folders once you confirm."}
+          The agent files everything it writes into these top-level folders. Pick one of the options, rename or reorder
+          its folders if you like, and confirm. You can change them later.
         </p>
+        <details className="mt-2 text-compact text-orb-gray">
+          <summary className="cursor-pointer text-orb-muted marker:text-orb-muted hover:text-orb-white">How this works</summary>
+          <ul className="mt-2 list-disc space-y-1 pl-5">
+            <li>The top-level folders are yours: the agent writes inside them and never adds, renames or removes one. A subject with no folder to go in is listed under What changed for you to place.</li>
+            <li>The numbers are part of the names, so the folders read in order. Rename a folder later and every link to it follows.</li>
+            <li>The first folder holds the overview and the index. Brand and Sources stay where they are.</li>
+            <li>The options are proposed by AI from your site map and your most-linked pages, once the agent is set to work. The default is always there.</li>
+            <li>Rebuild the structure, under What changed, brings this step back and moves what the Library holds into the new folders.</li>
+          </ul>
+        </details>
 
-        <SuggestionStatus suggestion={suggestion} working={working} busy={busy} onSuggestAgain={onSuggestAgain} />
+        <SuggestionStatus suggestion={suggestion} working={working} busy={busy} onSuggestAgain={onSuggestAgain} onStartAgent={onStartAgent} ai={ai} />
 
         <div role="radiogroup" aria-label="Structures to choose from" className="mt-5 grid gap-2.5 md:grid-cols-2">
           {options.map((option) => {
@@ -213,17 +233,41 @@ export function LibraryStructureChoice({ structure, working, busy, onChoose, onS
           </Button>
         </div>
 
-        <div className="mt-6 flex flex-wrap items-center gap-3">
-          <Button type="button" onClick={confirm} disabled={busy || pending || problems.length > 0}>
-            {pending ? "Creating the folders…" : "Use this structure"}
-          </Button>
-          <span role={failure || problems.length ? "alert" : undefined} className={cn("text-xs", failure || problems.length ? "text-orb-coral" : "text-orb-muted")}>
-            {failure ?? problems[0] ?? `${groups.length} ${groups.length === 1 ? "folder" : "folders"}, created as yours. Brand and Sources stay where they are.`}
-          </span>
+        <div className="mt-6 flex flex-wrap items-center gap-x-3 gap-y-2">
+          {working ? (
+            <Button type="button" onClick={() => confirm({ start: false })} disabled={busy || Boolean(pending) || problems.length > 0}>
+              {pending ? "Creating the folders…" : "Use this structure"}
+            </Button>
+          ) : (
+            <>
+              <Button type="button" onClick={() => confirm({ start: true })} disabled={busy || Boolean(pending) || problems.length > 0}>
+                {pending === "start" ? "Creating the folders…" : "Use this structure and start writing"}
+              </Button>
+              <Button type="button" variant="ghost" onClick={() => confirm({ start: false })} disabled={busy || Boolean(pending) || problems.length > 0}>
+                {pending === "save" ? "Saving…" : "Save without starting"}
+              </Button>
+            </>
+          )}
         </div>
+        <p role={failure || problems.length ? "alert" : undefined} className={cn("mt-2 text-xs", failure || problems.length ? "text-orb-coral" : "text-orb-muted")}>
+          {failure ?? problems[0] ?? afterConfirm({ working, ai, startsWithin, folders: groups.length })}
+        </p>
       </div>
     </section>
   );
+}
+
+/**
+ * What happens once the folders are confirmed, said under the buttons that confirm them.
+ */
+function afterConfirm({ working, ai, startsWithin, folders }) {
+  const made = `${folders} ${folders === 1 ? "folder" : "folders"}, created as yours.`;
+  if (ai?.availability === "unavailable") {
+    return `${made} ${aiUnavailableSentence({ isAdmin: ai.isAdmin, consequence: "the agent cannot write into them yet" })}`;
+  }
+  return working
+    ? `${made} The agent starts writing within ${startsWithin}.`
+    : `${made} Starting sets the Knowledge base agent to work: it writes the Library within ${startsWithin}, and again whenever your site changes. You can pause it at the foot of the explorer.`;
 }
 
 /**
@@ -233,12 +277,29 @@ export function LibraryStructureChoice({ structure, working, busy, onChoose, onS
  * spends nothing; until then there is nothing being proposed, and saying so is what keeps a person
  * from waiting on a spinner that never ends.
  */
-function SuggestionStatus({ suggestion, working, busy, onSuggestAgain }) {
-  if (!suggestion && !working) {
+function SuggestionStatus({ suggestion, working, busy, onSuggestAgain, onStartAgent, ai }) {
+  // No AI, no proposals: the scheduler never asks, or the question came back refused. Said in the
+  // words every page uses for it, rather than as a spinner that never stops.
+  const noAi = ai?.availability === "unavailable" || suggestion?.reason?.code === "PROVIDER_NOT_CONFIGURED";
+  if (noAi && suggestion?.status !== "ready") {
     return (
       <p role="status" className="mt-4 rounded-2xl bg-orb-raised px-3 py-2.5 text-compact text-orb-gray">
-        Set the agent to work and it proposes two or three structures from your site within a few minutes. Or start from
-        the default below now.
+        {aiUnavailableSentence({ isAdmin: Boolean(ai?.isAdmin), consequence: "no structures can be proposed from your site", after: "Start from the default below." })}
+      </p>
+    );
+  }
+  if (!suggestion && !working) {
+    return (
+      <p role="status" className="mt-4 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-2xl bg-orb-raised px-3 py-2.5 text-compact text-orb-gray">
+        <span>
+          The default below suits most sites. Set the agent to work and it also proposes two or three structures from
+          your site within a few minutes; it writes nothing until you confirm one.
+        </span>
+        {onStartAgent && (
+          <Button type="button" variant="ghost" size="sm" onClick={onStartAgent} disabled={busy}>
+            <RefreshCw aria-hidden="true" className="size-3.5" /> Propose from my site
+          </Button>
+        )}
       </p>
     );
   }

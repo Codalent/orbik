@@ -19,10 +19,13 @@ import { LibraryRevisions } from "./LibraryRevisions";
 import { LibraryStatusBar } from "./LibraryStatusBar";
 import { LibraryContext, targetOf } from "./libraryContext";
 import { useAgentWork } from "@/lib/agents/useAgentWork";
+import { useEdition } from "@/lib/api/edition";
 import * as api from "@/lib/api/library";
 import { includeAgentSource } from "@/lib/api/knowledge";
 import { WORKSPACES_PATH } from "@/lib/api/workspaces";
+import { useAuth } from "@/lib/auth/AuthProvider";
 import { formatDate } from "@/lib/format";
+import { aiAvailability, libraryWait } from "@/lib/library/agentWait";
 import {
   LEGACY_OVERVIEW_PATH,
   LIBRARY_AGENT_SLUG,
@@ -104,24 +107,31 @@ export function LibraryWorkspace({ workspaceId }) {
   // True for the one render after the first read, so whatever is on screen then is not revealed.
   const [starting, setStarting] = useState(false);
   const [structureSeen, setStructureSeen] = useState(null);
+  const [overviewSeen, setOverviewSeen] = useState(null);
   const [confirm, confirmDialog] = useConfirm();
 
   // The tree and its figures are one cached read, re-read when the tab is looked at again — which
   // is how a file somebody else's AI or another window wrote shows up without a reload. While a
-  // structure is being proposed the page looks again every few seconds.
+  // structure is being proposed the page looks again every few seconds, and while the agent is set
+  // to work and has never run, every half minute, so what it is waiting on stays current.
   const libraryRead = useSWR(api.libraryPath(workspaceId), {
-    refreshInterval: (latest) => (latest?.structure?.needsChoice && (!latest.structure.suggestion || latest.structure.suggestion.status === "pending") ? 8000 : 0),
+    refreshInterval: (latest) => {
+      if (latest?.structure?.needsChoice && (!latest.structure.suggestion || latest.structure.suggestion.status === "pending")) return 8000;
+      if (latest?.writer?.working && !latest.latestRun) return 30_000;
+      return 0;
+    },
   });
   const state = libraryRead.data ?? null;
   const mutateLibrary = libraryRead.mutate;
   const loading = !libraryRead.data && !libraryRead.error;
 
-  /** Re-reads the Library after something wrote to it. */
+  /** Re-reads the Library after something wrote to it, and answers with what it read. */
   const refresh = useCallback(async () => {
     try {
-      await mutateLibrary();
+      return await mutateLibrary();
     } catch {
       // What was last read stays on screen; the next focus or write reads it again.
+      return null;
     }
   }, [mutateLibrary]);
 
@@ -138,6 +148,15 @@ export function LibraryWorkspace({ workspaceId }) {
     setExpanded(new Set(topFolders(state.tree).slice(0, 1)));
     const empty = !layout.panes.some((pane) => pane.tabs.length);
     if (empty && !requestedPath) setLayout((current) => tabs.openLocation(current, tabs.nodeLocation(overviewPath)));
+  }
+
+  // The overview is found by role, and its place moves: `/overview` until the folders are chosen,
+  // inside the start folder after, and with that folder when it is renamed. A tab left at a place
+  // that holds no overview follows it to where it is now, rather than reporting a missing file.
+  if (state && overviewPath !== overviewSeen) {
+    setOverviewSeen(overviewPath);
+    const stale = [overviewSeen, LEGACY_OVERVIEW_PATH].filter((path) => path && path !== overviewPath && !findInTree(state.tree, path));
+    if (stale.length) setLayout((current) => tabs.followPaths(current, (path) => (stale.includes(path) ? overviewPath : path)));
   }
 
   // Following a citation while the page is already open moves to it — in a tab of its own, so the
@@ -200,6 +219,12 @@ export function LibraryWorkspace({ workspaceId }) {
   const canEdit = useCan("member", workspaceId);
 
   const work = useAgentWork({ workspaceId, agentSlug: LIBRARY_AGENT_SLUG, onFinished: refresh });
+
+  // What the agent is waiting on before it writes, worded for this reader: an install's admin is
+  // told the setting to change, everyone else what it means for them.
+  const isAdmin = Boolean(useAuth().user?.isAdmin);
+  const { edition } = useEdition();
+  const wait = libraryWait({ state, work, canEdit, isAdmin, edition });
 
   // The inspector follows the run: it shows the run while one is in flight, since a person who set
   // the agent to work is waiting to see something happen, and the file's own rail when it is over.
@@ -448,13 +473,27 @@ export function LibraryWorkspace({ workspaceId }) {
     });
   }
 
-  async function chooseStructure(groups) {
+  /**
+   * Saves the folders a person chose and, unless they asked only to save them, sets the agent to
+   * work in the same press: choosing the folders is the moment somebody expects the Library to
+   * start being written, and a paused agent behind a small switch is where the first write used to
+   * stall. What they land on is the overview, which says what the agent is doing about it — not
+   * the empty start folder.
+   */
+  async function chooseStructure(groups, { start: startAgent = false } = {}) {
     const chosen = await api.chooseLibraryStructure(workspaceId, groups);
-    await refresh();
+    if (startAgent && !work.working) await work.toggleWorking();
+    const read = await refresh();
     const start = chosen?.structure?.chosen?.groups?.find((group) => group.start)?.path ?? null;
+    const overview = read?.overviewPath ?? (start ? `${start}/overview` : null);
     setLayout((current) => {
       const closed = tabs.closeLocation(current, { view: tabs.VIEWS.structure });
-      return start ? tabs.openLocation(closed, tabs.nodeLocation(start), { target: "tab" }) : closed;
+      if (!overview) return closed;
+      // The overview's tab from before the choice, at `/overview`, is the one brought forward —
+      // unless a Library from before the structure step still keeps a real overview there.
+      const legacy = overview !== LEGACY_OVERVIEW_PATH && !findInTree(read?.tree, LEGACY_OVERVIEW_PATH);
+      const followed = legacy ? tabs.followPaths(closed, (path) => (path === LEGACY_OVERVIEW_PATH ? overview : path)) : closed;
+      return tabs.openLocation(followed, tabs.nodeLocation(overview), { target: "tab" });
     });
     if (start) setExpanded((current) => new Set([...current, start]));
   }
@@ -611,6 +650,10 @@ export function LibraryWorkspace({ workspaceId }) {
     overviewPath,
     busy,
     work,
+    wait,
+    // Whether a reasoning provider is there, and whether this reader is told the setting behind it.
+    ai: { availability: aiAvailability({ state, edition, work }), isAdmin },
+    edition: edition ?? null,
     phases,
     changes,
     activity,

@@ -32,10 +32,11 @@ import { LibraryDocument } from "./LibraryDocument";
 import { LibraryFileEditor } from "./LibraryFileEditor";
 import { LibraryFolder, LibraryFolderAside, FolderMenu } from "./LibraryFolder";
 import { LibraryInspector } from "./LibraryInspector";
+import { LibraryWaiting } from "./LibraryWaiting";
 import { PANE_ICON_BUTTON, PaneBody, ViewHeader } from "./LibraryPaneParts";
 import { useLibrary } from "./libraryContext";
 import { libraryNodePath } from "@/lib/api/library";
-import { LIBRARY_LIMITS, entryRoleOf, isFixedFolder, isSourcePath, writingStatus } from "@/lib/library/library";
+import { LEGACY_OVERVIEW_PATH, LIBRARY_LIMITS, entryRoleOf, isFixedFolder, isSourcePath, writingStatus } from "@/lib/library/library";
 import { cn } from "@/lib/utils";
 
 /**
@@ -61,8 +62,12 @@ export function LibraryNodeView({ pane, tab, path, focused }) {
   const { workspaceId, state, index } = library;
   const listed = index.get(path);
   // The page lands on the overview, and a Library that has only been copied so far has none: that
-  // is a Library with nothing written yet, not a file that failed to open.
-  const overviewPending = Boolean(state) && path === library.overviewPath && !listed;
+  // is a Library with nothing written yet, not a file that failed to open. Before the folders are
+  // chosen the overview's place is `/overview`, after it the start folder's; a tab opened at the
+  // first and remembered past the choice is still the overview's.
+  const overviewSlot = path === library.overviewPath
+    || (path === LEGACY_OVERVIEW_PATH && !index.has(library.overviewPath));
+  const overviewPending = Boolean(state) && overviewSlot && !listed;
   const read = useSWR(overviewPending ? null : libraryNodePath(workspaceId, path));
   const node = read.data?.node ?? null;
   const mutate = read.mutate;
@@ -79,17 +84,24 @@ export function LibraryNodeView({ pane, tab, path, focused }) {
   const idPrefix = `${pane.id}-`;
 
   if (overviewPending) {
+    // What the overview is waiting on, and the one thing that moves it forward; once nothing is,
+    // the agent's progress, and then the overview itself as soon as the run writes it.
+    const writing = library.wait?.kind === "writing";
     return (
       <>
         <ViewHeader pane={pane} tab={tab} path={path} title="Overview" />
         <PaneBody focused={focused}>
-          <div className="flex-1 p-8">
-            <div className="max-w-lg">
-              <h2 className="font-display text-lg font-bold text-orb-white">The overview has not been written yet</h2>
-              <p className="mt-2 text-sm text-orb-gray">
-                {writingStatus({ coverage: state.coverage, working: library.work.working, inFlight: library.work.inFlight })}
-              </p>
-            </div>
+          <div className="min-w-0 flex-1 overflow-y-auto p-8">
+            {library.wait ? (
+              <LibraryWaiting heading={writing ? "The agent is writing the overview now" : "The overview has not been written yet"} />
+            ) : (
+              <div className="max-w-lg">
+                <h2 className="font-display text-lg font-bold text-orb-white">The overview has not been written yet</h2>
+                <p className="mt-2 text-sm text-orb-gray">
+                  {writingStatus({ coverage: state.coverage, working: library.work.working, inFlight: library.work.inFlight })}
+                </p>
+              </div>
+            )}
           </div>
         </PaneBody>
       </>

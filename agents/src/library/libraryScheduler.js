@@ -1,5 +1,6 @@
 import { findAgentDefinition } from "@orbik/agent-definitions";
 import { AGENT_COLLECTIONS, COLLECTIONS, KNOWLEDGE_AGENT_SLUG, log } from "@orbik/core";
+import { activeExtensions, agentAllowed } from "@orbik/extensions";
 import { LIBRARY_NODE_KINDS, SOURCE_LAYER_WRITER_SLUG, SOURCE_ROOT_PATH, libraryStructureState } from "@orbik/library";
 import { RUN_STATUS } from "@orbik/protocol";
 
@@ -277,6 +278,52 @@ export function createLibraryScheduler({ database, queue, ledger, config, logger
   }
 
   /**
+   * Why this workspace's plan keeps the write run from starting, or null when it does not.
+   *
+   * The same rules a run meets once it starts — the worker refuses an agent the plan leaves out,
+   * and the AI call log refuses a model call it does not include — asked before the run is made,
+   * so a workspace over its plan waits with the reason on its Library page instead of collecting
+   * a failed run every time its site changes, and its first run starts on the next pass after the
+   * plan allows it. Without plan limits loaded nothing is looked up.
+   *
+   * @returns {Promise<{reason: string, limit: string}|null>}
+   */
+  async function planRefusal(workspaceId) {
+    const extensions = activeExtensions();
+    if (!extensions.hasPlanLimits) return null;
+    const workspace = await workspaces.findOne({ _id: workspaceId }, { projection: { ownerId: 1 } });
+    const limits = await extensions.limitsFor({ ownerId: workspace?.ownerId ?? null, workspaceId });
+    if (!agentAllowed(limits, KNOWLEDGE_AGENT_SLUG)) return { reason: "PLAN_LIMIT_REACHED", limit: "agents" };
+    if (!limits.aiCalls) return { reason: "PLAN_LIMIT_REACHED", limit: "aiCalls" };
+    if (!limits.reasoningCalls) return { reason: "PLAN_LIMIT_REACHED", limit: "reasoningCalls" };
+    return null;
+  }
+
+  /**
+   * Keeps this loop's last answer to "why has the Library not been written" on the knowledge
+   * agent's setup row, as `writeCheck`, for the Library page to say.
+   *
+   * Only this process knows some of the answers — whether a reasoning provider is configured is
+   * the worker's environment, not the API's — and a Library that waits with no reason given is the
+   * one thing its page must never show. `since` is when the answer last changed, `checkedAt` when
+   * it was last given (a page can tell a loop that has stopped looking from one that is waiting),
+   * and `everyMs` how often it is asked, so the page can say how soon a run will start. No row is
+   * made for it: a workspace without a setup row has never been set to work, which the page already
+   * knows.
+   */
+  async function recordWriteCheck(workspaceId, outcome) {
+    const at = now();
+    const reason = outcome.runId ? "RUN_STARTED" : outcome.reason ?? null;
+    const filter = { workspaceId, agentSlug: KNOWLEDGE_AGENT_SLUG };
+    const fresh = { "writeCheck.checkedAt": at, "writeCheck.everyMs": config.sourceIntervalMs, "writeCheck.limit": outcome.limit ?? null };
+    const same = await agentSetups.updateOne({ ...filter, "writeCheck.reason": reason }, { $set: fresh });
+    if (same.matchedCount) return;
+    await agentSetups.updateOne(filter, {
+      $set: { writeCheck: { reason, since: at, checkedAt: at, everyMs: config.sourceIntervalMs, limit: outcome.limit ?? null } },
+    });
+  }
+
+  /**
    * Decides whether the Library should be rewritten now, and starts the run when it should.
    *
    * A run is due when the pages the knowledge base is written from say something the last run did
@@ -338,6 +385,9 @@ export function createLibraryScheduler({ database, queue, ledger, config, logger
 
     const definition = findAgentDefinition(KNOWLEDGE_AGENT_SLUG);
     if (!definition) return { reason: "AGENT_NOT_AVAILABLE" };
+
+    const refusal = await planRefusal(workspaceId);
+    if (refusal) return refusal;
 
     const current = now();
     const claimedFor = newest(
@@ -462,6 +512,10 @@ export function createLibraryScheduler({ database, queue, ledger, config, logger
         // tick, and a decision taken after that enqueue would find one in flight forever.
         try {
           const outcome = await considerWrite({ workspaceId, siteId, position });
+          // What it decided is kept for the Library page; failing to keep it decides nothing.
+          await recordWriteCheck(workspaceId, outcome).catch((error) => {
+            logger("warn", "library_scheduler.write_check_failed", { workspaceId: id, message: error.message });
+          });
           if (outcome.runId) {
             started.push({ workspaceId, runId: outcome.runId });
             logger("info", "library_scheduler.run_created", {
