@@ -74,7 +74,7 @@ export function describeFailure(failure, { isAdmin, consequence }) {
  */
 export function planLimitText(message) {
   const said = sentence(message);
-  if (said && !/^[A-Z0-9_]+$/.test(said)) return said;
+  if (said && !/^[A-Z0-9_]+\.?$/.test(message.trim())) return said;
   return "This workspace's plan does not allow this, so it was not done.";
 }
 
