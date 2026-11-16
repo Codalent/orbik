@@ -41,6 +41,16 @@ The interval is measured from when the previous request to the host was actually
   makes it due immediately; the page shows "Queued" — through a reload — until the scheduler's
   next pass starts the run, then "Crawling" with live progress. Setting a site up for the first
   time leaves the same mark, so **Start crawling this site** lands on "Queued" as well.
+- **A crawl that could fetch nothing is refused, not queued.** When the workspace's month cannot
+  pay for a single page, the first setup (`PUT /crawl` on a workspace with no site yet), **Crawl
+  now**, **Fresh crawl** (`POST /crawl/runs`) and one page's **Crawl now** (`POST /crawl/recrawl`)
+  are answered `403 CRAWL_NOT_INCLUDED` when the month's allowance is zero — the plan includes no
+  crawl pages, which is how a deployment pauses a workspace — and `409 CRAWL_BUDGET_SPENT` when it
+  had pages and has none left; the message says when crawling resumes only when that is true
+  (`resumesAt`, below). Saving the settings of a site that exists is always accepted. The page
+  reads the same from `budget.state` and disables those buttons with the reason under them. The
+  scheduler's own visits still run, since discovery is free; a run that runs out part-way ends
+  `succeeded` with `pagesSkippedNoBudget`, which the page shows as "Stopped: out of crawl pages".
 - **Fresh crawl**, beside "Crawl now" and confirmed with a second press, asks for every eligible
   page of the site in full: each page is marked wanted and its cached validators are forgotten, so
   nothing comes back "unchanged" (`POST /crawl/runs` with `{ "fresh": true }`). Frequencies are
@@ -109,6 +119,7 @@ The interval is measured from when the previous request to the host was actually
   page whenever an input changes, so the crawler only compares two fields per page.
 - The route tree shows each page's frequency, and a folder's when everything under it shares one pattern. A page's detail panel lets it be pinned to its own frequency — including never — or returned to its pattern's, and has its own "Crawl now". A hand-triggered crawl marks the pages wanted and makes the site due; the request is satisfied by the next fetch, so it survives a run that ran out of budget before reaching the page.
 - The budget is the workspace's: one `crawl_budget_periods` document per workspace and UTC month, whoever in it starts a crawl, with the owner recorded on it (`userId`). The workspace's plan limits set its monthly page allowance (`monthlyCrawlPages`), as an extension answers them (docs/architecture/extensions.md). Without one — the open-source edition — every month is unlimited: `allowance` and `remaining` are null, `unlimited` is true, and `consumed` still counts every page fetched.
+- `statusFor` (and so `budget` on `GET /crawl`) names the month's situation in `state`: `unlimited`; `available`; `spent`, an allowance above zero with nothing left; or `not-included`, an allowance of zero — the plan includes no crawling, nothing was spent, and the page never words it as a budget used up. `planAllowance` is what the plan sets today, which is what the next month opens with, and `resumesAt` is the first of next month only when the month is spent or empty *and* the plan still has pages (`planAllowance` not 0); otherwise null, and the page promises no date. An install whose web extensions export `crawlBudgetLink` offers it beside those two states (docs/architecture/extensions.md § "Web extensions"); without it the page offers nothing to press.
 - The allowance is fixed when a UTC calendar month's budget is first opened. Plan allowance changes apply to the next month; the `grant:crawl-budget` command (`--workspace <id>`, or `--email` of an account that owns one workspace) can top up the current month. Extra grants do not carry into the following month.
 - Budgets were kept per account until the `2026-11-13-crawl-budget-per-workspace` migration. It gave the months of an account that owned one workspace to that workspace; an account that owned several keeps its old months as history, without `workspaceId`, and each of its workspaces opened the month it ran in afresh. A deleted workspace's months are kept as the record of what it spent.
 
@@ -118,7 +129,8 @@ A run's phase is one of: **queued** (waiting for the sites ahead of it), **disco
 
 Three reads keep the web app current, each at its own pace:
 
-- **Crawl status** (`GET /crawl`), shared by the sidebar and the crawl page, is re-read every four seconds while a crawl is running or queued and every thirty seconds otherwise, which is how a crawl the scheduler started gets noticed.
+- **Crawl status** (`GET /crawl`), shared by the sidebar and the crawl page, is re-read every four seconds while a crawl is running or queued and every thirty seconds otherwise, which is how a crawl the scheduler started gets noticed. When it sees a crawl get queued, start or end, it has the activity monitor (below) read again at once, so a crawl shorter than the monitor's idle interval is not missed. The page's table of pages (`GET /crawl/tree`) is remounted when the run starts and when it ends, and while it runs its top level is read again in place as the figures grow, keeping open folders open. A notice about an action ("Crawl queued…") is shown only until the crawl moves to its next stage.
+- **The figures' lists** (`GET /crawl/findings?kind=broken|orphans|duplicates&limit&skip`): pressing **Broken**, **Nothing links here** or **Duplicate URLs** lists those pages flat, by address, in place of the tree. The figures on `GET /crawl` (`urls.broken`, `urls.orphans`, `urls.duplicates`) are counted from `crawl_urls` by the same filters, so the two agree: broken is a last status of 400 or more on a page that is not a duplicate, as in the tree.
 - **The crawl page's activity log** (`GET /crawl/activity`) is re-read every two seconds while a crawl is live. It shows queue position, the phase, a progress bar, recent job outcomes and retry messages, fetched pages, and budget deferrals.
 - **The activity monitor** at the foot of the sidebar polls `GET /v1/activity` and shows, across every workspace the account owns: crawls that are queued or running with a progress bar, agent runs that are queued, waiting for a machine, or running with the tool they are on, model calls in flight, and the Library agent copying a site's pages into Sources (a queue job rather than a run, reported under `library`). It asks every three seconds while something is live and every fifteen when not.
 

@@ -69,6 +69,19 @@ export function createCrawlController(crawlService) {
       } catch (error) { next(error); }
     },
 
+    /** Lists the pages behind one finding: broken, nothing links here, or duplicate URLs. */
+    async findings(req, res, next) {
+      try {
+        res.json(await crawlService.getFindings({
+          userId: req.auth.userId,
+          workspaceId: req.validated.workspaceId,
+          kind: req.validated.kind,
+          limit: req.validated.limit,
+          skip: req.validated.skip,
+        }));
+      } catch (error) { next(error); }
+    },
+
     /** Returns everything recorded about one page. */
     async page(req, res, next) {
       try {

@@ -1,4 +1,5 @@
-import { isCanonicalObjectId, parseBounded, plainObject, validationError } from "./shared.js";
+import { FINDING_KINDS } from "../repositories/crawlRepository.js";
+import { isCanonicalObjectId, parseBounded, parseChoice, plainObject, validationError } from "./shared.js";
 import { canonicalizePublicUrl } from "./workspaceValidators.js";
 
 /** Bounds mirrored from the crawler's own configuration validator. */
@@ -18,6 +19,18 @@ const PAGE_LIMIT = Object.freeze({ min: 1, max: 200, fallback: 50 });
  * it has fetched a single page.
  */
 const MAX_SITEMAP_URLS = 20;
+
+/**
+ * Reads a bare host as the HTTPS address it names (`orbik.io` → `https://orbik.io`), which is
+ * what a person typing one into "Start crawling from" means. A value that already has a scheme is
+ * left alone, so the shared rule still refuses `ftp://…` rather than this rewriting it.
+ */
+function withHttps(value) {
+  if (typeof value !== "string") return value;
+  const input = value.trim();
+  if (!input || /^[a-z][a-z0-9+.-]*:\/\//i.test(input)) return input;
+  return `https://${input.replace(/^\/+/, "")}`;
+}
 
 /**
  * Validates a crawl configuration body.
@@ -41,7 +54,7 @@ export function validateCrawlSite(req, _res, next) {
   let seedUrl;
   if (body.seedUrl !== undefined) {
     try {
-      seedUrl = canonicalizePublicUrl(body.seedUrl);
+      seedUrl = canonicalizePublicUrl(withHttps(body.seedUrl));
     } catch (error) {
       fields.push({ field: "seedUrl", code: "INVALID", message: error.message });
     }
@@ -296,6 +309,31 @@ export function validateTreeQuery(req, _res, next) {
 
   if (fields.length) return next(validationError(fields));
   req.validated = { ...req.validated, path, limit, skip };
+  next();
+}
+
+/** How many findings one request may list. */
+const FINDINGS_LIMIT = Object.freeze({ min: 1, max: 100, fallback: 50 });
+
+/** Validates a request for the pages behind one finding: `kind`, and `limit`/`skip` to page. */
+export function validateFindingsQuery(req, _res, next) {
+  const fields = [];
+  const query = req.query ?? {};
+  const allowed = new Set(["kind", "limit", "skip"]);
+  for (const key of Object.keys(query)) {
+    if (!allowed.has(key)) {
+      fields.push({ field: key, code: "UNKNOWN_FIELD", message: "This filter is not accepted." });
+    }
+  }
+  if (query.kind === undefined || query.kind === "") {
+    fields.push({ field: "kind", code: "REQUIRED", message: `Ask for ${FINDING_KINDS.join(", ")}.` });
+  }
+  const kind = parseChoice(query.kind, { allowed: FINDING_KINDS, fallback: null }, "kind", fields);
+  const limit = parseBounded(query.limit, FINDINGS_LIMIT, "limit", fields, { blankIsZero: true });
+  const skip = query.skip === undefined ? 0 : parseBounded(query.skip, { min: 0, max: 100_000, fallback: 0 }, "skip", fields, { blankIsZero: true });
+
+  if (fields.length) return next(validationError(fields));
+  req.validated = { ...req.validated, kind, limit, skip };
   next();
 }
 

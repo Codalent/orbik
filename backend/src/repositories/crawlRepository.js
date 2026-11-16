@@ -96,6 +96,23 @@ export function toPageSummary(snapshot) {
 }
 
 /**
+ * The registry filters behind the crawl page's findings, shared by the figures (`summarizeUrls`)
+ * and the lists they open (`listFindings`) so the two can never count differently.
+ *
+ * Broken pages exclude duplicate URLs, as the route tree does: a broken address folded into the
+ * page it duplicates is reported once, on that page.
+ */
+const NOT_A_VARIANT = Object.freeze([{ variantOf: null }, { variantOf: { $exists: false } }]);
+const FINDINGS = Object.freeze({
+  broken: (siteId) => ({ siteId, lastStatus: { $gte: 400 }, $or: NOT_A_VARIANT }),
+  orphans: (siteId) => ({ siteId, orphan: true }),
+  duplicates: (siteId) => ({ siteId, variantOf: { $ne: null, $exists: true } }),
+});
+
+/** The findings a list can be asked for. */
+export const FINDING_KINDS = Object.freeze(Object.keys(FINDINGS));
+
+/**
  * Creates read access to the crawl dataset the agents produce, plus the one document the API owns.
  *
  * The API writes exactly one thing here — a workspace's crawl configuration — and reads everything
@@ -664,18 +681,58 @@ export function createCrawlRepository(collections) {
       });
     },
 
-    /** Counts a site's registered URLs by the dimensions the dashboard reports. */
+    /**
+     * Counts a site's registered URLs by the dimensions the dashboard reports.
+     *
+     * `broken`, `orphans` and `duplicates` are counted with the filters `listFindings` lists them
+     * by, so the figure a person presses and the list it opens always agree.
+     */
     async summarizeUrls(siteId) {
       const site = toObjectId(siteId);
-      const [total, eligible, orphans, duplicates] = await Promise.all([
+      const [total, eligible, orphans, duplicates, broken] = await Promise.all([
         urls.countDocuments({ siteId: site }),
         urls.countDocuments({ siteId: site, eligible: true }),
-        urls.countDocuments({ siteId: site, orphan: true }),
+        urls.countDocuments(FINDINGS.orphans(site)),
         // Counted rather than derived, because "1,240 URLs, 254 of them duplicates" is a
         // different and more honest headline than "1,240 URLs".
-        urls.countDocuments({ siteId: site, variantOf: { $ne: null, $exists: true } }),
+        urls.countDocuments(FINDINGS.duplicates(site)),
+        urls.countDocuments(FINDINGS.broken(site)),
       ]);
-      return { total, eligible, orphans, duplicates, pages: total - duplicates };
+      return { total, eligible, orphans, duplicates, broken, pages: total - duplicates };
+    },
+
+    /**
+     * Lists the pages behind one of the crawl page's findings — broken, nothing links here, or
+     * duplicate URLs — flat and by address, a page of them at a time.
+     *
+     * The tree answers "what is under /docs"; this answers "which nine are broken", which a tree
+     * of collapsed folders would make a person hunt for.
+     *
+     * @param {object} options
+     * @param {string|ObjectId} options.siteId site to read
+     * @param {"broken"|"orphans"|"duplicates"} options.kind which finding
+     * @param {number} options.limit
+     * @param {number} options.skip
+     */
+    async listFindings({ siteId, kind, limit, skip }) {
+      const site = toObjectId(siteId);
+      const filter = FINDINGS[kind](site);
+      const [items, total] = await Promise.all([
+        urls.find(filter)
+          .project({ url: 1, urlHash: 1, lastStatus: 1, indexable: 1, state: 1, variantOf: 1, variantReason: 1, inboundCount: 1 })
+          .sort({ url: 1 })
+          .skip(skip)
+          .limit(limit)
+          .toArray(),
+        urls.countDocuments(filter),
+      ]);
+      // A duplicate names the page it is folded into, which is what makes its row worth reading.
+      const targets = [...new Set(items.map((row) => row.variantOf).filter(Boolean))];
+      const canonical = targets.length
+        ? new Map((await urls.find({ siteId: site, urlHash: { $in: targets } }).project({ urlHash: 1, url: 1 }).toArray())
+          .map((row) => [row.urlHash, row.url]))
+        : new Map();
+      return { items: items.map((row) => ({ ...row, variantOfUrl: row.variantOf ? canonical.get(row.variantOf) ?? null : null })), total };
     },
 
     /**

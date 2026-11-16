@@ -28,6 +28,17 @@
 export const railItems = [];
 
 /**
+ * Where a person goes for more crawl pages — a plan to change, pages to buy — offered on the
+ * Crawler page beside "this month's crawl pages are spent" and "this workspace's plan includes no
+ * crawl pages". `path` is under the workspace, as a rail item's is (`"billing"` links to
+ * `/workspaces/:id/billing`), or an `https://` address, which opens in a new tab. With none, the
+ * page says what happened and offers nothing to press.
+ *
+ * @type {{label: string, path: string, feature?: string} | null}
+ */
+export const crawlBudgetLink = null;
+
+/**
  * Pages served under a workspace, at `/workspaces/:id/<path>`, by the one catch-all route the web
  * app keeps for them. A core page at the same address always wins.
  *
