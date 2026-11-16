@@ -114,10 +114,13 @@ export function LibraryWorkspace({ workspaceId }) {
   // is how a file somebody else's AI or another window wrote shows up without a reload. While a
   // structure is being proposed the page looks again every few seconds, and while the agent is set
   // to work and has never run, every half minute, so what it is waiting on stays current.
+  // Whether the agent is set to work as its own setup says, which a switch changes before this read
+  // does; kept in a ref so the interval below reads the current answer.
+  const agentWorking = useRef(null);
   const libraryRead = useSWR(api.libraryPath(workspaceId), {
     refreshInterval: (latest) => {
       if (latest?.structure?.needsChoice && (!latest.structure.suggestion || latest.structure.suggestion.status === "pending")) return 8000;
-      if (latest?.writer?.working && !latest.latestRun) return 30_000;
+      if ((agentWorking.current || latest?.writer?.working) && !latest?.latestRun) return 30_000;
       return 0;
     },
   });
@@ -219,6 +222,16 @@ export function LibraryWorkspace({ workspaceId }) {
   const canEdit = useCan("member", workspaceId);
 
   const work = useAgentWork({ workspaceId, agentSlug: LIBRARY_AGENT_SLUG, onFinished: refresh });
+
+  // Switched on from the explorer's foot, the agent's first pass is what the page waits to hear
+  // about: the read above polls from then on, and is read once now so the switch shows at once.
+  const setupRead = Boolean(work.setup);
+  useEffect(() => {
+    if (!setupRead) return;
+    const was = agentWorking.current;
+    agentWorking.current = work.working;
+    if (work.working && was === false) (async () => { await refresh(); })();
+  }, [setupRead, work.working, refresh]);
 
   // What the agent is waiting on before it writes, worded for this reader: an install's admin is
   // told the setting to change, everyone else what it means for them.
