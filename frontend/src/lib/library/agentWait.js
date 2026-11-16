@@ -1,3 +1,4 @@
+import { aiUnavailableText, isAiUnavailable } from "@/lib/agents/aiAvailability";
 import { formatDate } from "@/lib/format";
 
 /**
@@ -204,14 +205,15 @@ export function libraryWait({ state, work, canEdit, isAdmin, edition = null, now
 export function aiAvailability({ state, edition = null, work = null }) {
   const code = state?.writer?.check?.code ?? null;
   const run = work?.run ?? state?.latestRun ?? null;
-  const failedFor = run?.status === "failed" ? run.error?.code ?? null : null;
-  if (code === "PROVIDER_NOT_CONFIGURED" || failedFor === "PROVIDER_NOT_CONFIGURED" || edition?.ai?.reasoning === false) return "unavailable";
+  const failedForAi = run?.status === "failed" && isAiUnavailable(run.error);
+  if (code === "PROVIDER_NOT_CONFIGURED" || failedForAi || edition?.ai?.reasoning === false) return "unavailable";
   if (edition?.ai?.reasoning === true || (code && code !== "NOT_WORKING") || run?.status === "succeeded") return "available";
   return "unknown";
 }
 
 /**
- * The sentence for "there is no AI to do this with", worded for who is reading.
+ * The sentence for "there is no AI to do this with", worded for who is reading: the words every
+ * page uses (`aiUnavailableText` in `lib/agents/aiAvailability.js`), with a sentence after.
  *
  * An install's admin is told what is missing and the setting that supplies it; everyone else that
  * AI is not available here and what that means for them — never a variable name or an error code,
@@ -223,9 +225,7 @@ export function aiAvailability({ state, edition = null, work = null }) {
  * @param {string} [options.after] a sentence to follow
  */
 export function aiUnavailableSentence({ isAdmin, consequence, after = "" }) {
-  const sentence = isAdmin
-    ? `No AI provider is configured for the agents worker (PROVIDER_NOT_CONFIGURED), so ${consequence}. Set ORBIK_ANTHROPIC_API_KEY, or ORBIK_OPENAI_API_KEY, in the agents' environment (agents/.env) and restart the worker and the scheduler.`
-    : `AI is not available on this Orbik right now, so ${consequence}.`;
+  const sentence = aiUnavailableText({ isAdmin, consequence, reason: isAdmin ? "No AI provider is configured for the agents worker" : null });
   return after ? `${sentence} ${after}` : sentence;
 }
 

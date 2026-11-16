@@ -1246,8 +1246,10 @@ showed one file at a time.
   the copy still going, the scheduler not looking, or about to start ("within a minute", from
   `writer.everyMs`). The words depend on the reader: an install's admin (`user.isAdmin`) is told the
   setting to change; everyone else "AI is not available on this Orbik right now, so …", with no
-  variable name or error code. A reasoning provider counts as missing when the scheduler said
-  `PROVIDER_NOT_CONFIGURED`, a run failed with it, or `GET /v1/edition` says `ai.reasoning: false`.
+  variable name or error code — the sentence every page builds with `aiUnavailableText`
+  (`lib/agents/aiAvailability.js`). A reasoning provider counts as missing when the scheduler said
+  `PROVIDER_NOT_CONFIGURED`, a run failed for want of one, or `GET /v1/edition` says
+  `ai.reasoning: false`.
 - **Tabs, panes and the address.** `lib/library/workspaceTabs.js` is the model, as plain values and
   pure functions: one or two panes, each a strip of tabs, each tab a history of *locations* — a node
   by path, or one of the page's own views (`ledger`, `changes`, `structure`, `empty`) — so Back and
