@@ -43,8 +43,8 @@ export function canonicalizePublicUrl(value) {
 /**
  * A workspace's website as people type it: a bare host (`example.com`, `www.example.com`) means
  * `https://` there. Input that names a scheme is left as it is, and anything that is not a public
- * host still fails `canonicalizePublicUrl`. Only a workspace's website is read this way; the
- * crawl's start address and sitemaps are full URLs.
+ * host still fails `canonicalizePublicUrl`. A workspace's website and the crawl's start address
+ * are read this way; sitemaps are full URLs.
  */
 export function withAssumedScheme(value) {
   if (typeof value !== "string") return value;

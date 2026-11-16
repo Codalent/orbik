@@ -1,5 +1,6 @@
-import { isCanonicalObjectId, parseBounded, plainObject, validationError } from "./shared.js";
-import { canonicalizePublicUrl } from "./workspaceValidators.js";
+import { FINDING_KINDS } from "../repositories/crawlRepository.js";
+import { isCanonicalObjectId, parseBounded, parseChoice, plainObject, validationError } from "./shared.js";
+import { canonicalizePublicUrl, withAssumedScheme } from "./workspaceValidators.js";
 
 /** Bounds mirrored from the crawler's own configuration validator. */
 const BOUNDS = Object.freeze({
@@ -41,7 +42,8 @@ export function validateCrawlSite(req, _res, next) {
   let seedUrl;
   if (body.seedUrl !== undefined) {
     try {
-      seedUrl = canonicalizePublicUrl(body.seedUrl);
+      // A bare host (`orbik.io`) means https:// here too, as it does for a workspace's website.
+      seedUrl = canonicalizePublicUrl(withAssumedScheme(body.seedUrl));
     } catch (error) {
       fields.push({ field: "seedUrl", code: "INVALID", message: error.message });
     }
@@ -296,6 +298,31 @@ export function validateTreeQuery(req, _res, next) {
 
   if (fields.length) return next(validationError(fields));
   req.validated = { ...req.validated, path, limit, skip };
+  next();
+}
+
+/** How many findings one request may list. */
+const FINDINGS_LIMIT = Object.freeze({ min: 1, max: 100, fallback: 50 });
+
+/** Validates a request for the pages behind one finding: `kind`, and `limit`/`skip` to page. */
+export function validateFindingsQuery(req, _res, next) {
+  const fields = [];
+  const query = req.query ?? {};
+  const allowed = new Set(["kind", "limit", "skip"]);
+  for (const key of Object.keys(query)) {
+    if (!allowed.has(key)) {
+      fields.push({ field: key, code: "UNKNOWN_FIELD", message: "This filter is not accepted." });
+    }
+  }
+  if (query.kind === undefined || query.kind === "") {
+    fields.push({ field: "kind", code: "REQUIRED", message: `Ask for ${FINDING_KINDS.join(", ")}.` });
+  }
+  const kind = parseChoice(query.kind, { allowed: FINDING_KINDS, fallback: null }, "kind", fields);
+  const limit = parseBounded(query.limit, FINDINGS_LIMIT, "limit", fields, { blankIsZero: true });
+  const skip = query.skip === undefined ? 0 : parseBounded(query.skip, { min: 0, max: 100_000, fallback: 0 }, "skip", fields, { blankIsZero: true });
+
+  if (fields.length) return next(validationError(fields));
+  req.validated = { ...req.validated, kind, limit, skip };
   next();
 }
 

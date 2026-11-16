@@ -52,7 +52,7 @@ const WEBSITE_HINT = "Enter your website's public address, such as example.com."
 
 /**
  * A workspace's website, as the create wizard takes it: a full URL or a bare host. Separate from
- * {@link workspaceUrlSchema}, which the crawl's start address uses and which wants a full URL.
+ * {@link workspaceUrlSchema}, which wants a full URL.
  */
 const websiteUrlSchema = z.string().trim().min(1, "Website URL is required.").transform((value, context) => {
   try { return canonicalizePublicUrl(withAssumedScheme(value)); } catch (error) {

@@ -10,13 +10,17 @@ Library, search, Ask, llms.txt and the brand — works from what the crawl keeps
 2. On **Home**, the first step is **Connect your website**. **Start first crawl** starts the crawl
    from the workspace's website and opens the **Crawler** page, which is also listed under
    **Agents** in the workspace's rail. The crawl is queued, starts within a minute, and the page
-   follows it without a reload. If it cannot start — the month's crawl budget is used up, say — the
-   step says why.
+   follows it without a reload: the pages appear in the table as they are found. If it cannot
+   start — the month's crawl budget is used up, say — the step says why.
 3. To begin somewhere else on the same site, or to list sitemaps first, press **Choose the start
    address or add sitemaps first** instead. On the Crawler's set-up, **Start crawling from** is
-   filled in with the workspace's website. Orbik finds sitemaps through robots.txt and the usual
-   locations; only if yours live somewhere unusual, open **Add sitemap URLs** and list them, one
-   per line. Press **Start crawling this site**.
+   filled in with the workspace's website; an address typed without `https://` (`example.com`) is
+   read as one. Orbik finds sitemaps through robots.txt and the usual locations; only if yours
+   live somewhere unusual, open **Add sitemap URLs** and list them, one per line. Then press
+   **Start crawling this site**, right under the address. What a crawl does is explained under the
+   button.
+4. When the first crawl is in, the Crawler page says what comes next: choosing how the Library is
+   organised, in the [Library](library.md).
 
 Setting up and starting crawls needs the member role or above. A read-only member sees the
 crawl's results but not the controls.
@@ -38,7 +42,8 @@ crawl's results but not the controls.
 
 Along the top are the crawl's state and its controls: **Crawl now**, **Fresh crawl**, **Set crawl
 frequencies**, **Crawl logs** (every run, how it was started and how it ended), the settings gear
-and **Clear crawl data**.
+and **Clear crawl data**. Hover over a button for what it does. **Next visit in …** is when Orbik
+next comes back on its own (see [Keeping pages up to date](#keeping-pages-up-to-date)).
 
 While a crawl runs, the page shows its progress as pages fetched "of about N". N grows as the
 crawl finds new pages through links, which is why it is a count rather than a percentage. A live
@@ -51,12 +56,28 @@ The figures under it describe the site as the last crawl left it:
 | **Pages** | Distinct pages, with duplicate URLs folded into one |
 | **Crawled** | Pages fetched by the last crawl |
 | **Duplicate URLs** | Addresses that lead to a page already counted |
-| **Broken** | Pages that answered with an error |
+| **Broken** | Pages that answered with an error when they were last fetched |
 | **Nothing links here** | Pages reached through the sitemap alone |
 
-Below them is every page as a tree of paths, with each page's crawl frequency. Select a page to
-see what was read from it — status, title, description, headings, canonical — its **Markdown**,
-its own crawl frequency and a **Crawl now** for that page alone.
+Press **Duplicate URLs**, **Broken** or **Nothing links here** to list those pages in place of the
+tree, each with what it answered (and, for a duplicate, the page it is folded into); press it again,
+or **Show every page**, for the tree.
+
+Below them is every page as a tree of paths, with each page's crawl frequency. Hover over a column's
+heading for what it counts:
+
+| Column | Means |
+|---|---|
+| **Noindex** | Pages search engines are told not to index, or cannot: a noindex tag or header, a canonical naming another page, a redirect or an error |
+| **Orphan** | Pages no other page links to; only the sitemap names them |
+| **Not crawled** | Pages found but not fetched yet: they wait for the next crawl |
+| **Recrawl** | How often the page is fetched again. **Manual**: only when somebody asks. **varies**: the folder holds pages of several kinds; open it to see each one's |
+
+Select a page to see what was read from it — status, title, description, headings, canonical — its
+**Markdown**, its own crawl frequency and a **Crawl now** for that page alone.
+
+While a crawl is queued or running it is also listed in the **Activity** box at the foot of the
+Agents section's sidebar (on a phone, the one line under the agents).
 
 ## How OrbikBot treats your server
 
@@ -79,19 +100,26 @@ somebody asks.
   choose **Daily**, **Weekly**, **Monthly** or **Manual trigger**, and press **Apply**. A folder
   means the pages under it today; pages found later start on manual trigger.
 - One page's frequency can be changed from its detail panel.
-- Orbik visits the site at least once a week, and more often when any page is set more often. Each
-  visit checks the sitemaps, fetches pages it has never fetched, and fetches again the pages whose
-  frequency has come round. A page that comes back unchanged changes nothing downstream.
+- Orbik visits the site at least once a week, and more often when any page is set more often:
+  that is the **Next visit** at the top of the page. Each visit checks the sitemaps, fetches pages
+  it has never fetched, and fetches again the pages whose frequency has come round; a page on
+  **Manual** is not fetched again on a visit. A page that comes back unchanged changes nothing
+  downstream.
 - **Crawl now** asks for a crawl straight away. It shows **Queued** until the scheduler starts it,
   within a minute, and fetches what is due: new pages, pages somebody asked for, and pages whose
-  frequency has come round.
+  frequency has come round. Pages on Manual are not fetched again.
 - **Fresh crawl**, pressed twice to confirm, fetches every page of the site again in full, whatever
   its frequency. Frequencies are left as they were. Use it when much of the site has changed at
   once.
 
 > [!NOTE]
 > The Crawler page can show a monthly crawl budget. In this open-source edition every month is
-> unlimited; a budget applies only when an extension sets one.
+> unlimited; a budget applies only when an extension sets one. Where one does, a month whose
+> pages are spent, or a plan that includes no crawl pages at all, disables **Crawl now**, **Fresh
+> crawl** and **Start crawling this site** and says why under them; the page promises a date
+> crawling resumes only when the next month has pages. A crawl that runs out part-way stops
+> fetching, shows **Stopped: out of crawl pages**, and leaves the pages it did not fetch for the
+> next crawl.
 
 ## A site that will not let the crawler in
 
