@@ -1,3 +1,4 @@
+import { BUDGET_STATE, budgetStateOf, crawlBlockedReason } from "@/lib/crawl/budget";
 import { personFromEmail } from "@/lib/format";
 
 /**
@@ -88,4 +89,30 @@ export function doneLine(step, myEmail) {
 /** A count and its noun: "1 file", "14 files". */
 export function plural(count, one, many = `${one}s`) {
   return `${Number(count ?? 0).toLocaleString()} ${count === 1 ? one : many}`;
+}
+
+/**
+ * What this month's crawl budget allows, in the checklist's words: why a crawl cannot start, or
+ * what it costs. A month with no limit says nothing about a budget at all.
+ *
+ * Why it cannot start is the Crawler's own sentence (`crawlBlockedReason`), which tells a month
+ * whose allowance is nothing — the plan includes no crawl pages — from one that was spent.
+ *
+ * @param {object|null} budget the month as the API reports it
+ * @returns {{blocked: string|null, cost: string|null}} `blocked` when no page can be fetched;
+ *   otherwise `cost`, the balance to quote, or null with no limit
+ */
+export function crawlBudgetWords(budget) {
+  if (!budget) return { blocked: null, cost: null };
+  const blocked = crawlBlockedReason(budget);
+  if (blocked) return { blocked, cost: null };
+  if (budgetStateOf(budget) !== BUDGET_STATE.available) return { blocked: null, cost: null };
+  const allowance = budget.allowance ?? 0;
+  const remaining = budget.remaining ?? 0;
+  return {
+    blocked: null,
+    cost: allowance >= remaining
+      ? `${remaining.toLocaleString()} of your ${allowance.toLocaleString()} pages this month left`
+      : `${plural(remaining, "page")} left this month`,
+  };
 }

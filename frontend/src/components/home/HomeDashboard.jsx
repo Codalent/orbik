@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import useSWR from "swr";
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -8,7 +9,7 @@ import { HomeHeader } from "./HomeHeader";
 import { HomeSkeleton } from "./HomeSkeleton";
 import { SetupChecklist } from "./SetupChecklist";
 import { WorkspaceGlance } from "./WorkspaceGlance";
-import { requestCrawl } from "@/lib/api/crawl";
+import { requestCrawl, saveCrawlSite } from "@/lib/api/crawl";
 import { homePath, updateHomePreferences } from "@/lib/api/home";
 import { useAuth } from "@/lib/auth/AuthProvider";
 import { useCrawlOverview } from "@/lib/crawl/useCrawlOverview";
@@ -33,6 +34,7 @@ const IDLE_MS = 60_000;
  */
 export function HomeDashboard({ workspaceId }) {
   const auth = useAuth();
+  const router = useRouter();
   const read = useSWR(homePath(workspaceId), {
     refreshInterval: (latest) => (latest?.live ? LIVE_MS : IDLE_MS),
   });
@@ -63,6 +65,21 @@ export function HomeDashboard({ workspaceId }) {
     }
   }
 
+  /**
+   * Starts the first crawl from the workspace's website and opens the Crawler to watch it. With no
+   * crawl set up yet, saving the default set-up — the website the workspace was created with, and
+   * nothing else — is what asks for the first crawl, as the Crawler's own set-up form does; with
+   * one set up, the crawl is asked for. A refusal is thrown for the step to show.
+   *
+   * @param {boolean} configured whether a crawl is already set up
+   */
+  async function startFirstCrawl(configured) {
+    if (configured) await requestCrawl(workspaceId);
+    else await saveCrawlSite(workspaceId, {});
+    await Promise.all([read.mutate(), crawl.refresh()]).catch(() => {});
+    router.push(`/workspaces/${workspaceId}/agents/crawler`);
+  }
+
   const refresh = () => { read.mutate().catch(() => {}); };
 
   if (!home) {
@@ -81,6 +98,7 @@ export function HomeDashboard({ workspaceId }) {
       myEmail={myEmail}
       onPreferences={savePreferences}
       onRetryCrawl={retryCrawl}
+      onStartCrawl={startFirstCrawl}
       onChanged={refresh}
     />
   );

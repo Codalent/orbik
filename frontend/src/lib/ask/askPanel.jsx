@@ -2,12 +2,22 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 
+import { useShortcut } from "@/lib/keyboard";
+
 /** Where the panel's open and wide states are remembered, so a reload keeps the panel as it was. */
 const OPEN_KEY = "orbik.ask.open";
 const WIDE_KEY = "orbik.ask.wide";
 
-/** How the shortcut is written where it is shown. */
-export const ASK_SHORTCUT = "⌘J";
+/** The key that, with ⌘ or Ctrl, opens and closes the panel. */
+export const ASK_KEY = "j";
+
+/**
+ * How the shortcut is written where it is shown: "⌘J" on Apple devices, "Ctrl+J" elsewhere, and
+ * nothing until the browser has said which.
+ */
+export function useAskShortcut() {
+  return useShortcut(ASK_KEY);
+}
 
 const AskPanelContext = createContext(null);
 
@@ -49,7 +59,8 @@ export function AskPanelProvider({ children }) {
   const [open, setOpenState] = useState(() => typeof window !== "undefined" && remembered(OPEN_KEY));
   const [wide, setWideState] = useState(() => typeof window !== "undefined" && remembered(WIDE_KEY));
   // A question put in the box by something other than the person typing — the Library's quick
-  // switcher, an `/ask?q=` link. Carries a counter so asking for the same words twice still lands.
+  // switcher, an `/ask?q=` link — or, with `send`, asked at once (Home's suggested questions).
+  // Carries a counter so asking for the same words twice still lands.
   const [draft, setDraft] = useState(null);
 
   const setOpen = useCallback((value) => {
@@ -72,7 +83,16 @@ export function AskPanelProvider({ children }) {
 
   /** Opens the panel with a question in the box, to be read and sent by the person, not sent. */
   const askAbout = useCallback((text) => {
-    setDraft((current) => ({ text: String(text ?? "").slice(0, 1000), seq: (current?.seq ?? 0) + 1 }));
+    setDraft((current) => ({ text: String(text ?? "").slice(0, 1000), seq: (current?.seq ?? 0) + 1, send: false }));
+    setOpen(true);
+  }, [setOpen]);
+
+  /**
+   * Opens the panel and asks the question at once, in a new conversation: a suggested question
+   * somebody pressed is a question they asked, not one they still have to send.
+   */
+  const askNow = useCallback((text) => {
+    setDraft((current) => ({ text: String(text ?? "").slice(0, 1000), seq: (current?.seq ?? 0) + 1, send: true }));
     setOpen(true);
   }, [setOpen]);
 
@@ -94,7 +114,7 @@ export function AskPanelProvider({ children }) {
   useEffect(() => {
     function onKeyDown(event) {
       const mod = event.metaKey || event.ctrlKey;
-      if (mod && !event.shiftKey && !event.altKey && event.key.toLowerCase() === "j") {
+      if (mod && !event.shiftKey && !event.altKey && event.key.toLowerCase() === ASK_KEY) {
         event.preventDefault();
         toggle();
       }
@@ -104,8 +124,8 @@ export function AskPanelProvider({ children }) {
   }, [toggle]);
 
   const value = useMemo(
-    () => ({ open, setOpen, toggle, wide, setWide, draft, askAbout, dropped, sendFiles }),
-    [open, setOpen, toggle, wide, setWide, draft, askAbout, dropped, sendFiles],
+    () => ({ open, setOpen, toggle, wide, setWide, draft, askAbout, askNow, dropped, sendFiles }),
+    [open, setOpen, toggle, wide, setWide, draft, askAbout, askNow, dropped, sendFiles],
   );
   return <AskPanelContext.Provider value={value}>{children}</AskPanelContext.Provider>;
 }

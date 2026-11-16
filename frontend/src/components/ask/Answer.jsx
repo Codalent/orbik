@@ -21,6 +21,7 @@ import { BrandChanges, LeftOut } from "./BrandChanges";
 import { FileChip } from "./FileChip";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { aiUnavailableText, isAiUnavailableError, useAiAvailability } from "@/lib/ask/ai";
 import { cn } from "@/lib/utils";
 
 /** How sure the answer is, in the words a person would use. */
@@ -71,6 +72,7 @@ function libraryHref(workspaceId, path) {
  * @param {boolean} [props.canChange] whether the person may change the brand
  */
 export function Answer({ message, workspaceId, pending = false, latest = false, onReply, onRevise, onBrandChanged, canChange = true }) {
+  const { isAdmin } = useAiAvailability();
   if (message.role === "user") {
     return (
       <li className="flex flex-col items-end gap-1">
@@ -110,7 +112,11 @@ export function Answer({ message, workspaceId, pending = false, latest = false, 
       {failed && (
         <Alert variant="destructive" role="alert">
           <AlertDescription>
-            {message.error?.message ?? "This was not answered."}
+            {/* No AI to answer is said the same way everywhere: plainly, or with the setting for
+                the install's admin, who is the one person who can change it. */}
+            {isAiUnavailableError(message.error)
+              ? aiUnavailableText("this was not answered", { isAdmin, reason: message.error?.message })
+              : message.error?.message ?? "This was not answered."}
           </AlertDescription>
         </Alert>
       )}

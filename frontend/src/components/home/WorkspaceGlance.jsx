@@ -98,7 +98,7 @@ export function WorkspaceGlance({ home, myEmail }) {
             {attention.length ? (
               <AttentionList rows={attention} agents={agents} />
             ) : (
-              <Empty icon={CircleCheck}>Nothing waiting on you. Agents whose last run failed appear here.</Empty>
+              <Empty icon={CircleCheck}>Nothing waiting on you. Agents whose last run failed, and pages of your site that answer with an error, appear here.</Empty>
             )}
           </Card>
 
@@ -141,7 +141,8 @@ export function WorkspaceGlance({ home, myEmail }) {
 }
 
 /**
- * The agents that want somebody, each with its own icon and its failed run said in coral.
+ * The agents that want somebody, each with its own icon: a failed run said in coral, the site's
+ * broken pages in orange (the site wants a look; Orbik did not fail).
  */
 function AttentionList({ rows, agents }) {
   return (
@@ -162,8 +163,8 @@ function AttentionList({ rows, agents }) {
             <span className="min-w-0 flex-1">
               <span className="flex min-w-0 items-baseline justify-between gap-3">
                 <span className="min-w-0 truncate text-sm font-medium text-orb-white">{agent?.name ?? humanize(row.agentSlug)}</span>
-                <span className={cn("shrink-0 text-xs tabular-nums", row.failedRun ? "text-orb-coral" : "text-orb-gray")}>
-                  {row.failedRun ? "last run failed" : null}
+                <span className={cn("shrink-0 text-xs tabular-nums", row.failedRun ? "text-orb-coral" : row.brokenPages ? "text-orb-orange" : "text-orb-gray")}>
+                  {row.failedRun ? "last run failed" : row.brokenPages ? `${plural(row.brokenPages, "broken page")}` : null}
                 </span>
               </span>
               <span aria-hidden="true" className="mt-1.5 block h-1 overflow-hidden rounded-full bg-orb-line">
@@ -174,7 +175,7 @@ function AttentionList({ rows, agents }) {
           </>
         );
         return (
-          <li key={row.agentSlug}>
+          <li key={`${row.agentSlug}-${row.failedRun ? "failed" : "broken"}`}>
             {agent ? (
               <Link href={agent.href} className="group flex min-w-0 items-center gap-3 rounded-lg px-2 py-2 transition-colors hover:bg-orb-raised/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/70">
                 {body}
@@ -322,6 +323,13 @@ function ActivityTimeline({ runs, agents, myEmail }) {
                 {RUN_STATUS[run.status] ?? run.status}
                 {group.who ? ` · started by ${group.who}` : run.trigger === "manual" ? "" : " · on its own"}
               </p>
+              {/* What the run recorded about how it went, when it recorded something: a run that
+                  succeeded without its main result says so here rather than reading as finished. */}
+              {noteOf(run) && (
+                <p className={cn("mt-0.5 line-clamp-2 text-xs", run.incomplete ? "text-orb-orange" : "text-orb-muted")} title={noteOf(run)}>
+                  {noteOf(run)}
+                </p>
+              )}
             </div>
           </li>
         );
@@ -392,6 +400,11 @@ function Empty({ icon: Icon, children }) {
   );
 }
 
+/** A run's note — `note` on its Home row, a short line in a person's words — or null. */
+function noteOf(run) {
+  return typeof run.note === "string" && run.note.trim() ? run.note.trim() : null;
+}
+
 /** How close together runs must be to be read as one line: a day. */
 const GROUP_WITHIN_MS = 86_400_000;
 
@@ -404,7 +417,8 @@ function groupRuns(runs, myEmail) {
   const groups = [];
   for (const run of runs) {
     const who = personName(run.startedBy, myEmail);
-    const key = [run.agentSlug, run.status, who ?? "", who ? "" : run.trigger === "manual" ? "manual" : "auto"].join("|");
+    // A run with a note is its own line: folding it into others would hide what it says.
+    const key = noteOf(run) ? `note|${run.id}` : [run.agentSlug, run.status, who ?? "", who ? "" : run.trigger === "manual" ? "manual" : "auto"].join("|");
     const at = new Date(run.finishedAt ?? run.startedAt ?? 0).getTime();
     const previous = groups[groups.length - 1];
     if (previous && previous.key === key && Math.abs(previous.oldestAt - at) <= GROUP_WITHIN_MS) {

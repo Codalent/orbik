@@ -13,6 +13,7 @@ import { searchLibrary, searchLibraryPassages } from "@/lib/api/library";
 import { hostAndPath, isSourcePath } from "@/lib/library/library";
 import { VIEWS, activeLocation, loadRecent, nodeLocation } from "@/lib/library/workspaceTabs";
 import { cn } from "@/lib/utils";
+import { useShortcut } from "@/lib/keyboard";
 
 /** Where a search looks: everywhere, the files written from the site, or the copies of its pages. */
 const SCOPES = Object.freeze([
@@ -46,6 +47,7 @@ export function LibraryQuickSwitcher({ onClose }) {
   const library = useLibrary();
   const router = useRouter();
   const askPanel = useAskPanel();
+  const askShortcut = useShortcut("Enter");
   const [query, setQuery] = useState("");
   const [scope, setScope] = useState("all");
   const [highlighted, setHighlighted] = useState(0);
@@ -299,7 +301,7 @@ export function LibraryQuickSwitcher({ onClose }) {
                   <Option at={at} current={current} onHover={setHighlighted} onChoose={ask} className="mx-1 mt-2.5 border border-dashed border-orb-line">
                     <MessagesSquare aria-hidden="true" className="size-4 shrink-0 text-orb-muted" />
                     <span className="flex-1 text-compact text-orb-gray">Ask “{term}”</span>
-                    <kbd className="rounded-[5px] border border-orb-line px-1.5 font-sans text-2xs text-orb-gray">⌘↵</kbd>
+                    {askShortcut && <kbd className="rounded-[5px] border border-orb-line px-1.5 font-sans text-2xs text-orb-gray">{askShortcut}</kbd>}
                   </Option>
                 );
               })()}
