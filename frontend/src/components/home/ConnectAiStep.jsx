@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Check, Copy } from "lucide-react";
+import { Check, Copy, MessagesSquare, Terminal } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,8 +12,8 @@ import { cn } from "@/lib/utils";
 
 /** The two ways a person's AI connects, as the step's tabs name them. */
 const TABS = Object.freeze([
-  { id: "connector", label: "Claude.ai / ChatGPT" },
-  { id: "token", label: "Claude Code / Cursor" },
+  { id: "connector", label: "Claude.ai / ChatGPT", Icon: MessagesSquare },
+  { id: "token", label: "Claude Code / Cursor", Icon: Terminal },
 ]);
 
 /**
@@ -61,7 +61,7 @@ export function ConnectAiStep({ workspaceId, settingsHref, onChanged }) {
   return (
     <div className="min-w-0 space-y-3">
       {/* A tab list rather than two buttons, so a screen reader says which way in is showing. */}
-      <div role="tablist" aria-label="How your AI connects" className="flex flex-wrap gap-1 rounded-[13px] border border-orb-line p-1">
+      <div role="tablist" aria-label="How your AI connects" className="flex w-full flex-wrap gap-0.5 rounded-[13px] border border-orb-line bg-orb-space/60 p-[3px] sm:inline-flex sm:w-auto sm:rounded-full">
         {TABS.map((item) => (
           <button
             key={item.id}
@@ -72,10 +72,11 @@ export function ConnectAiStep({ workspaceId, settingsHref, onChanged }) {
             aria-controls={`home-ai-panel-${item.id}`}
             onClick={() => setTab(item.id)}
             className={cn(
-              "min-w-0 flex-1 rounded-[9px] px-3 py-1.5 text-compact font-medium transition-colors",
+              "inline-flex min-h-9 min-w-0 flex-1 items-center justify-center gap-2 rounded-[10px] px-3 py-1.5 text-compact font-medium leading-tight transition-colors sm:flex-none sm:rounded-full sm:px-4",
               tab === item.id ? "bg-orb-raised text-orb-white" : "text-orb-muted hover:text-orb-white",
             )}
           >
+            <item.Icon aria-hidden="true" className="hidden size-3.5 shrink-0 sm:block" />
             {item.label}
           </button>
         ))}

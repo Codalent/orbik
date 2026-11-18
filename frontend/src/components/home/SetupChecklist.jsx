@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import Link from "next/link";
-import { Check, ChevronDown, CircleAlert, Lock, LoaderCircle } from "lucide-react";
+import { Check, CircleAlert, Lock, LoaderCircle } from "lucide-react";
 
 import { Button, buttonVariants } from "@/components/ui/button";
 import { ConnectAiStep } from "./ConnectAiStep";
@@ -17,14 +17,16 @@ const KNOWLEDGE_AGENT_SLUG = "business-knowledge-base";
 
 /**
  * The setup checklist at the top of Home: **Set up {workspace}**, how many essentials are done,
- * the four essentials in order and the recommended steps under them.
+ * then the steps as a stepper beside the one being looked at.
  *
  * Every state comes from the API, which reads it from what the workspace records; nothing here is
  * ticked by hand, so a step done on Settings or by a teammate is done here on the next read. The
- * first essential not done is open, carrying the one button that moves it on; any other step opens
- * when its line is pressed. The steps are drawn as the crawl's setup guide draws its sequence — a
- * column of tiles joined by hairlines, the accent kept for what is done or moving — because they
- * are a sequence: the folders wait for the crawl, and the Library waits for the folders.
+ * left column is the sequence — the four essentials in order, joined by a rail that is solid where
+ * a step is done and dashed where it is not, then the recommended steps under their own label —
+ * because they are a sequence: the folders wait for the crawl, and the Library waits for the
+ * folders. The right column is the selected step: what it is and the one button that moves it on.
+ * The first essential not done is selected, and ringed in the rail; any other step is selected by
+ * pressing its line. Below `md` the two columns stack, the step under the list.
  *
  * When every essential is done the card is one line, "Setup complete · 2 recommended left", with
  * Show to open it again; Hide takes it off the page altogether.
@@ -40,20 +42,28 @@ const KNOWLEDGE_AGENT_SLUG = "business-knowledge-base";
  */
 export function SetupChecklist({ home, myEmail, onPreferences, onRetryCrawl, onStartCrawl, onChanged }) {
   const ai = useAiAvailability();
-  const workspaceId = home.workspace.id;
   const essentials = home.steps.filter((step) => step.group === "essential");
   const recommended = home.steps.filter((step) => step.group === "recommended");
   const { done, total } = home.progress.essentials;
   const complete = done === total;
   // The step that carries the primary button: the first essential this person can move on.
   const next = essentials.find((step) => step.state !== STEP_STATE.done && step.state !== STEP_STATE.notPermitted) ?? null;
+  // With nothing essential left to move on, the first recommended step still open is looked at.
+  const fallback = recommended.find((step) => step.state !== STEP_STATE.done && step.state !== STEP_STATE.skipped)
+    ?? essentials[0] ?? recommended[0] ?? null;
 
   const [shown, setShown] = useState(false);
-  const [opened, setOpened] = useState(null);
-  const [recommendedOpen, setRecommendedOpen] = useState(complete);
+  const [picked, setPicked] = useState(null);
   const [busy, setBusy] = useState(false);
-  const openId = opened ?? next?.id ?? null;
-  const toggle = (id) => setOpened(openId === id ? "none" : id);
+  const selected = home.steps.find((step) => step.id === picked) ?? next ?? fallback;
+  const detailRef = useRef(null);
+
+  // Stacked below `md`, the step shows under the whole list: bring it into view when it is picked.
+  function pick(id) {
+    setPicked(id);
+    if (window.matchMedia("(min-width: 48rem)").matches) return;
+    requestAnimationFrame(() => detailRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }));
+  }
 
   async function save(change) {
     setBusy(true);
@@ -88,14 +98,30 @@ export function SetupChecklist({ home, myEmail, onPreferences, onRetryCrawl, onS
     );
   }
 
+  const left = essentials.filter((step) => step.state !== STEP_STATE.done).length;
+  const row = (step, index, list, number) => (
+    <StepRow
+      key={step.id}
+      step={step}
+      number={number}
+      last={index === list.length - 1}
+      selected={selected?.id === step.id}
+      current={next?.id === step.id}
+      onPick={() => pick(step.id)}
+      home={home}
+      myEmail={myEmail}
+      ai={ai}
+    />
+  );
+
   return (
-    <section id="home-setup" aria-labelledby="home-setup-title" className="scroll-mt-4 rounded-xl border border-orb-line bg-orb-raised/40">
-      <div className="flex flex-wrap items-start gap-x-4 gap-y-2 px-5 pt-5">
-        <div className="min-w-0 flex-1">
-          <h2 id="home-setup-title" className="font-display text-xl font-bold tracking-[-0.015em] text-orb-white [overflow-wrap:anywhere]">
+    <section id="home-setup" aria-labelledby="home-setup-title" className="scroll-mt-4 overflow-hidden rounded-xl border border-orb-line">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-orb-line px-5 py-4 sm:px-6">
+        <div className="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-3 gap-y-0.5">
+          <h2 id="home-setup-title" className="font-display text-xl font-bold tracking-[-0.03em] text-orb-white [overflow-wrap:anywhere]">
             Set up {home.workspace.name}
           </h2>
-          <p className="mt-0.5 text-sm text-orb-gray">
+          <p className="text-compact tabular-nums text-orb-gray">
             {total ? `${done} of ${total} essentials done` : "Nothing here is yours to do"}
           </p>
         </div>
@@ -104,62 +130,46 @@ export function SetupChecklist({ home, myEmail, onPreferences, onRetryCrawl, onS
           {hideButton}
         </div>
       </div>
-      {/* The bar is the same fact as the line above it, drawn: it adds nothing for a screen reader. */}
-      <div aria-hidden="true" className="mx-5 mt-3 h-1 overflow-hidden rounded-full bg-orb-line">
-        <div className="h-full rounded-full bg-orb-lime transition-[width] duration-500" style={{ width: `${total ? (done / total) * 100 : 0}%` }} />
-      </div>
 
-      <ol aria-label="Essentials" className="px-5 pt-5">
-        {essentials.map((step, index) => (
-          <StepRow
-            key={step.id}
-            step={step}
-            number={index + 1}
-            last={index === essentials.length - 1}
-            open={openId === step.id}
-            primary={next?.id === step.id}
-            onToggle={() => toggle(step.id)}
-            home={home}
-            myEmail={myEmail}
-            ai={ai}
-            onRetryCrawl={onRetryCrawl}
-            onStartCrawl={onStartCrawl}
-            onChanged={onChanged}
-          />
-        ))}
-      </ol>
+      <div className="md:grid md:grid-cols-[minmax(16rem,21rem)_minmax(0,1fr)]">
+        <nav aria-label="Setup steps" className="p-3">
+          {essentials.length > 0 && (
+            <ol aria-label="Essentials">{essentials.map((step, index, list) => row(step, index, list, index + 1))}</ol>
+          )}
+          {recommended.length > 0 && (
+            <>
+              <p id="home-setup-recommended" className="pb-2 pl-[3.25rem] pr-3 pt-3.5 text-2xs font-medium uppercase tracking-[0.12em] text-orb-muted">
+                Recommended
+                <span className="normal-case tracking-normal"> · {home.progress.recommended.left ? `${home.progress.recommended.left} left` : "all done or skipped"}</span>
+              </p>
+              <ol aria-labelledby="home-setup-recommended">{recommended.map((step, index, list) => row(step, index, list))}</ol>
+            </>
+          )}
+        </nav>
 
-      <div className="border-t border-orb-line px-5 py-3">
-        <button
-          type="button"
-          aria-expanded={recommendedOpen}
-          onClick={() => setRecommendedOpen(!recommendedOpen)}
-          className="flex w-full items-center gap-2 text-left text-sm font-medium text-orb-white"
-        >
-          <ChevronDown aria-hidden="true" className={cn("size-4 text-orb-muted transition-transform", !recommendedOpen && "-rotate-90")} />
-          Recommended
-          <span className="font-normal text-orb-muted">
-            · {home.progress.recommended.left ? `${home.progress.recommended.left} left` : "all done or skipped"}
-          </span>
-        </button>
-        {recommendedOpen && (
-          <ol aria-label="Recommended" className="pt-4">
-            {recommended.map((step, index) => (
-              <StepRow
-                key={step.id}
-                step={step}
-                last={index === recommended.length - 1}
-                open={openId === step.id}
-                onToggle={() => toggle(step.id)}
-                home={home}
-                myEmail={myEmail}
-                ai={ai}
-                busy={busy}
-                onSkip={(skipped) => save(skipped ? { skip: [step.id] } : { unskip: [step.id] })}
-                onChanged={onChanged}
-              />
-            ))}
-          </ol>
+        {selected && (
+          <div
+            ref={detailRef}
+            id="home-setup-step"
+            role="region"
+            aria-labelledby="home-setup-step-title"
+            className="min-w-0 scroll-mt-4 border-t border-orb-line bg-orb-raised/40 p-5 sm:p-7 md:border-l md:border-t-0"
+          >
+            <StepDetail
+              key={selected.id}
+              step={selected}
+              essentials={essentials}
+              current={next?.id === selected.id}
+              lastOne={left === 1}
+              home={home}
+              ai={ai}
+              busy={busy}
+              onSkip={selected.group === "recommended" ? (skipped) => save(skipped ? { skip: [selected.id] } : { unskip: [selected.id] }) : null}
+              onRetryCrawl={onRetryCrawl}
+              onStartCrawl={onStartCrawl}
+              onChanged={onChanged}
+            />
+          </div>
         )}
       </div>
     </section>
@@ -167,65 +177,115 @@ export function SetupChecklist({ home, myEmail, onPreferences, onRetryCrawl, onS
 }
 
 /**
- * One step: its tile, its title and one line of where it stands, and — while open — what to do.
+ * One line of the stepper: its marker, its title and one line of where it stands. Pressing it shows
+ * the step on the right.
  *
- * The connector to the next tile is drawn by this row, as in the crawl's setup guide, because only
- * this row knows where its own tile ends.
+ * The rail down to the next marker is drawn by this row, because only this row knows where its own
+ * marker ends; it is solid lime under a step that is done and dashed under one that is not.
  */
-function StepRow({ step, number, last, open, primary = false, onToggle, home, myEmail, ai, busy, onSkip, onRetryCrawl, onStartCrawl, onChanged }) {
+function StepRow({ step, number, last, selected, current, onPick, home, myEmail, ai }) {
   const title = STEP_TITLES[step.id] ?? step.id;
   const status = statusLine(step, myEmail, ai, home);
-  const bodyId = `home-step-${step.id}`;
   const muted = step.state === STEP_STATE.notPermitted || step.state === STEP_STATE.skipped;
+  const quiet = muted || (step.group === "recommended" && !selected);
+  const done = step.state === STEP_STATE.done;
 
   return (
-    <li className="flex gap-3 sm:gap-4">
-      <div className="flex flex-col items-center">
-        <StepTile state={step.state} number={number} />
-        {!last && <span aria-hidden="true" className={cn("w-px flex-1", step.state === STEP_STATE.done ? "bg-orb-lime/40" : "bg-orb-muted/60")} />}
-      </div>
-      <div className={cn("min-w-0 flex-1", last ? "pb-1" : "pb-5")}>
-        <button
-          type="button"
-          aria-expanded={open}
-          aria-controls={bodyId}
-          onClick={onToggle}
-          className="group flex w-full min-w-0 flex-col items-start pt-1.5 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring/70 rounded-md"
-        >
-          <span className={cn("text-sm font-semibold [overflow-wrap:anywhere]", muted ? "text-orb-gray" : "text-orb-white")}>{title}</span>
-          <span className={cn("text-compact [overflow-wrap:anywhere]", toneOf(step.state))}>{status}</span>
-        </button>
-        {open && (
-          <div id={bodyId} className="mt-3 min-w-0 space-y-3">
-            <StepBody step={step} home={home} ai={ai} primary={primary} onRetryCrawl={onRetryCrawl} onStartCrawl={onStartCrawl} onChanged={onChanged} />
-            {onSkip && step.state !== STEP_STATE.done && step.permitted && (
-              <Button type="button" variant="ghost" size="sm" disabled={busy} onClick={() => onSkip(step.state !== STEP_STATE.skipped)} className="text-orb-muted">
-                {step.state === STEP_STATE.skipped ? "Bring it back" : "Skip"}
-              </Button>
-            )}
-          </div>
+    <li>
+      <button
+        type="button"
+        aria-current={selected ? "step" : undefined}
+        aria-controls="home-setup-step"
+        onClick={onPick}
+        className={cn(
+          "grid w-full grid-cols-[1.5rem_minmax(0,1fr)] gap-x-3 rounded-lg px-3 text-left outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring/70",
+          selected ? "bg-orb-raised/70" : "hover:bg-orb-raised/40",
         )}
-      </div>
+      >
+        <span className="flex flex-col items-center pt-3">
+          <StepMarker step={step} number={number} current={current} />
+          {!last && (
+            <span
+              aria-hidden="true"
+              className={cn("mt-1 min-h-4 flex-1", done ? "w-0.5 bg-orb-lime/45" : "w-0 border-l-2 border-dashed border-orb-line")}
+            />
+          )}
+        </span>
+        <span className="flex min-w-0 flex-col gap-0.5 pb-4 pt-3">
+          <span className={cn("text-sm font-medium [overflow-wrap:anywhere]", quiet ? "text-orb-gray" : "text-orb-white")}>{title}</span>
+          <span className={cn("text-xs [overflow-wrap:anywhere]", current && step.state === STEP_STATE.notStarted ? "text-orb-lime" : toneOf(step.state))}>
+            {status}
+          </span>
+        </span>
+      </button>
     </li>
   );
 }
 
-/** The tile at the head of a step: its number, a spinner ring, a check, or a warning. */
-function StepTile({ state, number }) {
-  const base = "flex size-8 shrink-0 items-center justify-center rounded-full border text-xs font-semibold";
-  if (state === STEP_STATE.done) {
-    return <span className={cn(base, "border-orb-lime/50 bg-orb-lime/15 text-orb-lime")}><Check aria-hidden="true" className="size-4" /></span>;
+/**
+ * The marker at the head of a step: a check when done, a lime ring round its number when it is the
+ * one to do next, a spinner while it moves, a warning, a lock, its number, or — for a recommended
+ * step — a dashed circle, since nothing waits for it.
+ */
+function StepMarker({ step, number, current }) {
+  const base = "flex size-6 shrink-0 items-center justify-center rounded-full text-2xs font-semibold";
+  switch (step.state) {
+    case STEP_STATE.done:
+      return <span className={cn(base, "bg-orb-lime/15 text-orb-lime")}><Check aria-hidden="true" strokeWidth={3} className="size-3" /></span>;
+    case STEP_STATE.inProgress:
+      return <span className={cn(base, "border-[1.5px] border-orb-lime/50 text-orb-lime")}><LoaderCircle aria-hidden="true" className="size-3.5 animate-spin motion-reduce:animate-none" /></span>;
+    case STEP_STATE.attention:
+      return <span className={cn(base, "border-[1.5px] border-orb-coral/60 bg-orb-coral/10 text-orb-coral")}><CircleAlert aria-hidden="true" className="size-3.5" /></span>;
+    case STEP_STATE.notPermitted:
+      return <span className={cn(base, "border border-orb-line text-orb-muted")}><Lock aria-hidden="true" className="size-3" /></span>;
+    default:
+      break;
   }
-  if (state === STEP_STATE.inProgress) {
-    return <span className={cn(base, "border-orb-lime/50 text-orb-lime")}><LoaderCircle aria-hidden="true" className="size-4 animate-spin motion-reduce:animate-none" /></span>;
+  if (current) {
+    return <span className={cn(base, "border-[1.5px] border-orb-lime text-orb-lime ring-4 ring-orb-lime/15")}>{number ?? ""}</span>;
   }
-  if (state === STEP_STATE.attention) {
-    return <span className={cn(base, "border-orb-coral/60 bg-orb-coral/10 text-orb-coral")}><CircleAlert aria-hidden="true" className="size-4" /></span>;
+  if (number == null || step.state === STEP_STATE.skipped) {
+    return (
+      <span aria-hidden="true" className={base}>
+        <span className="size-4 rounded-full border-[1.5px] border-dashed border-orb-muted" />
+      </span>
+    );
   }
-  if (state === STEP_STATE.notPermitted) {
-    return <span className={cn(base, "border-orb-line text-orb-muted")}><Lock aria-hidden="true" className="size-3.5" /></span>;
+  return <span className={cn(base, "border border-orb-muted/60 bg-orb-space text-orb-gray")}>{number}</span>;
+}
+
+/**
+ * The selected step, on the right: where it sits in the sequence, its title, and what it says and
+ * offers (`StepBody`), with Skip for a recommended step.
+ */
+function StepDetail({ step, essentials, current, lastOne, home, ai, busy, onSkip, onRetryCrawl, onStartCrawl, onChanged }) {
+  const index = essentials.findIndex((other) => other.id === step.id);
+  const done = step.state === STEP_STATE.done;
+  let eyebrow;
+  if (index < 0) {
+    eyebrow = step.state === STEP_STATE.skipped ? "Recommended · skipped" : done ? "Recommended · done" : "Recommended";
+  } else {
+    eyebrow = `Step ${index + 1} of ${essentials.length}${done ? " · done" : current ? (lastOne ? " · last one" : " · next") : ""}`;
   }
-  return <span className={cn(base, "border-orb-muted/60 bg-orb-space text-orb-gray", state === STEP_STATE.skipped && "border-dashed")}>{number ?? ""}</span>;
+
+  return (
+    <div className="space-y-4">
+      <div className="space-y-1">
+        <p className={cn("text-2xs font-medium uppercase tracking-[0.12em]", current ? "text-orb-lime" : "text-orb-muted")}>{eyebrow}</p>
+        <h3 id="home-setup-step-title" className="font-display text-xl font-bold tracking-[-0.02em] text-orb-white [overflow-wrap:anywhere]">
+          {STEP_TITLES[step.id] ?? step.id}
+        </h3>
+      </div>
+      <div className="min-w-0 space-y-4">
+        <StepBody step={step} home={home} ai={ai} primary={current} onRetryCrawl={onRetryCrawl} onStartCrawl={onStartCrawl} onChanged={onChanged} />
+      </div>
+      {onSkip && !done && step.permitted && (
+        <Button type="button" variant="ghost" size="sm" disabled={busy} onClick={() => onSkip(step.state !== STEP_STATE.skipped)} className="text-orb-muted">
+          {step.state === STEP_STATE.skipped ? "Bring it back" : "Skip"}
+        </Button>
+      )}
+    </div>
+  );
 }
 
 /** The colour a step's status line is drawn in, by its state. */
@@ -265,7 +325,7 @@ function statusLine(step, myEmail, ai, home) {
     if (wait) return capitalised(wait.short);
   }
   if (step.waitsFor) return `Waits for ${WAITS_FOR[step.waitsFor] ?? "the step before"}`;
-  return "Not started";
+  return step.group === "recommended" ? "Optional" : "Not started";
 }
 
 /** A link styled as a button: it navigates, so it is an anchor, not a button. */
