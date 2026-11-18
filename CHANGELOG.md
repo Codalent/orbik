@@ -48,6 +48,16 @@ What changed in each release of Orbik. Releases are tagged `vX.Y.Z`; upgrading i
 - **Light mode.** New colours: cool greys in place of green-tinted ones, and stronger blue, orange
   and red. Main buttons are the brand's bright lime with dark text, as in dark mode, instead of
   olive. The Orbik logo is black, and the workspace's initial sits on a grey tile.
+- **Settings → Account and Admin.** Changing your password and the install's Admin page (access
+  requests, password reset links) are sections of **Settings**, under **You**, in place of items in
+  the account menu. `/account/password` and `/admin`, which the access-request email names, lead
+  there; with no workspace yet they are still pages of their own. The account menu's source link
+  says **Star us on GitHub** unless `NEXT_PUBLIC_ORBIK_SOURCE_URL` names another source.
+- **Library.** The Knowledge base agent is a small icon at the start of the line along the foot of
+  the Library, lime while it is set to work, with a dot circling it while it writes; it opens the
+  switch, **What changed** and **Source ledger**, which took a strip at the foot of the explorer.
+- **Home.** The ask box appears once Ask can answer; before the first crawl has finished, Home no
+  longer shows a box saying why it cannot. The workspace's rail is a little narrower.
 
 ## 0.1.0 — 2026-11-09
 

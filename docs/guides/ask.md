@@ -10,9 +10,9 @@ Press **Ask** in the workspace's rail, the **Ask** button at the top of the page
 right and stays open, with its conversation, as you move between pages. **Conversations** lists
 earlier ones and **New conversation** starts afresh. Escape, or ⌘J again, closes it.
 
-Once the site has been crawled, **Home** offers a few questions to start with; pressing one asks it
-at once, in a new conversation. Before the first crawl Home says that Ask answers from your site
-and points at the step that crawls it.
+Once the site has been crawled, **Home** offers an ask box and a few questions to start with;
+pressing one asks it at once, in a new conversation. Until the first crawl has finished, or while
+no AI is configured, Home shows neither.
 
 From the Library's quick switcher (⌘O, or Ctrl+O), ⌘Enter (Ctrl+Enter) puts what you typed in Ask's
 box. A link to `/workspaces/<id>/ask?q=<question>` opens the panel with that question in its box.

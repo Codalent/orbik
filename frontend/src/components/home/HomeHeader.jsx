@@ -1,11 +1,10 @@
 "use client";
 
-import Link from "next/link";
-import { ArrowRight, ArrowUpRight, Search } from "lucide-react";
+import { ArrowUpRight, Search } from "lucide-react";
 
 import { OrbikMark } from "@/components/OrbikMark";
 import { Button } from "@/components/ui/button";
-import { aiUnavailableText, useAiAvailability } from "@/lib/ask/ai";
+import { useAiAvailability } from "@/lib/ask/ai";
 import { useAskPanel, useAskShortcut } from "@/lib/ask/askPanel";
 import { STEP_STATE, plural } from "@/lib/home/home";
 import { cn } from "@/lib/utils";
@@ -21,9 +20,9 @@ import { cn } from "@/lib/utils";
  * newest run failed and no crawled page answered with an error — and claims nothing else.
  *
  * The ask bar opens the Ask panel the shell already holds, and a suggested question asks itself.
- * Both are offered only once there is something to ask about: until the site is crawled and its
- * pages indexed, or with no AI to answer, the bar says why not and points at the step that moves
- * it on, rather than inviting a question that could only come back empty.
+ * Both appear only once there is something to ask about: until the first crawl has finished, or
+ * with no AI to answer, the head has no ask bar at all — the setup checklist below it is what
+ * moves the workspace on, and the Ask panel itself says why it cannot answer yet.
  *
  * @param {object} props
  * @param {object} props.home the Home read
@@ -38,7 +37,6 @@ export function HomeHeader({ home, hidden, onShowSetup }) {
   const host = hostOf(websiteUrl);
   const status = statusOf(home);
   const starters = [`What does ${name} offer?`, `Who is ${name} for?`, `What sets ${name} apart?`];
-  const blocked = askBlocked(home, ai);
 
   return (
     <header className="relative isolate overflow-hidden rounded-2xl border border-orb-line bg-orb-raised/40 px-5 pb-5 pt-5 md:px-7 md:pb-6 md:pt-6">
@@ -78,32 +76,9 @@ export function HomeHeader({ home, hidden, onShowSetup }) {
         )}
       </div>
 
-      {ask && blocked && (
-        <div className="mt-6 max-w-2xl">
-          <div className="flex min-w-0 items-start gap-3 rounded-xl border border-dashed border-orb-line bg-orb-space/50 px-4 py-3">
-            <Search aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-orb-muted" />
-            <div className="min-w-0 flex-1 space-y-1.5">
-              <p className="text-sm leading-relaxed text-orb-gray">{blocked.text}</p>
-              {blocked.step && (hidden ? (
-                <button type="button" onClick={onShowSetup} className="inline-flex items-center gap-1 text-sm font-medium text-orb-lime underline-offset-4 hover:underline">
-                  Show setup <ArrowRight aria-hidden="true" className="size-3.5" />
-                </button>
-              ) : (
-                <a href="#home-setup" className="inline-flex items-center gap-1 text-sm font-medium text-orb-lime underline-offset-4 hover:underline">
-                  {blocked.step} <ArrowRight aria-hidden="true" className="size-3.5" />
-                </a>
-              ))}
-              {blocked.href && (
-                <Link href={blocked.href.to} className="inline-flex items-center gap-1 text-sm font-medium text-orb-lime underline-offset-4 hover:underline">
-                  {blocked.href.label} <ArrowRight aria-hidden="true" className="size-3.5" />
-                </Link>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {ask && !blocked && (
+      {/* Only once Ask can answer: before that the setup checklist below is the way forward,
+          and a box saying why it cannot be used yet was one more thing to read. */}
+      {ask && askReady(home, ai) && (
         <div className="mt-6 max-w-2xl">
           <button
             type="button"
@@ -134,33 +109,15 @@ export function HomeHeader({ home, hidden, onShowSetup }) {
 }
 
 /**
- * Why the Ask bar cannot be used yet, or null when it can: the sentence to show, and the step that
- * moves it on — the setup checklist's (`step`, its label) or a page (`href`).
- *
- * Two reasons: no AI to answer at all, or nothing crawled to answer from. An index still being
- * built, or one that cannot be (no embedding key), is not one: Ask then reads the crawled pages
- * themselves, and its panel says what it searches.
+ * Whether the Ask bar is offered: there is AI to answer, and the first crawl has finished (or the
+ * workspace has no website step to wait on). An index still being built, or one that cannot be
+ * (no embedding key), does not hold it back: Ask then reads the crawled pages themselves, and its
+ * panel says what it searches.
  */
-function askBlocked(home, ai) {
+function askReady(home, ai) {
+  if (!ai.reasoning) return false;
   const website = home.steps.find((step) => step.id === "website");
-  const name = home.workspace.name;
-  if (!ai.reasoning) return { text: aiUnavailableText("Ask cannot answer questions", { isAdmin: ai.isAdmin }) };
-  if (website && website.state !== STEP_STATE.done) {
-    if (website.state === STEP_STATE.inProgress) {
-      return {
-        text: "Ask answers from your site. It opens once the first crawl has finished.",
-        href: { to: `/workspaces/${home.workspace.id}/agents/crawler`, label: "Watch the crawl" },
-      };
-    }
-    if (website.state === STEP_STATE.notPermitted) {
-      return { text: "Ask answers from your site, once a member has crawled it." };
-    }
-    return {
-      text: `Ask answers from your site. Start with the first crawl: once it has finished, you can ask anything about ${name}.`,
-      step: "Go to Connect your website",
-    };
-  }
-  return null;
+  return !website || website.state === STEP_STATE.done;
 }
 
 /** How the workspace is doing, in a word and a colour. */

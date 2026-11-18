@@ -31,7 +31,7 @@ it creates the account if the address has none (see
 [Workspaces and members](workspaces-and-members.md#inviting-someone)).
 
 **By asking.** Signup is closed by default. The **Request access** form at `/signup` takes an
-email address and puts it on the Admin page for an admin to approve. The form answers the same
+email address and puts it under Settings → Admin for an admin to approve. The form answers the same
 whoever asks, so it never tells anyone whether an address already has an account.
 
 **By signing up.** With `ORBIK_SIGNUP=open`, anyone who can reach the sign-in page can create an
@@ -73,8 +73,9 @@ To set it up, make an OAuth client in [Google Cloud's console](https://console.c
 ## The Admin page
 
 The install's admins are the addresses in `ORBIK_ADMIN_EMAILS` (comma-separated), or, with it
-unset, the install's first account. They find **Admin** in the account menu (`/admin`); for anyone
-else the page does not exist. Being an install admin is separate from a workspace role: it gives
+unset, the install's first account. They find **Admin** under **Settings**, in any workspace,
+below the workspace's own sections (`/admin` leads there too, and is where an admin with no
+workspace yet finds it); for anyone else it does not exist. Being an install admin is separate from a workspace role: it gives
 no access to anyone's workspaces.
 
 **Access requests** are listed with where each stands: **Waiting**, **Approved**, **Joined** or
@@ -92,10 +93,11 @@ email and choose **Make link**, then send it to them.
 
 ## Changing your password
 
-**Change password** in the account menu (the initial at the top right) opens `/account/password`:
-enter the current password and the new one twice. The new password works at once, this browser
-stays signed in, and the account is signed out everywhere else. An account made with **Continue
-with Google** has no password, so the menu does not offer it; **Forgot password?** gives it one.
+**Settings → Account**, in any workspace, changes your password (`/account/password` leads there
+too, and is where an account with no workspace yet changes it): enter the current password and the
+new one twice. The new password works at once, this browser stays signed in, and the account is
+signed out everywhere else. An account made with **Continue with Google** has no password, and
+the section says so; **Forgot password?** gives it one.
 
 ## Forgotten passwords
 
@@ -104,7 +106,7 @@ with Google** has no password, so the menu does not offer it; **Forgot password?
 once, for an hour.
 
 An install that sends no email says so on that page and asks the person to get a link from the
-admin, who makes one on the Admin page or from a terminal:
+admin, who makes one under **Settings → Admin** or from a terminal:
 
 ```sh
 # Docker install

@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 import Link from "next/link";
 import { useParams, usePathname, useRouter } from "next/navigation";
-import { Bot, Building2, Puzzle, ScrollText, Users } from "lucide-react";
+import { Bot, Building2, Puzzle, ScrollText, ShieldCheck, UserRound, Users } from "lucide-react";
 import useSWR from "swr";
 
 import { PageFrame } from "@/components/workspaces/PageFrame";
@@ -11,6 +11,7 @@ import * as membersApi from "@/lib/api/members";
 import * as mcpApi from "@/lib/api/mcp";
 import * as oauthApi from "@/lib/api/oauth";
 import { WORKSPACES_PATH } from "@/lib/api/workspaces";
+import { useAuth } from "@/lib/auth/AuthProvider";
 import { useExtensionSlots } from "@/lib/extensions/slots";
 import { hostOf } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -23,6 +24,12 @@ import { roleOf } from "@/lib/workspaces/roles";
  * account's log of model calls, which used to be a button in the top bar), and
  * `/settings/extensions/<id>` for a section an installed extension adds — and this frame is their
  * shared layout, so the navigation stays put while the section below it changes.
+ *
+ * Under them, apart, are two sections about the person and the install rather than the workspace,
+ * the same in every workspace: `/settings/account`, the signed-in account (changing its password),
+ * and for the install's admins `/settings/admin`, access requests and password reset links. Both
+ * were reached from the account menu before, as pages of their own (`/account/password`,
+ * `/admin`); those addresses now lead here.
  *
  * A token and an invite link are shown once, by the section that made them: going to another
  * section leaves that page, as leaving Settings always did, and takes them with it.
@@ -38,6 +45,7 @@ export function SettingsFrame({ children }) {
   const { settingsSections } = useExtensionSlots();
   const workspace = useSWR(WORKSPACES_PATH).data?.items?.find((item) => item.id === workspaceId) ?? null;
   const counts = useSectionCounts(workspaceId);
+  const isAdmin = Boolean(useAuth().user?.isAdmin);
 
   const base = settingsPath(workspaceId);
   const sections = [
@@ -46,6 +54,8 @@ export function SettingsFrame({ children }) {
     { id: "ai", title: "Orbik MCP", icon: Bot, href: `${base}/ai`, count: counts.ai },
     { id: "ai-calls", title: "AI calls", icon: ScrollText, href: `${base}/ai-calls` },
     ...settingsSections.map(({ id, title }) => ({ id: `extension-${id}`, title, icon: Puzzle, href: `${base}/extensions/${id}` })),
+    { id: "account", title: "Account", icon: UserRound, href: `${base}/account`, group: "You" },
+    ...(isAdmin ? [{ id: "admin", title: "Admin", icon: ShieldCheck, href: `${base}/admin` }] : []),
   ];
   const here = pathname?.replace(/\/$/, "");
 
@@ -94,6 +104,8 @@ function settingsPath(workspaceId) {
 /**
  * The navigation: a sticky column of sections from `lg` up, a scrolling row of tabs above the
  * section below it. Each item is a link to its section's route; the one being viewed is marked.
+ * An item that starts a `group` is set apart from the ones before it, under the group's name in
+ * the column and after a rule in the row.
  */
 function SectionNav({ sections, here }) {
   return (
@@ -103,7 +115,10 @@ function SectionNav({ sections, here }) {
           const Icon = section.icon;
           const current = here === section.href;
           return (
-            <li key={section.id} className="shrink-0">
+            <li key={section.id} className={cn("shrink-0", section.group && "ml-2 border-l border-orb-line pl-2 lg:ml-0 lg:mt-5 lg:border-l-0 lg:pl-0")}>
+              {section.group && (
+                <p className="hidden px-3 pb-1.5 text-2xs font-medium uppercase tracking-[0.12em] text-orb-muted lg:block">{section.group}</p>
+              )}
               <Link
                 href={section.href}
                 aria-current={current ? "page" : undefined}

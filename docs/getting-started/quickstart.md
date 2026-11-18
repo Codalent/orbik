@@ -85,7 +85,8 @@ folders.
 2. Rename, add, remove or drag folders into another order if you like. With your keys set,
    **Suggest changes** lets you ask for a change in your own words ("merge Proof into Offer"),
    which Orbik makes to the list in a few seconds.
-3. Press **Use this structure and start writing**. That also sets the agent to work: it rewrites
+3. Press **Use this structure and start writing**. That also sets the **Knowledge base agent** to
+   work (**Set to work** in its menu, from its icon at the bottom left of the Library): it rewrites
    the Library whenever a crawl finds a change.
 
 The Library opens on the overview, which says what the agent is doing: its first run starts within

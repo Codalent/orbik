@@ -498,7 +498,7 @@ function afterConfirm({ working, ai, startsWithin }) {
   }
   return working
     ? `The agent starts writing within ${startsWithin}.`
-    : `Starting sets the Knowledge base agent to work. It writes the Library within ${startsWithin}, and again whenever your site changes. You can pause it at the foot of the explorer.`;
+    : `Starting sets the Knowledge base agent to work. It writes the Library within ${startsWithin}, and again whenever your site changes. You can pause it from its icon at the bottom left of the Library.`;
 }
 
 /** A list of groups as the editor holds them, each with a key that survives reordering. */

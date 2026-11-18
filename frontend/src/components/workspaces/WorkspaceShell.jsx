@@ -185,10 +185,10 @@ function WorkspaceChrome({ children }) {
               )}
               {/* The theme sits in the bar rather than the account menu, where it was not found. */}
               <ThemeSwitch />
-              <UserMenu email={auth.user?.email} isAdmin={Boolean(auth.user?.isAdmin)} onSignOut={signOut} disabled={busy} />
+              <UserMenu email={auth.user?.email} onSignOut={signOut} disabled={busy} />
             </div>
           </header>
-          <div className="flex flex-1 flex-col gap-2 px-2 pb-2 md:min-h-0 md:flex-row">
+          <div className="flex flex-1 flex-col gap-2 px-2 pb-2 md:min-h-0 md:flex-row md:gap-1.5 md:pl-1.5">
             <SectionRail items={rail.items} />
             {/* One panel holds the agents' sidebar, on their pages, and the page, with a line
                 between them rather than a gap: the sidebar is the page's own navigation, not a

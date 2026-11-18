@@ -12,7 +12,8 @@ engines to stay out.
   account when signup is open and is a **Request access** form when it is closed; `/invite/[token]`
   and `/join/[token]` accept an invite or an approved request; `/forgot-password` and
   `/reset-password/[token]` reset a password.
-- Standalone: `/admin` is the install's admin page; `/llm-calls` is the account's model-call log;
+- Standalone: `/admin` and `/account/password` send someone with a workspace to Settings → Admin
+  and Settings → Account, and are those pages for an account with no workspace yet; `/llm-calls` is the account's model-call log;
   `/oauth/consent` approves an AI client's request to read a workspace; `/workspaces/new` is the
   two-step name and URL form.
 - In the workspace shell under `/workspaces/[id]`: `home`; `library`; `ask`; `markdown`, every

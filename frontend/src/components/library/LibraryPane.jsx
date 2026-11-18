@@ -256,7 +256,7 @@ function EmptyView({ pane, tab, focused }) {
 /**
  * What the last run did to the Library, file by file, as a tab of its own.
  *
- * Opened from the agent strip. A file it names opens in a tab beside this one, so the list stays
+ * Opened from the agent's menu (LibraryAgent). A file it names opens in a tab beside this one, so the list stays
  * where it was for the next.
  */
 function ChangesView({ pane, tab, focused }) {

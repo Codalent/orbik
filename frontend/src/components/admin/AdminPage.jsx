@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import useSWR from "swr";
+import useSWR, { useSWRConfig } from "swr";
 import { Check, Copy, Inbox, KeyRound, ShieldCheck, X } from "lucide-react";
 
 import { AccountFrame } from "@/components/account/AccountFrame";
@@ -36,20 +36,66 @@ const FILTERS = [
 ];
 
 /**
- * The install's Admin page: who asked for access on the closed signup page, and a password reset
- * link for someone who cannot get one by email. Only the install's admins (`ORBIK_ADMIN_EMAILS`,
- * or the install's first account) can open it; the API answers anyone else as if it were not here.
+ * The install's Admin page on its own, at `/admin`, for an admin with no workspace yet: someone
+ * with one is sent to Settings → Admin, where AdminTools is a section. Only the install's admins
+ * (`ORBIK_ADMIN_EMAILS`, or the install's first account) can open it; the API answers anyone else
+ * as if it were not here.
  */
 export function AdminPage() {
   const auth = useAuth();
+  if (auth.user && !auth.user.isAdmin) {
+    return (
+      <AccountFrame>
+        <NotAnAdmin />
+      </AccountFrame>
+    );
+  }
+  return (
+    <AccountFrame>
+      <AdminTools
+        head={(pending) => (
+          <PageHeader
+            icon={ShieldCheck}
+            title="Admin"
+            description={ADMIN_DESCRIPTION}
+            status={pending ? <Pill tone="orange" dot>{pending} waiting</Pill> : null}
+          />
+        )}
+      />
+    </AccountFrame>
+  );
+}
+
+/** What the Admin tools are for, in one line, under their heading. */
+export const ADMIN_DESCRIPTION = "People asking to join this Orbik, and password resets for people who can't get one by email.";
+
+/** What someone who is not one of the install's admins sees in place of the tools. */
+export function NotAnAdmin() {
+  return <EmptyState icon={ShieldCheck}>Only this Orbik&apos;s admins can open this page.</EmptyState>;
+}
+
+/**
+ * The install's admin tools: who asked for access on the closed signup page, and a password reset
+ * link for someone who cannot get one by email. Drawn on the standalone Admin page and as the
+ * Admin section of Settings; only for the install's admins.
+ *
+ * @param {object} props
+ * @param {(pending: number) => import("react").ReactNode} [props.head] the heading to draw above
+ *   them once loaded, given how many requests are waiting
+ */
+export function AdminTools({ head }) {
+  const auth = useAuth();
   const [filter, setFilter] = useState("pending");
-  const { data, error: loadError, mutate } = useSWR(auth.user?.isAdmin ? accessRequestsPath({ status: filter || undefined }) : null);
+  const { data, error: loadError } = useSWR(auth.user?.isAdmin ? accessRequestsPath({ status: filter || undefined }) : null);
+  const { mutate: mutateCache } = useSWRConfig();
   const [actionError, setError] = useState(null);
   const error = actionError ?? loadError;
   const [busyId, setBusyId] = useState(null);
   // The one link just made, shown once so the admin can send it.
   const [issued, setIssued] = useState(null);
-  const load = () => mutate();
+  // Every filter's list, not only the one on screen: the waiting count beside the heading is read
+  // from the Waiting list whichever filter is chosen.
+  const load = () => mutateCache((key) => typeof key === "string" && key.startsWith(accessRequestsPath()));
 
   async function act(row, action) {
     setBusyId(row.id);
@@ -70,23 +116,11 @@ export function AdminPage() {
     }
   }
 
-  if (auth.user && !auth.user.isAdmin) {
-    return (
-      <AccountFrame>
-        <EmptyState icon={ShieldCheck}>Only this Orbik&apos;s admins can open this page.</EmptyState>
-      </AccountFrame>
-    );
-  }
-  if (!data && !error) return <NeutralLoading label="Loading Admin" />;
+  if (!data && !error) return <NeutralLoading inline label="Loading Admin" />;
 
   return (
-    <AccountFrame>
-      <PageHeader
-        icon={ShieldCheck}
-        title="Admin"
-        description="People asking to join this Orbik, and password resets for people who can't get one by email."
-        status={data?.pending ? <Pill tone="orange" dot>{data.pending} waiting</Pill> : null}
-      />
+    <div className="flex flex-col gap-6">
+      {head?.(data?.pending ?? 0)}
 
       {error && (
         <Alert variant="destructive" role="alert">
@@ -151,7 +185,7 @@ export function AdminPage() {
       </section>
 
       <ResetLinkPanel onIssued={setIssued} />
-    </AccountFrame>
+    </div>
   );
 }
 

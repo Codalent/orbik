@@ -57,7 +57,7 @@ import { useCan } from "@/lib/workspaces/roles";
  *
  * Everything that writes is still here and still goes through the same API: a person edits a file
  * block by block and what they write is kept, folders are made, renamed, reordered and locked,
- * History restores. The agent sits at the foot of the explorer as the Library's other writer, and
+ * History restores. The agent is an icon at the start of the line along the foot, as the Library's other writer, and
  * the source ledger — which pages it writes from, and which it left out — is a tab of its own.
  *
  * A phone has room for the file and nothing beside it, and the file is what somebody came to read,
