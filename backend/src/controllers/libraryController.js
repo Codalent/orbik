@@ -116,7 +116,7 @@ export function createLibraryController(libraryService) {
       } catch (error) { next(error); }
     },
 
-    /** Returns the structure step: what was chosen, what is proposed, the default. */
+    /** Returns the structure step: what was chosen, the change last asked for, the default. */
     async getStructure(req, res, next) {
       try {
         res.json(await libraryService.getStructure(caller(req)));
@@ -130,10 +130,14 @@ export function createLibraryController(libraryService) {
       } catch (error) { next(error); }
     },
 
-    /** Asks for the proposed structures again. */
-    async suggestStructureAgain(req, res, next) {
+    /** Asks for a change to the folders on the page, in the person's words. */
+    async reviseStructure(req, res, next) {
       try {
-        res.json(await libraryService.suggestStructureAgain(caller(req)));
+        res.status(202).json(await libraryService.reviseStructure({
+          ...caller(req),
+          groups: req.validated.groups,
+          instruction: req.validated.instruction,
+        }));
       } catch (error) { next(error); }
     },
 

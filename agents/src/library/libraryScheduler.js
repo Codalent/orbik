@@ -15,14 +15,6 @@ const MAX_WORKSPACES_PER_PASS = 50;
 const IN_FLIGHT = [JOB_STATUS.pending, JOB_STATUS.running];
 
 /**
- * How long a structure suggestion may stay `pending` before it is asked for again.
- *
- * The job is one model call; one still pending after this was lost with its worker, and the person
- * waiting on the Library page would otherwise wait for good.
- */
-const SUGGESTION_STALE_MS = 30 * 60 * 1000;
-
-/**
  * Creates the loop that keeps every workspace's Library agent moving.
  *
  * The Library agent is three stages — copy each page into the source layer, embed what changed,
@@ -244,40 +236,6 @@ export function createLibraryScheduler({ database, queue, ledger, config, logger
   }
 
   /**
-   * Makes sure there are structures for a person to choose from, while the Library waits on one.
-   *
-   * The first write run — and a rebuild's — files into top-level folders the person chose, so it
-   * cannot start until they have. What they choose from is two or three variants a model proposes
-   * from the site (`structure.suggest`); this queues that question once, when the site is copied
-   * and nothing is pending, and again only when the step was reopened since the last answer, a
-   * pending one was lost, or a failed one has a changed site to try on.
-   */
-  async function considerSuggestion({ workspaceId, siteId, state, position }) {
-    const suggestion = state.suggestion;
-    const askedAt = suggestion?.generatedAt ?? suggestion?.queuedAt ?? null;
-    const current = now();
-    const due = !suggestion
-      || (state.openedAt && (!askedAt || new Date(askedAt) < state.openedAt))
-      || (suggestion.status === "pending" && (!suggestion.queuedAt || current - new Date(suggestion.queuedAt) > SUGGESTION_STALE_MS))
-      || (["failed", "skipped"].includes(suggestion.status) && position.movedAt && askedAt && position.movedAt > new Date(askedAt));
-    if (!due) return false;
-    await agentSetups.updateOne(
-      { workspaceId, agentSlug: KNOWLEDGE_AGENT_SLUG },
-      {
-        $set: { "structure.suggestion": { status: "pending", queuedAt: current, variants: [] }, updatedAt: current },
-        $setOnInsert: { createdAt: current },
-      },
-      { upsert: true },
-    );
-    await queue.enqueue({
-      ...libraryJob(LIBRARY_JOBS.suggest, { workspaceId, siteId, idempotencyKey: `structure:${workspaceId.toHexString()}:${current.getTime()}` }),
-      maxAttempts: config.maxAttempts,
-    });
-    logger("info", "library_scheduler.structure_queued", { workspaceId: workspaceId.toHexString(), reason: state.reason });
-    return true;
-  }
-
-  /**
    * Why this workspace's plan keeps the write run from starting, or null when it does not.
    *
    * The same rules a run meets once it starts — the worker refuses an agent the plan leaves out,
@@ -362,10 +320,7 @@ export function createLibraryScheduler({ database, queue, ledger, config, logger
     const structure = libraryStructureState(
       await agentSetups.findOne({ workspaceId, agentSlug: KNOWLEDGE_AGENT_SLUG }, { projection: { structure: 1 } }),
     );
-    if (structure.needsChoice) {
-      await considerSuggestion({ workspaceId, siteId, state: structure, position });
-      return { reason: "STRUCTURE_NOT_CHOSEN" };
-    }
+    if (structure.needsChoice) return { reason: "STRUCTURE_NOT_CHOSEN" };
 
     const [last] = await runs
       .find({ workspaceId, agentSlug: KNOWLEDGE_AGENT_SLUG })

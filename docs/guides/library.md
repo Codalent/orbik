@@ -40,11 +40,8 @@ knowledge base**.
 
 ## Choosing the top-level folders
 
-The top level of the Library is yours. After the first crawl, once the **Knowledge base agent** is
-set to work, Orbik reads the site map and the most linked-to pages and proposes two or three ways
-to organise it, each with a line on why it fits, beside its default. While the agent is paused, or
-when no AI is available, nothing is proposed, since a proposal is a model call; the default is
-there either way:
+The top level of the Library is yours. After the first crawl you choose its folders, starting from
+Orbik's standard ones:
 
 ```
 00 Start Here   overview · index · open-questions
@@ -56,12 +53,22 @@ there either way:
 ```
 
 Home calls this step **Choose how your Library is organised**, and the Library opens it as a tab.
-Pick one, rename, add, remove or reorder its folders (up to twelve; the first holds the overview
-and the index), and confirm. With the agent paused, **Use this structure and start writing** also
-sets it to work, and **Save without starting** keeps it paused; with the agent already at work the
-button is **Use this structure**. **How this works** on the step has the rules below. **Propose
-from my site** sets the agent to work so that it proposes structures, and **Propose again** asks
-for new ones. Nothing is written until you confirm.
+Each folder is a row with its number, its name, its path and the kinds of page the agent files
+there. Rename a folder with the pencil, remove it with the cross, add one with **Add a folder**,
+and reorder them by dragging the handle at the left of a row (or focusing it and pressing the up
+and down arrow keys). Up to twelve folders; the first holds the overview and the index, and the
+numbers follow the order you set.
+
+**Suggest changes** opens **Ask**, where you say what you want in your own words — "merge Proof
+into Offer", "add a folder for our locations" — and press **Send**. Orbik makes the change to the
+list on screen within a few seconds, says in a line what it changed, and offers **Undo**. It is one
+model call, so it is offered only when AI is available; everything else on the step works without
+it.
+
+With the agent paused, **Use this structure and start writing** also sets it to work, and **Or
+save without starting** keeps it paused; with the agent already at work the button is **Use this
+structure**. **How this works** on the step has the rules below. Nothing is written until you
+confirm.
 
 Confirming opens the overview. Until it is written, it lists the steps before the first write —
 site crawled, folders chosen, agent set to work, AI available — marks the one it is waiting on, and
@@ -69,8 +76,8 @@ offers the one action that moves it forward. Once nothing stands in the way the 
 within a minute, and the overview shows its progress, then the overview itself.
 
 After that, agents never write at the top level and never rename, move or delete a folder a person
-made. The numbers are part of each folder's name and nothing more; the order is set with **Move
-up** and **Move down**. **Rebuild the structure…**, under **What changed**, offers the step again,
+made. The numbers are part of each folder's name and nothing more; once the folders are chosen, the
+order is set in the explorer. **Rebuild the structure…**, under **What changed**, offers the step again,
 and the next run moves what the Library holds into the new folders, links and history included.
 
 Two folders are not yours to choose: **Sources**, and `brand`, which is reserved for the Design
@@ -132,7 +139,7 @@ Writing needs a reasoning key: `ORBIK_ANTHROPIC_API_KEY`, or `ORBIK_OPENAI_API_K
 still made, and the Library says the knowledge base cannot be written: to the install's admins with
 the setting to change, to everyone else as "AI is not available on this Orbik right now". Every model call is listed under
 **Settings** → **AI calls**. On a site of about seventy pages, with Claude making the reasoning
-calls, a first build came to about $0.90 and a structure proposal about $0.10; an ordinary
+calls, a first build came to about $0.90 and a change to the folders asked for in words about $0.03; an ordinary
 update, which reads only the pages that changed, costs a fraction of a first build.
 
 ## Finding things

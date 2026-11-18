@@ -182,6 +182,13 @@ export async function ensureAgentIndexes(database) {
       { unique: true, name: "agent_setups_workspace_agent_unique" },
     ),
 
+    // Backs the structure dispatcher's pass every couple of seconds: the few setups with a change
+    // to the Library's folders still waiting for its job. Partial, so it holds only those.
+    agentSetups.createIndex(
+      { "structure.revision.queuedAt": 1 },
+      { name: "agent_setups_structure_revision_pending", partialFilterExpression: { "structure.revision.status": "pending" } },
+    ),
+
     // One verdict per source per agent. Keyed on the source's kind and key rather than on a URL
     // hash, because a verdict is no longer only ever about a crawled page: a route pattern is one
     // verdict that stands for every page under it, and a Notion page or a vault note will be a
@@ -437,7 +444,9 @@ async function dropSupersededLeaseFields(database) {
  *
  * The first stage's job type went the same way later: it was `notes.write` while it wrote a
  * model's note per page, and is `sources.mirror` now that it copies the page. The agent still
- * exists, so such a job would be claimed and then fail for want of a handler.
+ * exists, so such a job would be claimed and then fail for want of a handler. So would
+ * `structure.suggest`, which proposed whole structures before a person started from the standard
+ * folders and asked for changes in words (`structure.revise`).
  *
  * Deleted rather than renamed, because nothing is lost by it: neither stage keeps its work in the
  * job. What is outstanding is a hash comparison against the documents, and the crawler's next
@@ -451,7 +460,7 @@ async function retireSupersededJobs(database) {
     await database
       .collection(AGENT_COLLECTIONS.jobs)
       .deleteMany({
-        $or: [{ agent: { $in: ["notes", "index"] } }, { agent: "library", type: "notes.write" }],
+        $or: [{ agent: { $in: ["notes", "index"] } }, { agent: "library", type: { $in: ["notes.write", "structure.suggest"] } }],
         status: { $in: ["pending", "running"] },
       });
   } catch (error) {

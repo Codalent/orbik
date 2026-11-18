@@ -49,7 +49,7 @@ export function createAgents({ config, database, logger, extensions = activeExte
     createLibraryAgent({
       retrieval,
       retrievalReason: reason,
-      // The one model question the Library's plain-code stages ask: which folders to propose.
+      // The one model question the Library's plain-code stages ask: a change to the folders.
       // Through the same router and call log as every other call, so it is recorded in `ai_calls`.
       writeStructured: createStructuredWriter({
         modelRouter: createModelRouter({ providers: createProviders({ config, callLog }), routes: config.routes }),

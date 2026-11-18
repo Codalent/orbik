@@ -13,6 +13,7 @@ import {
   validateLibraryRestoreBody,
   validateLibrarySearchQuery,
   validateLibraryStructureBody,
+  validateLibraryStructureRevisionBody,
   validateLibraryTreeQuery,
 } from "../validators/libraryValidators.js";
 
@@ -50,11 +51,11 @@ export function createLibraryRouter({ libraryService, csrfProtection }) {
   // source ledger — opens one inside the Library.
   router.get(`${base}/locate`, ...read, validateLibraryLocateQuery, controller.locatePage);
 
-  // The top-level structure: proposed by a model, chosen by the person, waited on by the write
-  // run. Literals, like `/index`, so none of them is read as a node path.
+  // The top-level structure: chosen by the person, changed by a model when they ask in words,
+  // waited on by the write run. Literals, like `/index`, so none of them is read as a node path.
   router.get(`${base}/structure`, ...read, controller.getStructure);
   router.put(`${base}/structure`, ...write, validateLibraryStructureBody, controller.chooseStructure);
-  router.post(`${base}/structure/suggest`, ...write, controller.suggestStructureAgain);
+  router.post(`${base}/structure/revise`, ...write, validateLibraryStructureRevisionBody, controller.reviseStructure);
   router.post(`${base}/structure/rebuild`, ...write, controller.requestRebuild);
 
   // The revisions routes are declared before the bare node route so that a path ending in

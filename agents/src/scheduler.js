@@ -43,7 +43,7 @@ const extensions = await loadExtensions({
 extendAgentCatalog({ definitions: extensions.agentDefinitions, tools: extensions.tools });
 
 const {
-  crawlScheduler, agentScheduler, dispatcher, libraryScheduler, outboxScheduler,
+  crawlScheduler, agentScheduler, dispatcher, libraryScheduler, outboxScheduler, structureDispatcher,
 } = createRuntime({
   database,
   config,
@@ -57,7 +57,7 @@ telemetry.announce();
 
 // An extension's loops start and stop with the core ones.
 const loops = [
-  crawlScheduler, agentScheduler, dispatcher, libraryScheduler, outboxScheduler,
+  crawlScheduler, agentScheduler, dispatcher, libraryScheduler, outboxScheduler, structureDispatcher,
   ...(telemetry.loop ? [telemetry.loop] : []),
   ...extensions.loops,
 ];

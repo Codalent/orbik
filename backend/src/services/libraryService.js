@@ -1,3 +1,4 @@
+import { ObjectId } from "mongodb";
 import { AGENT_COLLECTIONS, KNOWLEDGE_AGENT_SLUG, toObjectId } from "@orbik/core";
 import {
   DEFAULT_LIBRARY_STRUCTURE,
@@ -61,31 +62,37 @@ export function createLibraryService({
   const coverage = createSourceCoverageReader({ database });
 
   const requireWorkspaceAccess = createWorkspaceAccessCheck(workspaceRepository);
-  // The knowledge agent's setup document, where the structure the person chose — and the variants
-  // a model proposed — are kept. The same document holds its other per-workspace settings.
+  // The knowledge agent's setup document, where the structure the person chose — and the change
+  // they last asked a model for — are kept. The same document holds its other per-workspace settings.
   const setups = database.collection(AGENT_COLLECTIONS.agentSetups);
   const setupFilter = (workspaceId) => ({ workspaceId, agentSlug: KNOWLEDGE_AGENT_SLUG });
 
   /**
    * The structure step as the Library page shows it: whether the Library is waiting on a choice,
-   * what was chosen, what was proposed, and the default to start from when nothing was.
+   * what was chosen, the change last asked for in words and how it went, and the default to start
+   * from.
    */
   async function structureOf(workspaceId, read = null) {
     const setup = read ?? await setups.findOne(setupFilter(workspaceId), { projection: { structure: 1 } });
     const state = libraryStructureState(setup);
-    const suggestion = state.suggestion;
+    const revision = state.revision;
     return {
       needsChoice: state.needsChoice,
       reason: state.reason,
       chosen: state.chosen
         ? { groups: state.chosen.groups, chosenAt: iso(state.chosenAt) }
         : null,
-      suggestion: suggestion
+      revision: revision
         ? {
-          status: suggestion.status,
-          variants: suggestion.variants ?? [],
-          generatedAt: iso(suggestion.generatedAt ?? suggestion.queuedAt ?? null),
-          reason: suggestion.reason ? { code: suggestion.reason.code, message: suggestion.reason.message } : null,
+          id: String(revision.id),
+          status: revision.status,
+          instruction: revision.instruction,
+          // The folders the model returned once it has answered; until then the ones asked about.
+          groups: revision.groups ?? [],
+          note: revision.note ?? null,
+          requestedAt: iso(revision.requestedAt),
+          answeredAt: iso(revision.answeredAt ?? null),
+          reason: revision.reason ? { code: revision.reason.code, message: revision.reason.message } : null,
         }
         : null,
       defaults: normalizeLibraryStructure(DEFAULT_LIBRARY_STRUCTURE).groups,
@@ -256,7 +263,7 @@ export function createLibraryService({
       };
     },
 
-    /** The structure step on its own: what was chosen, what is proposed, and the default. */
+    /** The structure step on its own: what was chosen, the change last asked for, and the default. */
     async getStructure({ userId, workspaceId }) {
       const workspace = await requireWorkspaceAccess(userId, workspaceId, { role: "read-only" });
       return { structure: await structureOf(workspace._id) };
@@ -299,7 +306,6 @@ export function createLibraryService({
           chosenBy: state.chosen?.chosenBy ? String(state.chosen.chosenBy) : null,
           needsChoice: state.needsChoice,
           reason: state.reason,
-          suggestion: state.suggestion?.status ?? null,
         },
         // Whether the agent is set to work. Paused, it writes nothing, and the Home page says so
         // rather than leaving "Library written" waiting for a run that is never coming.
@@ -352,6 +358,9 @@ export function createLibraryService({
             "structure.chosen": { groups: normalized.groups, start: applied.start, chosenAt: at, chosenBy: toObjectId(userId) },
             updatedAt: at,
           },
+          // A change still being asked for is about a list that is now chosen: its answer would
+          // land on a step that is closed.
+          $unset: { "structure.revision": "" },
           $setOnInsert: { createdAt: at },
         },
         { upsert: true },
@@ -360,17 +369,44 @@ export function createLibraryService({
     },
 
     /**
-     * Asks for the variants again. Nothing is queued here — the API never enqueues — the
-     * suggestion is cleared, and the Library scheduler asks for a new one within a minute.
+     * Asks for a change to the folders in the person's own words: "merge Proof into Offer".
+     *
+     * The folders sent are the ones on the person's screen, edits and all, not the default: the
+     * change is made to what they are looking at. Nothing is queued here — the API never enqueues
+     * — the request is stored as `structure.revision`, pending, and the agents process turns it
+     * into one `structure.revise` job within a couple of seconds; the page reads the answer from
+     * this same step. A new request replaces one still pending, whose answer is then dropped.
+     * Nothing is created: the person still confirms the list.
      */
-    async suggestStructureAgain({ userId, workspaceId }) {
+    async reviseStructure({ userId, workspaceId, groups, instruction }) {
       const workspace = await requireWorkspaceAccess(userId, workspaceId, { role: "member" });
       const state = libraryStructureState(await setups.findOne(setupFilter(workspace._id), { projection: { structure: 1 } }));
       if (!state.needsChoice) {
         throw new AppError({ status: 409, code: "STRUCTURE_ALREADY_CHOSEN", message: "This Library's structure is already chosen." });
       }
-      if (state.suggestion?.status === "pending") return { structure: await structureOf(workspace._id) };
-      await setups.updateOne(setupFilter(workspace._id), { $unset: { "structure.suggestion": "" }, $set: { updatedAt: new Date() } });
+      const normalized = normalizeLibraryStructure({ groups });
+      if (normalized.errors.length) {
+        throw new AppError({ status: 400, code: "INVALID_STRUCTURE", message: normalized.errors.join(" ") });
+      }
+      const at = new Date();
+      await setups.updateOne(
+        setupFilter(workspace._id),
+        {
+          $set: {
+            "structure.revision": {
+              id: new ObjectId(),
+              status: "pending",
+              instruction,
+              groups: normalized.groups,
+              requestedAt: at,
+              requestedBy: toObjectId(userId),
+            },
+            updatedAt: at,
+          },
+          $setOnInsert: { createdAt: at },
+        },
+        { upsert: true },
+      );
       return { structure: await structureOf(workspace._id) };
     },
 
@@ -386,7 +422,7 @@ export function createLibraryService({
         {
           // Who asked is kept beside when, as the choice keeps `chosenBy`.
           $set: { "structure.rebuildRequestedAt": at, "structure.rebuildRequestedBy": toObjectId(userId), updatedAt: at },
-          $unset: { "structure.suggestion": "" },
+          $unset: { "structure.revision": "" },
           $setOnInsert: { createdAt: at },
         },
         { upsert: true },

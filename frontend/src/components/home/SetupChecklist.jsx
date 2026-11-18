@@ -250,7 +250,6 @@ function statusLine(step, myEmail, ai, home) {
         return detail.queued && !detail.fetched && !detail.discovered
           ? "Queued — the crawl starts within a minute"
           : `Crawling… ${plural(detail.discovered, "page")} found, ${detail.fetched.toLocaleString()} fetched`;
-      case "structure": return "Proposing structures…";
       case "library":
         return detail.filesWritten ? `Writing — ${plural(detail.filesWritten, "file")} so far` : detail.copying ? "Copying your pages into Sources…" : "Writing…";
       case "ai": return "Connected, waiting for the first call";
@@ -290,24 +289,19 @@ function StepBody({ step, home, ai, primary, onRetryCrawl, onStartCrawl, onChang
     case "website":
       return <WebsiteStep step={step} home={home} primary={primary} onRetryCrawl={onRetryCrawl} onStartCrawl={onStartCrawl} />;
     case "structure": {
-      // Proposals are made by the Library agent, so only while it is at work and AI is available;
-      // Orbik's default is always there to choose.
-      const library = home.steps.find((other) => other.id === "library");
-      const proposes = library?.detail?.working !== false && ai.reasoning;
+      // Changing the folders in words is a model call, so it is offered only while AI is
+      // available; the standard folders and editing them by hand are always there.
+      const asks = ai.reasoning;
       return (
         <>
           <p className={text}>
             {done
               ? "The Library's top-level folders are chosen. Rename, add or move them in the Library; every link follows."
               : step.waitsFor
-                ? proposes
-                  ? "Once the first crawl has finished, Orbik reads your site and proposes two or three ways to organise the Library. You pick one and confirm."
-                  : "Once the first crawl has finished, you choose the Library's top-level folders — Orbik's default, changed as you like — and confirm."
-                : detail.suggestion === "ready"
-                  ? "Orbik read your site and proposed ways to organise the Library's top-level folders. Pick one, change it if you like, and confirm. The agent writes nothing until you do."
-                  : proposes
-                    ? "Choose the Library's top-level folders — Orbik's default, or a structure it proposes from your site — change them if you like, and confirm. The agent writes nothing until you do."
-                    : "Choose the Library's top-level folders — Orbik's default, changed as you like — and confirm. Orbik proposes structures from your site only while the Library agent is set to work and AI is available."}
+                ? "Once the first crawl has finished, you choose the Library's top-level folders: Orbik's standard ones, changed as you like. Then confirm."
+                : asks
+                  ? "Choose the Library's top-level folders: start from Orbik's standard ones, rename, reorder or remove them, or ask for changes in your own words, then confirm. The agent writes nothing until you do."
+                  : "Choose the Library's top-level folders: start from Orbik's standard ones, rename, reorder or remove them, then confirm. The agent writes nothing until you do."}
           </p>
           {!step.waitsFor && <ActionLink href={libraryHref} primary={primary && !done}>{done ? "Open the Library" : "Choose folders"}</ActionLink>}
         </>

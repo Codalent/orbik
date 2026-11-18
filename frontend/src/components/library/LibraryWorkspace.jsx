@@ -112,14 +112,15 @@ export function LibraryWorkspace({ workspaceId }) {
 
   // The tree and its figures are one cached read, re-read when the tab is looked at again — which
   // is how a file somebody else's AI or another window wrote shows up without a reload. While a
-  // structure is being proposed the page looks again every few seconds, and while the agent is set
-  // to work and has never run, every half minute, so what it is waiting on stays current.
+  // change to the folders asked for in words is being made the page looks again every second and a
+  // half, and while the agent is set to work and has never run, every half minute, so what it is
+  // waiting on stays current.
   // Whether the agent is set to work as its own setup says, which a switch changes before this read
   // does; kept in a ref so the interval below reads the current answer.
   const agentWorking = useRef(null);
   const libraryRead = useSWR(api.libraryPath(workspaceId), {
     refreshInterval: (latest) => {
-      if (latest?.structure?.needsChoice && (!latest.structure.suggestion || latest.structure.suggestion.status === "pending")) return 8000;
+      if (latest?.structure?.needsChoice && latest.structure.revision?.status === "pending") return 1500;
       if ((agentWorking.current || latest?.writer?.working) && !latest?.latestRun) return 30_000;
       return 0;
     },
@@ -721,7 +722,12 @@ export function LibraryWorkspace({ workspaceId }) {
     canReorder,
     saveNode,
     chooseStructure,
-    suggestStructureAgain: () => perform(() => api.suggestLibraryStructureAgain(workspaceId)),
+    // Throws a readable message, which the structure step shows beside the request.
+    reviseStructure: async (groups, instruction) => {
+      const result = await api.reviseLibraryStructure(workspaceId, groups, instruction);
+      await refresh();
+      return result;
+    },
     rebuildStructure: waitingOnStructure || work.inFlight || !canEdit ? null : rebuildStructure,
     include,
     toggleBookmark,

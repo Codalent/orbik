@@ -293,13 +293,12 @@ function StructureView({ pane, tab, focused }) {
           </p>
         ) : structure?.needsChoice ? (
           <LibraryStructureChoice
-            key={`${structure.reason}:${structure.suggestion?.generatedAt ?? "none"}`}
+            key={structure.reason}
             structure={structure}
             working={library.work.working}
             busy={library.busy || library.work.busy}
             onChoose={library.chooseStructure}
-            onSuggestAgain={library.suggestStructureAgain}
-            onStartAgent={library.work.working ? null : library.work.toggleWorking}
+            onRevise={library.reviseStructure}
             ai={library.ai}
             startsWithin={aboutInterval(library.state?.writer?.everyMs ?? 60_000)}
           />
