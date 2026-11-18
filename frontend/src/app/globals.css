@@ -223,6 +223,81 @@
   }
 }
 
+/*
+ * Ask, open: the whole app — header, rail and page — becomes a framed window on a darker surround,
+ * and Ask is a column of its own beside it, so it reads as something that holds the app rather than
+ * a panel inside it. The surround is Ask's own ground: lighter than the app's chrome on the dark
+ * theme and darker on the light one, so in either the app reads as a window set into it. The dot
+ * field the signed-out pages float on comes back here, with a faint light from Ask's side.
+ */
+:root {
+  --ask-surround: #181B20;
+  --ask-edge: color-mix(in oklab, var(--moon-white) 10%, transparent);
+}
+
+:root[data-theme="light"] {
+  --ask-surround: #DCE2E9;
+  --ask-edge: #C9D0D8;
+}
+
+.ask-surround {
+  background-color: var(--ask-surround);
+  background-image:
+    radial-gradient(60% 80% at 100% 30%, color-mix(in oklab, var(--orbit-lime) 7%, transparent), transparent 70%),
+    radial-gradient(circle at 1px 1px, color-mix(in oklab, var(--moon-white) 6%, transparent) 1px, transparent 0);
+  background-size: 100% 100%, 16px 16px;
+}
+
+/*
+ * The framed app. While Ask is working — an answer being written, the Library or the brand being
+ * changed — the frame's edge takes the lime that means "moving": what Ask does happens to the app
+ * inside the frame, and this is where a person sees it reach in.
+ */
+.ask-frame {
+  border-color: var(--ask-edge);
+  box-shadow: 0 1px 0 0 color-mix(in oklab, var(--moon-white) 4%, transparent) inset, 0 30px 80px -30px rgb(0 0 0 / 0.85);
+  transition: box-shadow 0.5s ease, border-color 0.5s ease;
+}
+
+:root[data-theme="light"] .ask-frame {
+  box-shadow: 0 24px 64px -32px rgb(15 23 42 / 0.25);
+}
+
+.ask-frame[data-working] {
+  border-color: color-mix(in oklab, var(--orbit-lime) 40%, var(--ask-edge));
+  animation: orbik-ask-working 2.4s ease-in-out infinite;
+}
+
+@keyframes orbik-ask-working {
+  0%, 100% { box-shadow: 0 0 0 1px color-mix(in oklab, var(--orbit-lime) 10%, transparent), 0 0 32px -12px color-mix(in oklab, var(--orbit-lime) 25%, transparent); }
+  50% { box-shadow: 0 0 0 1px color-mix(in oklab, var(--orbit-lime) 22%, transparent), 0 0 48px -10px color-mix(in oklab, var(--orbit-lime) 40%, transparent); }
+}
+
+/* The column opening: it grows from nothing at the right edge, so the frame beside it is seen to make room. */
+@keyframes orbik-ask-in {
+  from { width: 0; opacity: 0; }
+}
+
+/* The step Ask is on, read as in progress: a light passing along the words. */
+.ask-shimmer {
+  background: linear-gradient(90deg, var(--satellite-gray) 0%, var(--satellite-gray) 40%, var(--moon-white) 50%, var(--satellite-gray) 60%, var(--satellite-gray) 100%);
+  background-size: 250% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: orbik-ask-shimmer 2.2s linear infinite;
+}
+
+@keyframes orbik-ask-shimmer {
+  from { background-position: 100% 0; }
+  to { background-position: -150% 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ask-frame[data-working] { animation: none; }
+  .ask-shimmer { animation: none; color: var(--satellite-gray); background: none; }
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;
