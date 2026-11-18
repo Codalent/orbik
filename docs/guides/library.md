@@ -32,7 +32,7 @@ lists only a few (a case studies page, say), and then the rest, most linked firs
 logins and carts, paginated and tag listings, and pages with next to nothing on them are left out
 unless somebody asks for them.
 
-**Source ledger**, in the Knowledge base agent's menu (its icon at the bottom left of the Library), lists every page with the reason it was used or
+**Source ledger**, in the Knowledge base agent's menu (its icon at the bottom left of the Library) and on its page under **Agents**, lists every page with the reason it was used or
 left out — "Linked from 72 of the site's 72 pages with content" — under **All**, **Used** and **Left out**. On a
 left-out page, **Include** asks for the knowledge base to be written from it too. The row says
 **Queued** until the next write run has used it. A copy's inspector offers the same under **In the
@@ -123,6 +123,10 @@ is a small round icon: grey while it is paused, lime once it is set to work,
 with a dot circling it while it writes. The words beside it say what it is doing, or what it is
 waiting on (point at them for the whole sentence). Press the icon for its menu, where **Set to
 work** decides whether the agent works at all:
+
+The same switch, with the folders the agent writes into, the source ledger, what its last run
+changed and its recent runs, is on its own page: **Agents → Knowledge base**. That page links into
+the Library for anything that is read or changed there, such as choosing the folders.
 
 - Set to work, it rewrites the knowledge base when a crawl finds that a page it is written from
   has changed, a page has been newly chosen, or a chosen page has left the site — once the crawl's

@@ -27,7 +27,8 @@ export const AGENT_STATUS = Object.freeze({
  *
  * The Business Knowledge Base is here as an agent — whether it is set to work, whether its last
  * write failed — and under Knowledge as the Library (`@/lib/library/registry`), the place people
- * read and edit; both lead to the same page, which carries its switch. llms.txt is only here,
+ * read and edit. The agent's row leads to its own page, with its switch and settings; the Library
+ * row leads to the Library. llms.txt is only here,
  * because nobody edits it — it is read-only output on a schedule, and the question worth
  * answering at a glance is whether it has been rebuilt since the site changed.
  *
@@ -56,8 +57,8 @@ const AGENTS = Object.freeze([
     name: "Knowledge base",
     // An open book with text: what this one writes is the Library's knowledge base.
     icon: BookOpenText,
-    // The agent's route renders the Library, where its switch, its last write and its source
-    // ledger are; a link from the agent list stays among the agents.
+    // The agent's own page: its switch, its folders, its source ledger and its runs. What it
+    // writes is the Library, listed under Knowledge.
     href: (workspaceId) => `/workspaces/${workspaceId}/agents/${LIBRARY_AGENT_SLUG}`,
     // It writes from the pages the crawler copied into Sources, so before a crawl it is not set up.
     describe: describeCrawlReader,
@@ -105,10 +106,17 @@ const AGENTS = Object.freeze([
  *
  * @param {string} workspaceId workspace the rows link into
  * @param {object|null} crawl crawl overview, or null when it could not be read
+ * A row is drawn as working whenever the live activity read (`GET /v1/activity`, the one the
+ * activity monitor at the sidebar's foot polls) has a run of that agent in this workspace, whatever
+ * its own state says: an agent started by the crawl or the scheduler is working as much as one a
+ * person started, and a still row beside a run in the activity monitor reads as two accounts of
+ * one thing. The Knowledge base agent also counts its first stage, the copy into Sources.
+ *
  * @param {Array<[string, {name?: string, icon?: Function}]>} [extensionAgents] `[slug, entry]`
  *   pairs from `useExtensionSlots().agentPages`
+ * @param {object|null} [activity] what is running now, from `GET /v1/activity`; null when unread
  */
-export function buildAgentRows(workspaceId, crawl, extensionAgents = []) {
+export function buildAgentRows(workspaceId, crawl, extensionAgents = [], activity = null) {
   const core = AGENTS.map((agent) => ({
     id: agent.id,
     name: agent.name,
@@ -126,7 +134,20 @@ export function buildAgentRows(workspaceId, crawl, extensionAgents = []) {
       href: `/workspaces/${workspaceId}/agents/${encodeURIComponent(slug)}`,
       ...describeCrawlReader(crawl),
     }));
-  return [...core, ...added];
+  return [...core, ...added].map((row) => (
+    row.status !== AGENT_STATUS.working && isRunning(row.id, workspaceId, activity)
+      ? { ...row, status: AGENT_STATUS.working, label: undefined }
+      : row
+  ));
+}
+
+/** Whether the activity read has this agent at work in this workspace. */
+function isRunning(agentSlug, workspaceId, activity) {
+  if (!activity || !workspaceId) return false;
+  if ((activity.agents ?? []).some((run) => run.workspaceId === workspaceId && run.agentSlug === agentSlug)) return true;
+  // Copying the crawled pages into Sources is the Knowledge base agent's first stage, a queue job
+  // rather than a run, which the activity read reports under `library`.
+  return agentSlug === LIBRARY_AGENT_SLUG && (activity.library ?? []).some((entry) => entry.workspaceId === workspaceId);
 }
 
 /** The status of an agent that reads the crawl: unknown, not set up until a first crawl, or idle. */

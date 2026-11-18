@@ -13,8 +13,8 @@ import { NeutralLoading } from "@/components/NeutralLoading";
  * It has its own route rather than living only under the agent that writes it, because it is no
  * longer only that agent's output. People create and edit files here, other agents will read it,
  * and a person looking for what their company knows should not have to know which agent produced
- * it. The agent's own switch is still on the page — the agent route renders the same workspace, so
- * a link from the agent list lands in the same place.
+ * it. The agent's own switch is still on the page; its settings are on its own page among the
+ * agents, which links here.
  *
  * It fills the panel rather than sitting in the usual column of cards: an explorer, tabs and an
  * inspector, each scrolling separately, so it renders its own `main` instead of `PageFrame`. It is

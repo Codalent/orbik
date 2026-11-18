@@ -47,7 +47,7 @@ const STARTED_BY = Object.freeze({
 
 /** What a card says for an agent not set to work, where "runs only when started" is not true. */
 const NOT_WORKING = Object.freeze({
-  "business-knowledge-base": "Writes nothing until it is set to work, in the Library",
+  "business-knowledge-base": "Writes nothing until it is set to work",
 });
 
 /**
