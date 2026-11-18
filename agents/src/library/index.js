@@ -4,7 +4,7 @@ import { LIBRARY_AGENT, LIBRARY_JOBS } from "../jobs.js";
 import { defineAgent } from "../runtime/registry.js";
 import { createEmbedHandler } from "./embed.js";
 import { createMirrorHandler } from "./mirror.js";
-import { createStructureHandler } from "./structure.js";
+import { createStructureRevisionHandler } from "./structure.js";
 
 /**
  * The Library agent: everything that turns a crawled site into a workspace's knowledge.
@@ -20,10 +20,10 @@ import { createStructureHandler } from "./structure.js";
  *    and rewrites the subject tree. `libraryScheduler.js` starts it once the mirror has settled
  *    and something among the chosen pages moved.
  *
- * Between the first stage and the first write run sits one question rather than a stage: which
- * top-level folders the Library should have. A person chooses them, from two or three variants a
- * model proposes (`structure.suggest`, `./structure.js`); the scheduler waits for the choice
- * before it starts the write run.
+ * Between the first stage and the first write run sits one choice rather than a stage: which
+ * top-level folders the Library should have. A person chooses them, starting from the standard
+ * ones, and may ask in words for a change, which one model call makes (`structure.revise`,
+ * `./structure.js`); the scheduler waits for the choice before it starts the write run.
  *
  * The first two are handlers here. The third is a conversation with a model, so it is an agent
  * *definition* executed by the `ai` agent — it needs instructions, a tool allow-list and a run a
@@ -38,7 +38,7 @@ import { createStructureHandler } from "./structure.js";
  * @param {object|null} options.retrieval the retrieval index, or null when none is configured
  * @param {{code: string, message: string}|null} [options.retrievalReason] why there is none
  * @param {((request: object) => Promise<object>)|null} [options.writeStructured] the structured
- *   writer the structure suggestion asks with; null on a worker with no model
+ *   writer a change to the folders is asked with; null on a worker with no model
  * @param {(level: string, message: string, context?: object) => void} [options.logger]
  */
 export function createLibraryAgent({ retrieval, retrievalReason = null, writeStructured = null, logger = log }) {
@@ -48,7 +48,7 @@ export function createLibraryAgent({ retrieval, retrievalReason = null, writeStr
     handlers: {
       [LIBRARY_JOBS.mirror]: createMirrorHandler({ logger }),
       [LIBRARY_JOBS.embed]: createEmbedHandler({ retrieval, reason: retrievalReason, logger }),
-      [LIBRARY_JOBS.suggest]: createStructureHandler({ writeStructured, logger }),
+      [LIBRARY_JOBS.revise]: createStructureRevisionHandler({ writeStructured, logger }),
     },
   });
 }

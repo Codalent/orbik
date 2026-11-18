@@ -17,8 +17,9 @@ Three agents touch it. The **Library agent** builds and maintains all of it, in 
 nobody starts by hand: it **mirrors** every page the crawler brings back into the source layer
 and chooses which of them the knowledge base is written from (`sources.mirror`), **embeds** what
 changed (`index.embed`, the retrieval index), and **writes** the subject tree from the chosen
-pages (a run of the `business-knowledge-base` definition) into the top-level folders a person chose
-from two or three a model proposed (`structure.suggest`). The crawler calls it when a crawl
+pages (a run of the `business-knowledge-base` definition) into the top-level folders a person chose,
+starting from the standard ones and asking a model for changes in words if they like
+(`structure.revise`). The crawler calls it when a crawl
 finishes, and each stage follows from the one before — see
 [The Library agent](#the-library-agent). The **llms.txt** agent reads the overview and publishes a
 short curated map of the site. **Ask**, the chat in the side panel of every workspace page,
@@ -35,8 +36,7 @@ flowchart LR
   CH -->|"3 · when the mirror has settled and a chosen page moved"| K["Library write run (business-knowledge-base)"]
   M --> L[llms.txt]
   N -->|library.write| LIB[(library_nodes: folders and files)]
-  CH -->|"before the first write: structure.suggest"| SV[Two or three proposed structures]
-  SV -->|"a person chooses: PUT /library/structure"| LIB
+  SV["The standard folders, edited by hand or in words: structure.revise"] -->|"before the first write, a person chooses: PUT /library/structure"| LIB
   K -->|library.write, library.move| LIB
   P[A person, in the app] -->|PUT /library/nodes| LIB
   LIB -->|library_revisions| H[(Kept versions per file)]
@@ -640,13 +640,8 @@ held in `library_structures`, and never part of a path. Somebody looking at thei
 grouping they could not open, rename or move, over paths nobody had asked them about. Sections and
 `library.arrange` are gone. The top level is folders, and they are the person's.
 
-**The structure is suggested, then chosen.** When a workspace's site has been copied and its pages
-chosen, and before the first write run, the Library scheduler queues one question
-(`structure.suggest`, `agents/src/library/structure.js`): a model reads `content.siteMap` and the
-copies of the six most linked-to chosen pages — nothing else — and proposes two or three variants
-in the numbered format, each with a sentence on why it fits this site. It is one bounded structured
-call through the model router, recorded in `ai_calls` with the knowledge agent's slug and no run
-(about $0.10 on the development site). The Library page shows the variants beside Orbik's default
+**The structure starts from the standard folders, and the person makes it theirs.** Before the
+first write run the Library page shows Orbik's standard folders
 (`DEFAULT_LIBRARY_STRUCTURE` in `packages/library/src/structure.js`):
 
 ```
@@ -658,7 +653,25 @@ call through the model router, recorded in `ai_calls` with the knowledge agent's
 05 Content      content
 ```
 
-The person picks one and may rename, add, remove or reorder folders before confirming. The choice
+The person renames, adds, removes or reorders folders by hand — a numbered list is renumbered as it
+is reordered — and may ask for a change in their own words ("merge Proof into Offer"). That request
+(`POST /library/structure/revise`, with the folders as they stand on the page) is stored on the
+knowledge agent's setup document as `structure.revision`, `pending`; the API never queues it. The
+agents process's **structure dispatcher** (`agents/src/library/structureDispatcher.js`), a pass at
+the run dispatcher's pace, claims it by setting `queuedAt` and queues one `structure.revise` job
+(`agents/src/library/structure.js`): one bounded structured call through the model router, with the
+folders, the request and the site map (titles and addresses, no page), recorded in `ai_calls` with
+the knowledge agent's slug and no run (about $0.03 and ten seconds on the development site). The answer — the whole list after the change and a sentence
+on what changed — is checked by `normalizeLibraryStructure` and stored back on the same request,
+`ready` (or `failed` or `skipped`, with the reason), only if it is still the newest; the page,
+polling while it is pending, puts it in place of its list and offers Undo. One request at a time:
+a new one replaces it, and choosing or reopening the step clears it. A request pending for ten
+minutes was lost with its worker and is queued again. Until 2026-11 the scheduler instead asked a
+model, before the first write, to propose two or three whole structures from the site map and the
+core pages (`structure.suggest`, about $0.10 whether or not anybody used them); a job of that type
+still queued is deleted when the worker starts.
+
+The choice
 is checked by `normalizeLibraryStructure` (1 to 12 folders, names of up to 40 characters, no two
 with one path, none named for a folder code writes, exactly one start folder — the first unless
 marked) and stored on the knowledge agent's setup document as `structure.chosen`. **Code, not the
@@ -677,8 +690,8 @@ into exactly those folders. A subject with no home is not filed: it is named in 
 under `unfiled`, with the folder the agent would suggest, and shown under "What changed".
 
 **A rebuild offers the step again**; an ordinary update never does. "Rebuild the structure…" under
-"What changed" (`POST /library/structure/rebuild`) reopens it, the variants are proposed afresh,
-and the run that follows the new choice moves what the old shape left at the top level into the new
+"What changed" (`POST /library/structure/rebuild`) reopens it, starting from the standard folders
+again, and the run that follows the new choice moves what the old shape left at the top level into the new
 folders with `library.move`, links and history included. A Library from before this change has no
 chosen structure, so it simply waits on the step: nothing migrates it. Until it is rebuilt it is
 read as it is — its overview at `/overview`, its subjects at the top level — by the page and over MCP.
@@ -957,7 +970,7 @@ written from, and a person could start a run with nothing new for it to read.
 | --- | --- | --- |
 | 1 · Mirror | `sources.mirror`, a handler of the registered `library` agent. Copies each new or changed page into `/sources/website` and chooses the pages the knowledge base is written from. No model call | the crawler's finalize step; the Library scheduler, for a failed page, a page asked for by name, or a page nothing has looked at yet |
 | 2 · Embed | `index.embed`, the other handler of `library`. Chunks and embeds what changed among the pages and the Library's files | the crawler's finalize step; the Library scheduler, when a file or page was written since anything was last indexed |
-| Before 3 · Structure | `structure.suggest`, a handler of `library`: one structured model call proposing two or three top-level structures from the site map and the core pages, which a person chooses from | the Library scheduler, when stage 3 would start and no structure is chosen, or a rebuild reopened the choice |
+| Before 3 · Structure | `structure.revise`, a handler of `library`: one structured model call making a change a person asked for in words to the top-level folders they are choosing | the structure dispatcher, within a couple of seconds of the request (`POST /library/structure/revise`) |
 | 3 · Write | a run of the `business-knowledge-base` definition, executed by `ai`. Reads the chosen pages and rewrites the subject tree inside the top-level folders the person chose | the Library scheduler, once stage 1 is quiet, a structure is chosen, and a chosen page has moved — or the structure was chosen — since the last run |
 
 **The crawler calls it once per crawl, not once per page.** The hand-off is in
@@ -987,10 +1000,8 @@ when all of these hold:
   for a page that is not yet chosen. A crawl hands over to stage 1 before its last job completes,
   and a mirror pass queues its own continuation the same way, so there is no gap to slip through;
 - the person has chosen the top-level structure, and has not asked to choose it again since.
-  Until then the reason is `STRUCTURE_NOT_CHOSEN`, and the scheduler queues `structure.suggest`
-  once — again only if the step was reopened since the last answer, a pending one is older than
-  thirty minutes, or a failed one has a moved site to try on. See
-  [The top level](#the-top-level-a-structure-the-person-chose);
+  Until then the reason is `STRUCTURE_NOT_CHOSEN`, and nothing is queued for it: the person is
+  choosing. See [The top level](#the-top-level-a-structure-the-person-chose);
 - no run of the definition is queued or running;
 - a page the knowledge base is written from moved after the newest run started — it was copied
   afresh, was newly chosen, or left the site — or the structure was chosen after it, or there has
@@ -1104,8 +1115,9 @@ cited, and the ones it deliberately did not.
 Measured on a scratch copy of the development site's database: the first v9 run, which rebuilt the
 v8 Library into the default-like structure the person chose (moving fifteen top-level files and
 folders into it and writing the overview and the index afresh), made 6 model calls and cost $0.38
-after a $0.10 structure suggestion; a second rebuild into an edited structure, with one folder
-renamed and one added, came to eight model calls and $0.47 with its own suggestion.
+after a $0.10 structure suggestion (since replaced by changes asked for in words); a second rebuild
+into an edited structure, with one folder renamed and one added, came to eight model calls and $0.47
+with its own suggestion.
 
 Measured on the development site (72 pages, 65 stored, 56 to 58 chosen): the first run under v8,
 which rearranged a Library v7 had built, made 18 model calls and cost $0.47; two rebuilds made 15
@@ -1196,7 +1208,7 @@ becomes an underscore, as for MCP clients — and converted back when the model 
 | `library_nodes` | one per `(workspaceId, path)`: kind, role (`overview`, `index` or `start`, on three nodes), name, title, summary, Markdown, tags, order, authors, protected and removed blocks, locked, sources, links, revision |
 | `library_revisions` | last 20 per `(workspaceId, path)`, 3 under `/sources`: the content as written, by whom, and — for a version a rename made — which path was renamed to which |
 | `library_structures` | retired: the sections the top level used to be shown under. Nothing reads or writes it; existing rows are left in place |
-| `agent_setups` (the knowledge agent's) | `structure`: the variants proposed (`suggestion`), the structure the person chose (`chosen`: folders, start folder, when, by whom), and `rebuildRequestedAt` when the choice was reopened |
+| `agent_setups` (the knowledge agent's) | `structure`: the change last asked for in words (`revision`: request, folders, status, note), the structure the person chose (`chosen`: folders, start folder, when, by whom), and `rebuildRequestedAt` when the choice was reopened |
 | `source_documents` | one per `(workspaceId, kind, key)`: prose from a connector. Empty today |
 | `knowledge_sources` | one per `(workspaceId, agentSlug, sourceKind, sourceKey)`: relevant, reason, reviewedHash |
 | `llms_documents` | one per workspace: the text, plus its parsed sections and links |
@@ -1479,10 +1491,10 @@ seconds, doubling to at most four minutes — under one of two keys taken in tur
 requests made while the workspace is busy come to one pass waiting (`sources.pass_put_off` in the
 log).
 - **Write**, on the same tick and decided first: the conditions under
-  [The Library agent](#the-library-agent). While no structure is chosen it is also where the
-  structure suggestion is queued (`structure.suggest`, keyed by the moment it was asked for) and
-  marked `pending` on the setup document; the API never queues it — "Propose again" clears the
-  suggestion and this asks within a minute.
+  [The Library agent](#the-library-agent). While no structure is chosen it records
+  `STRUCTURE_NOT_CHOSEN` and queues nothing; a change to the folders asked for in words is queued
+  by the structure dispatcher, a separate pass every couple of seconds, since somebody is waiting
+  on it.
 
 The crawler's finalize step queues stages 1 and 2 for the site it has just rewritten — two jobs
 rather than a chain, so a workspace with no embedding key still gets its mirror and a workspace
@@ -1508,9 +1520,9 @@ GET    /library/nodes/*path               one folder or file
 PUT    /library/nodes/*path               create or replace a folder or a file
 DELETE /library/nodes/*path               delete a file, or an empty folder
 POST   /library/move/*path                {"to": "/new/path", "title"?: "New name"} — every link to it follows
-GET    /library/structure                 the structure step: chosen, proposed, the default
+GET    /library/structure                 the structure step: chosen, the change last asked for (revision), the default
 PUT    /library/structure                 {"groups": [{"title", "summary"?, "subjects"?, "start"?}]} — creates the folders
-POST   /library/structure/suggest         ask for the proposals again
+POST   /library/structure/revise          {"groups": [...], "instruction"} — ask for a change in words; 202, answered on revision
 POST   /library/structure/rebuild         reopen the step: a rebuild, which waits for a new choice
 POST   /library/lock/*path                agents stop writing here
 POST   /library/unlock/*path              agents may write here again

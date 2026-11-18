@@ -316,9 +316,10 @@ the reason a person is shown, and `ai_calls` to confirm the mirror made none. A 
 started by the scheduler, never by hand, when a chosen page moved; it costs about half a dollar on
 the development site, so change a chosen page or use **Include** in the source ledger rather than
 looping one. The Library's top level is folders the *person* chose (`00 Start Here`, `01 Company`,
-… by default) from two or three a model proposed (`structure.suggest`, about ten cents); the first
+… by default), starting from the standard ones and changed by hand or, asked in words, by one model
+call (`structure.revise`, queued by the agents process's structure dispatcher); the first
 write run, and a rebuild's, waits for that choice (`STRUCTURE_NOT_CHOSEN` from the scheduler), and
-agents may write nothing at the top level. The choice and the proposals are `structure` on the
+agents may write nothing at the top level. The choice and the change last asked for are `structure` on the
 knowledge agent's `agent_setups` row; the overview and the index are found by `role` on their node,
 not at fixed paths, and a rename rewrites every link to what moved. `library_structures` held the
 sections the top level used to be shown under and is no longer read. Read docs/architecture/library.md before

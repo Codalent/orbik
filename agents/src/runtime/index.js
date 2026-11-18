@@ -12,6 +12,7 @@ import { createOutboxScheduler } from "../ai/outboxScheduler.js";
 import { createRunDispatcher } from "../ai/runDispatcher.js";
 import { createCrawlScheduler } from "../crawler/crawlScheduler.js";
 import { createLibraryScheduler } from "../library/libraryScheduler.js";
+import { createStructureDispatcher } from "../library/structureDispatcher.js";
 import { createJobQueue } from "./queue.js";
 import { createAgentRegistry } from "./registry.js";
 import { createRunLedger } from "./runLedger.js";
@@ -63,8 +64,11 @@ export function createRuntime({ database, config, agents, logger }) {
   // agent in this release is one, so its passes find nothing to do. It creates run rows and leaves
   // them to the dispatcher, so it needs the ledger and not the queue.
   const outboxScheduler = createOutboxScheduler({ database, ledger, config, logger });
+  // The sixth, at the dispatcher's pace: a change to the Library's folders that a person asked for
+  // in words and is waiting on, turned into its job.
+  const structureDispatcher = createStructureDispatcher({ database, queue, config, logger });
   return {
     queue, ledger, registry, worker, crawlScheduler, agentScheduler, dispatcher,
-    libraryScheduler, outboxScheduler,
+    libraryScheduler, outboxScheduler, structureDispatcher,
   };
 }

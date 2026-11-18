@@ -39,7 +39,7 @@ ORBIK_ANTHROPIC_API_KEY=sk-ant-...    # optional
 
 | Key | Required | What needs it |
 |---|---|---|
-| `ORBIK_OPENAI_API_KEY` | **Yes** | Embeddings: the search index behind Ask and your AI's `content_search`. With only this key set, it also does all the writing: the Library's knowledge base, proposing its folders, Ask, the llms.txt agent and the brand proposal. |
+| `ORBIK_OPENAI_API_KEY` | **Yes** | Embeddings: the search index behind Ask and your AI's `content_search`. With only this key set, it also does all the writing: the Library's knowledge base, changing its folders when asked, Ask, the llms.txt agent and the brand proposal. |
 | `ORBIK_ANTHROPIC_API_KEY` | No | With it set, Claude does the writing instead of OpenAI. |
 | `ORBIK_AI_PROVIDER` | No | With both keys set, which one does the writing: `anthropic` (the default) or `openai`. |
 
@@ -80,14 +80,14 @@ recrawling and frequencies.
 Open **Library**. Before Orbik writes anything above the copied pages, you choose its top-level
 folders.
 
-1. The Library opens on **Choose how your Library is organised**. Orbik's default — `00 Start
-   Here`, `01 Company`, `02 Offer`, … — is always offered. With the **Knowledge base agent** set
-   to work (**Set to work** in its menu, from its icon at the bottom left of the Library) and your keys set, Orbik also
-   reads your site and, within a few minutes, proposes two or three structures, each with a
-   sentence on why it fits.
-2. Pick one, rename, add, remove or reorder folders if you like, and press
-   **Use this structure and start writing**. That also sets the agent to work: it rewrites the
-   Library whenever a crawl finds a change.
+1. The Library opens on **Choose how your Library is organised**, with Orbik's standard folders:
+   `00 Start Here`, `01 Company`, `02 Offer`, ….
+2. Rename, add, remove or drag folders into another order if you like. With your keys set,
+   **Suggest changes** lets you ask for a change in your own words ("merge Proof into Offer"),
+   which Orbik makes to the list in a few seconds.
+3. Press **Use this structure and start writing**. That also sets the **Knowledge base agent** to
+   work (**Set to work** in its menu, from its icon at the bottom left of the Library): it rewrites
+   the Library whenever a crawl finds a change.
 
 The Library opens on the overview, which says what the agent is doing: its first run starts within
 a minute, and the overview follows it as it writes. You can rename any folder later, and every

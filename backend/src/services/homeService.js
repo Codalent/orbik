@@ -311,12 +311,10 @@ function websiteFacts(crawl, firstCrawl, personOf) {
  */
 function structureFacts(library, personOf) {
   const { structure } = library;
-  const detail = { suggestion: structure.suggestion };
   if (structure.chosen) {
-    return { state: STEP_STATES.done, doneAt: structure.chosenAt, doneBy: personOf(structure.chosenBy), detail };
+    return { state: STEP_STATES.done, doneAt: structure.chosenAt, doneBy: personOf(structure.chosenBy), detail: {} };
   }
-  if (structure.suggestion === "pending") return { state: STEP_STATES.inProgress, detail };
-  return { state: STEP_STATES.notStarted, detail };
+  return { state: STEP_STATES.notStarted, detail: {} };
 }
 
 /**

@@ -138,11 +138,14 @@ export function chooseLibraryStructure(workspaceId, groups) {
   });
 }
 
-/** Asks for the proposed structures again; the scheduler asks the model within a minute. */
-export function suggestLibraryStructureAgain(workspaceId) {
-  return apiFetch(`/v1/workspaces/${requireId(workspaceId, "Workspace")}/library/structure/suggest`, {
+/**
+ * Asks for a change to the folders on the page, in the person's own words. The answer arrives on
+ * the structure step's `revision` within seconds; nothing is created until the person confirms.
+ */
+export function reviseLibraryStructure(workspaceId, groups, instruction) {
+  return apiFetch(`/v1/workspaces/${requireId(workspaceId, "Workspace")}/library/structure/revise`, {
     method: "POST",
-    body: JSON.stringify({}),
+    body: JSON.stringify({ groups, instruction }),
   });
 }
 

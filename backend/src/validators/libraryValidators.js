@@ -6,6 +6,7 @@ import {
   LIBRARY_SOURCE_KINDS,
   LIBRARY_SOURCE_KIND_VALUES,
   LibraryError,
+  STRUCTURE_LIMITS,
   normalizeLibraryPath,
 } from "@orbik/library";
 
@@ -200,34 +201,57 @@ export function validateLibraryStructureBody(req, _res, next) {
   for (const key of Object.keys(body)) {
     if (key !== "groups") fields.push({ field: key, code: "UNKNOWN_FIELD", message: "This field is not accepted." });
   }
-  const groups = Array.isArray(body.groups) ? body.groups : null;
-  if (!groups || !groups.length || groups.length > LIBRARY_LIMITS.groups) {
-    fields.push({ field: "groups", code: "INVALID", message: `Choose between 1 and ${LIBRARY_LIMITS.groups} folders.` });
-  } else {
-    for (const [index, group] of groups.entries()) {
-      if (group === null || typeof group !== "object" || Array.isArray(group)) {
-        fields.push({ field: `groups[${index}]`, code: "INVALID", message: "Each folder is {title, summary?, subjects?, start?}." });
-        continue;
-      }
-      for (const key of Object.keys(group)) {
-        if (!["title", "summary", "subjects", "start", "path"].includes(key)) {
-          fields.push({ field: `groups[${index}].${key}`, code: "UNKNOWN_FIELD", message: "This field is not accepted." });
-        }
-      }
-      if (typeof group.title !== "string" || !group.title.trim() || group.title.length > LIBRARY_LIMITS.groupTitle) {
-        fields.push({ field: `groups[${index}].title`, code: "INVALID", message: `A folder's name is 1 to ${LIBRARY_LIMITS.groupTitle} characters.` });
-      }
-      if (group.summary !== undefined && (typeof group.summary !== "string" || group.summary.length > LIBRARY_LIMITS.summary)) {
-        fields.push({ field: `groups[${index}].summary`, code: "INVALID", message: `A summary is at most ${LIBRARY_LIMITS.summary} characters.` });
-      }
-      if (group.subjects !== undefined && (!Array.isArray(group.subjects) || group.subjects.some((subject) => typeof subject !== "string" || subject.length > LIBRARY_LIMITS.segment))) {
-        fields.push({ field: `groups[${index}].subjects`, code: "INVALID", message: "Subjects are a list of names." });
-      }
-    }
-  }
+  const groups = parseStructureGroups(body.groups, fields);
   if (fields.length) return next(validationError(fields));
   req.validated = { ...req.validated, groups };
   next();
+}
+
+/**
+ * Validates a request to change the folders in words: the folders as they stand on the page, and
+ * what the person wants done to them.
+ */
+export function validateLibraryStructureRevisionBody(req, _res, next) {
+  const fields = [];
+  const body = req.body ?? {};
+  for (const key of Object.keys(body)) {
+    if (!["groups", "instruction"].includes(key)) fields.push({ field: key, code: "UNKNOWN_FIELD", message: "This field is not accepted." });
+  }
+  const groups = parseStructureGroups(body.groups, fields);
+  const instruction = parseText(body.instruction, "instruction", { max: STRUCTURE_LIMITS.instruction, required: true }, fields);
+  if (fields.length) return next(validationError(fields));
+  req.validated = { ...req.validated, groups, instruction };
+  next();
+}
+
+/** The `groups` of a structure body, checked for shape; problems are added to `fields`. */
+function parseStructureGroups(value, fields) {
+  const groups = Array.isArray(value) ? value : null;
+  if (!groups || !groups.length || groups.length > LIBRARY_LIMITS.groups) {
+    fields.push({ field: "groups", code: "INVALID", message: `Choose between 1 and ${LIBRARY_LIMITS.groups} folders.` });
+    return groups;
+  }
+  for (const [index, group] of groups.entries()) {
+    if (group === null || typeof group !== "object" || Array.isArray(group)) {
+      fields.push({ field: `groups[${index}]`, code: "INVALID", message: "Each folder is {title, summary?, subjects?, start?}." });
+      continue;
+    }
+    for (const key of Object.keys(group)) {
+      if (!["title", "summary", "subjects", "start", "path"].includes(key)) {
+        fields.push({ field: `groups[${index}].${key}`, code: "UNKNOWN_FIELD", message: "This field is not accepted." });
+      }
+    }
+    if (typeof group.title !== "string" || !group.title.trim() || group.title.length > LIBRARY_LIMITS.groupTitle) {
+      fields.push({ field: `groups[${index}].title`, code: "INVALID", message: `A folder's name is 1 to ${LIBRARY_LIMITS.groupTitle} characters.` });
+    }
+    if (group.summary !== undefined && (typeof group.summary !== "string" || group.summary.length > LIBRARY_LIMITS.summary)) {
+      fields.push({ field: `groups[${index}].summary`, code: "INVALID", message: `A summary is at most ${LIBRARY_LIMITS.summary} characters.` });
+    }
+    if (group.subjects !== undefined && (!Array.isArray(group.subjects) || group.subjects.some((subject) => typeof subject !== "string" || subject.length > LIBRARY_LIMITS.segment))) {
+      fields.push({ field: `groups[${index}].subjects`, code: "INVALID", message: "Subjects are a list of names." });
+    }
+  }
+  return groups;
 }
 
 /** Validates a node's place among its siblings; `null` puts it back in the default order. */

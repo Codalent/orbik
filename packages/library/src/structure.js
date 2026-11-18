@@ -18,9 +18,10 @@ import { LIBRARY_STANDARD_FOLDER_NAMES } from "./vocabulary.js";
  * put `00` before `01`. A person who renames `02 Offer` to `Offer` changes its path to `/offer`,
  * every link to it is rewritten, and nothing else moves.
  *
- * **The structure is the person's.** When a Library is first built — and again on a rebuild — a
- * model reads the site map and the core pages and proposes two or three variants of this list,
- * the person picks one and may edit it, and code creates exactly those folders, as theirs. The
+ * **The structure is the person's.** When a Library is first built — and again on a rebuild — the
+ * person starts from the standard list below, renames, reorders, adds or removes folders, and may
+ * ask in their own words for a change ("merge Proof into Offer"), which one model call makes to
+ * the list on screen (`structure.revise`). Code then creates exactly those folders, as theirs. The
  * write run files into them and may not create, rename, move or delete one: a top-level folder
  * nobody chose is the thing this replaces.
  *
@@ -31,7 +32,7 @@ import { LIBRARY_STANDARD_FOLDER_NAMES } from "./vocabulary.js";
  */
 
 /**
- * The structure the suggestion starts from, and the shape every variant is written in.
+ * The structure the step starts from, and the shape every structure is written in.
  *
  * Groups are created only when the site has something for them: a site with no proof has no
  * `03`. `subjects` are the standard subject names (`./vocabulary.js`) filed into each; the start
@@ -66,9 +67,9 @@ const ENTRY_POINTS = Object.freeze(new Set(["overview", "index"]));
 export const STRUCTURE_LIMITS = Object.freeze({
   subjects: 20,
   summary: LIBRARY_LIMITS.summary,
-  variants: 3,
-  variantName: 60,
-  why: 400,
+  // A person's request for a change to the folders, and the model's sentence on what it did.
+  instruction: 500,
+  note: 400,
 });
 
 /**
@@ -163,15 +164,18 @@ export function describeDefaultStructure() {
  *   `normalizeLibraryStructure` returns it.
  * - `rebuildRequestedAt` — a person asked to choose again. Later than `chosenAt`, the step is open
  *   again and the write run waits for the new choice.
- * - `suggestion` — `{status, variants, generatedAt, reason}`: what a model proposed, `pending`
- *   while the job that asks it is queued.
+ * - `revision` — `{id, status, instruction, groups, note, requestedAt, requestedBy, queuedAt,
+ *   answeredAt, reason}`: the last change a person asked for in their own words. `groups` is the
+ *   list they asked about, then the list the model returned; `status` is `pending` until the
+ *   `structure.revise` job answers, then `ready`, `failed` or `skipped`. One at a time: a new
+ *   request replaces it, and choosing or reopening the step clears it.
  *
  * One reading of it, shared by the scheduler that waits on the choice and the API that shows it,
  * so the page and the run can never disagree about whether the Library is waiting on a person.
  *
  * @param {object|null} setup the knowledge agent's setup document
  * @returns {{needsChoice: boolean, reason: "first"|"rebuild"|null, chosen: object|null, chosenAt: Date|null,
- *   suggestion: object|null, openedAt: Date|null}}
+ *   revision: object|null, openedAt: Date|null}}
  */
 export function libraryStructureState(setup) {
   const structure = setup?.structure ?? {};
@@ -185,8 +189,9 @@ export function libraryStructureState(setup) {
     reason: needsChoice ? (rebuilding ? "rebuild" : "first") : null,
     chosen,
     chosenAt,
-    suggestion: structure.suggestion ?? null,
-    // The moment the step was opened: a suggestion older than this was made for an earlier choice.
+    // Only while the step is open: a request made for an earlier choice is not this one's.
+    revision: needsChoice && structure.revision?.id ? structure.revision : null,
+    // The moment the step was opened again, for a rebuild.
     openedAt: rebuilding ? rebuildAt : null,
   };
 }

@@ -48,17 +48,16 @@ export const AI_JOBS = Object.freeze({ execute: "ai.execute" });
 export const LIBRARY_JOBS = Object.freeze({
   mirror: "sources.mirror",
   embed: "index.embed",
-  // Not a stage of its own: the one question asked between the first two stages and the first
-  // write run — which top-level folders the Library should have — whose answer a person chooses
-  // from. See `library/structure.js`.
-  suggest: "structure.suggest",
+  // Not a stage of its own: a change a person asks for, in words, to the top-level folders they
+  // are choosing before the first write run (or a rebuild's). See `library/structure.js`.
+  revise: "structure.revise",
 });
 
 /** The idempotency-key prefix of each stage, which is also what its log lines are named after. */
 const KEY_PREFIX = Object.freeze({
   [LIBRARY_JOBS.mirror]: "sources",
   [LIBRARY_JOBS.embed]: "index",
-  [LIBRARY_JOBS.suggest]: "structure",
+  [LIBRARY_JOBS.revise]: "structure",
 });
 
 /**
