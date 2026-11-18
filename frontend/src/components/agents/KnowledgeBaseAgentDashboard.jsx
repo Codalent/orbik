@@ -22,7 +22,7 @@ import { useAgentWork } from "@/lib/agents/useAgentWork";
 import { formatDate } from "@/lib/format";
 import { ago, plural } from "@/lib/home/home";
 import { libraryWait } from "@/lib/library/agentWait";
-import { LIBRARY_AGENT_SLUG, coverageLine, coverageNote } from "@/lib/library/library";
+import { LIBRARY_AGENT_SLUG, coverageLine, coverageNote, isFixedFolder } from "@/lib/library/library";
 import { changesOf } from "@/lib/library/runActivity";
 import { VIEWS } from "@/lib/library/workspaceTabs";
 import { useCan } from "@/lib/workspaces/roles";
@@ -87,7 +87,12 @@ export function KnowledgeBaseAgentDashboard({ workspaceId }) {
   const libraryHref = `/workspaces/${workspaceId}/library`;
   const viewHref = (view) => `${libraryHref}?view=${view}`;
   const structure = state?.structure ?? null;
-  const folders = structure?.chosen?.groups ?? [];
+  // The folders as they are now, which a person may have renamed, added or moved since choosing
+  // them; each says what it holds where the structure that made it still describes it.
+  const described = new Map((structure?.chosen?.groups ?? []).map((group) => [group.path, group]));
+  const folders = (state?.tree?.children ?? [])
+    .filter((node) => node.kind === "folder" && !isFixedFolder(node.path))
+    .map((node) => ({ path: node.path, title: node.title || node.name || described.get(node.path)?.title || node.path, ...pick(described.get(node.path)) }));
   const stats = state?.stats ?? null;
   const sources = state?.sources ?? null;
   const coverage = state?.coverage ?? null;
@@ -209,9 +214,15 @@ export function KnowledgeBaseAgentDashboard({ workspaceId }) {
         <SectionHeading
           id="kb-folders"
           aside={folders.length ? `${folders.length} at the top of the Library` : null}
+          // Before they are chosen, the choice is a step of its own in the Library; after, they are
+          // renamed, added and moved in the Library's explorer like any other folder.
           action={canEdit && ready ? (
-            <Link href={viewHref(VIEWS.structure)} className={buttonVariants({ size: "sm", variant: "outline" })}>
-              <FolderTree className="size-3.5" /> {folders.length ? "Change folders" : "Choose folders"}
+            <Link
+              href={structure?.needsChoice ? viewHref(VIEWS.structure) : libraryHref}
+              className={buttonVariants({ size: "sm", variant: "outline" })}
+              title={structure?.needsChoice ? undefined : "Rename, add or move them in the Library's explorer"}
+            >
+              <FolderTree className="size-3.5" /> {structure?.needsChoice ? "Choose the folders" : "Edit in the Library"}
             </Link>
           ) : null}
         >
@@ -276,6 +287,11 @@ export function KnowledgeBaseAgentDashboard({ workspaceId }) {
   );
 }
 
+/** What the chosen structure says about a folder: its summary, and whether it is read first. */
+function pick(group) {
+  return group ? { summary: group.summary ?? null, start: Boolean(group.start) } : {};
+}
+
 /** One run in the recent-runs list: how it ended, and when and why it started. */
 function RunRow({ run }) {
   const at = run.finishedAt ?? run.startedAt;
@@ -285,7 +301,7 @@ function RunRow({ run }) {
         {RUN_STATUS_LABELS[run.status] ?? run.status}
       </Pill>
       <p className="min-w-[11rem] flex-1 text-compact text-orb-gray">
-        {run.status === "queued" ? "Waiting to start" : run.status === "running" ? "Writing the Library" : run.status === "failed" ? "Did not finish" : run.status === "cancelled" ? "Stopped before it finished" : "Finished"}
+        {run.status === "queued" ? "Waiting to start" : run.status === "running" ? "Writing the Library" : run.status === "failed" ? "Did not finish" : run.status === "cancelled" ? "Stopped before it finished" : "Rewrote what had changed"}
       </p>
       <p className="text-xs text-orb-muted">
         {at ? formatDate(at) : "Not started"}
