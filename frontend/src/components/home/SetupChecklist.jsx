@@ -377,7 +377,7 @@ function StepBody({ step, home, ai, primary, onRetryCrawl, onStartCrawl, onChang
             actually says.
             {home.steps.find((other) => other.id === "library")?.state !== STEP_STATE.done && " You can connect it now: it sees pages as they arrive."}
           </p>
-          <ConnectAiStep workspaceId={id} settingsHref={`/workspaces/${id}/settings/ai`} onChanged={onChanged} />
+          <ConnectAiStep workspaceId={id} workspaceName={home.workspace.name} state={step.state} settingsHref={`/workspaces/${id}/settings/ai`} onChanged={onChanged} />
         </>
       );
     case "brand":

@@ -104,18 +104,24 @@ run. See [The Library](../guides/library.md).
 
 ## 8. Connect your AI
 
-On **Home**, **Connect Orbik MCP** shows the two ways in:
+On **Home**, **Connect Orbik MCP** asks where you use AI:
 
-- **Claude.ai / ChatGPT**: add the **Connector URL** (`http://localhost:8080/mcp` here) as a
-  custom connector, then sign in to Orbik and approve. These services reach your install from the
-  internet, so they need it on an HTTPS address; see [A domain with HTTPS](../self-hosting/https.md).
-- **Claude Code / Cursor**: name the connection, press **Create token**, and paste the token into
-  your client. For Claude Code:
+- **Claude Code, Cursor, Codex**: press **Copy prompt** and paste it into your agent. It adds the
+  Orbik MCP server itself, then you sign in to Orbik in your browser and choose what it may read; no
+  token is needed. **Set it up by hand instead** shows the Claude Code command, the URL for other
+  clients, and a token for a server or CI where nobody can sign in. With a token, for Claude Code:
 
   ```sh
   claude mcp add --transport http orbik http://localhost:8080/mcp \
     --header "Authorization: Bearer orbm_…"
   ```
+
+- **Claude.ai, ChatGPT**: copy the **connector URL** (`http://localhost:8080/mcp` here), open the
+  app's connector settings from the step, add it as a custom connector, then sign in to Orbik and
+  approve. These services reach your install from the internet, so they need it on an HTTPS
+  address; see [A domain with HTTPS](../self-hosting/https.md).
+
+The step ticks itself off once your AI first calls Orbik.
 
 Your AI can now read the Library, search it, and read your brand and llms.txt.
 [Connect your AI](../connect-your-ai/README.md) covers each client, reading several workspaces and
