@@ -72,7 +72,9 @@ function WorkspaceChrome({ children }) {
   const extensionSlots = useExtensionSlots();
 
   const knowledge = selectedWorkspaceId ? buildKnowledgeRows(selectedWorkspaceId, activity) : [];
-  const agents = selectedWorkspaceId ? buildAgentRows(selectedWorkspaceId, crawl, extensionSlots.agentPages) : [];
+  // Each agent row, and through them the rail's Agents item, is drawn as working while the same
+  // activity read has that agent running in this workspace.
+  const agents = selectedWorkspaceId ? buildAgentRows(selectedWorkspaceId, crawl, extensionSlots.agentPages, activity) : [];
   // Settings is in the rail because connecting an AI is something a person looks for from
   // wherever they are; it sits at the bottom of it, apart from the places a person works in.
   const settingsLink = selectedWorkspaceId ? [{ id: "settings", name: "Settings", icon: Settings, href: `/workspaces/${selectedWorkspaceId}/settings` }] : [];
@@ -100,9 +102,9 @@ function WorkspaceChrome({ children }) {
   // the agent where the person is.
   const overviewLink = agentsHref ? [{ name: "Agents", href: agentsHref }] : [];
   const pageName = pageNameFor(pathname, [...homeLink, ...knowledge, ...overviewLink, ...agents, ...extensionLinks, ...settingsLink], panelWorkspaceId);
-  // On the Library — at its own address or the agent's that renders it — the header carries the
-  // way into its quick switcher, which the page opens when asked; the shell holds none of its state.
-  const onLibrary = /^\/workspaces\/[^/]+\/(?:library|agents\/business-knowledge-base)\/?$/.test(pathname ?? "");
+  // On the Library the header carries the way into its quick switcher, which the page opens when
+  // asked; the shell holds none of its state.
+  const onLibrary = /^\/workspaces\/[^/]+\/library\/?$/.test(pathname ?? "");
 
   /** Selects only an identifier supplied by the owner-scoped server list. */
   async function select(id) {

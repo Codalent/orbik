@@ -44,6 +44,9 @@ import { changesOf, runPhases, treeActivity } from "@/lib/library/runActivity";
 import * as tabs from "@/lib/library/workspaceTabs";
 import { useCan } from "@/lib/workspaces/roles";
 
+/** The views a link may open with `?view=`. */
+const LINKABLE_VIEWS = Object.freeze([tabs.VIEWS.structure, tabs.VIEWS.changes, tabs.VIEWS.ledger]);
+
 /**
  * The Library: a workspace's knowledge as a file browser people and agents share, laid out the way
  * a notes app is — an explorer on the left, files in tabs, and an inspector beside the open one.
@@ -74,11 +77,14 @@ import { useCan } from "@/lib/workspaces/roles";
 export function LibraryWorkspace({ workspaceId }) {
   // A `?path=` opens that file. It is how a citation on the ask page reaches the file it names, and
   // it is kept equal to the file on screen, so the address bar always says where somebody is.
-  const requestedPath = useSearchParams().get("path");
+  const searchParams = useSearchParams();
+  const requestedPath = searchParams.get("path");
+  const requestedView = searchParams.get("view");
   // Read from the browser while the page is still loading the Library, so what it paints first is
   // already the tabs somebody left rather than the overview and then their tabs.
   const [layout, setLayout] = useState(() => tabs.loadLayout(workspaceId) ?? tabs.initialLayout());
   const [followed, setFollowed] = useState(null);
+  const [followedView, setFollowedView] = useState(null);
   const [expanded, setExpanded] = useState(() => new Set());
   const [revealed, setRevealed] = useState(null);
   // Branches fetched on demand, keyed by path. Held beside the tree rather than merged into it,
@@ -169,6 +175,16 @@ export function LibraryWorkspace({ workspaceId }) {
     setFollowed(requestedPath);
     if (requestedPath && /^(?:\/[a-z0-9-]+)+$/.test(requestedPath)) {
       setLayout((current) => tabs.openLocation(current, tabs.nodeLocation(requestedPath), { target: "tab" }));
+    }
+  }
+
+  // A `?view=` opens one of the Library's own views in a tab — the folder choice, What changed or
+  // the source ledger — which is how the Knowledge base agent's page leads to them. Followed once
+  // per value, like `?path=`.
+  if (requestedView !== followedView) {
+    setFollowedView(requestedView);
+    if (LINKABLE_VIEWS.includes(requestedView)) {
+      setLayout((current) => tabs.openLocation(current, { view: requestedView }, { target: "tab" }));
     }
   }
 

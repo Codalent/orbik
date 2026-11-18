@@ -86,12 +86,13 @@ your site; every link in it is a page the crawler fetched. You copy it to your s
 
 An **agent** is one job Orbik does for a workspace. Those listed under **Agents** are the
 **Crawler**, the **Knowledge base** agent (which writes the Library, and is switched on and off from
-the **Library** page), **llms.txt** and **Design system**. A **run** is one time an agent works.
+its own page under **Agents** or from the Library), **llms.txt** and **Design system**. A **run** is one time an agent works.
 **Run now** runs an agent once; **Set to work** puts it on its schedule, and **Pause** takes it off
 again. An agent's page and its card on the Agents overview say the same thing: *Set to work*, *Not
 set to work* (it runs only when started by hand), *Running*, or *Last run failed*. The Knowledge
 base agent is never started by hand: set to work, it writes when the pages it reads change. Agent
-definitions are part of Orbik's code.
+definitions are part of Orbik's code. While any agent is working, the rail's **Agents** item
+carries a lime dot, as the **Library** item does while the Library is being written.
 
 ## Activity and the AI call log
 
