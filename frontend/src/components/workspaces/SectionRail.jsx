@@ -64,7 +64,7 @@ export function buildRail({ leading = [], knowledge, agents, links = [], footer 
 /**
  * The rail at the left edge: one icon over one word for each destination.
  *
- * From `md` up the column is a fixed 44px, a little wider than an icon, so it takes no more room
+ * From `md` up the column is a fixed 40px, a little wider than an icon, so it takes no more room
  * than it needs; a name wider than that wraps (an extension's, say), and that is accepted as the
  * price of a narrow rail. Below `md` the rail is a row across
  * the top, where each item is as wide as its name and the row fits a 390px screen with room to
@@ -93,7 +93,7 @@ export function SectionRail({ items }) {
             key={item.id}
             {...role}
             className={cn(
-              "group flex min-w-10 max-w-20 flex-col items-center gap-0.5 rounded-xl px-1 py-1.5 text-[0.625rem] font-medium outline-none transition-colors md:w-11 md:min-w-0 md:max-w-none md:px-0.5",
+              "group flex min-w-10 max-w-20 flex-col items-center gap-0.5 rounded-xl px-1 py-1.5 text-[0.625rem] font-medium outline-none transition-colors md:w-10 md:min-w-0 md:max-w-none md:px-0",
               "focus-visible:ring-2 focus-visible:ring-ring/70",
               item.active ? "text-orb-white" : "text-orb-muted hover:text-orb-white",
               item.first && "ml-3 md:ml-0 md:mt-3",
@@ -115,7 +115,7 @@ export function SectionRail({ items }) {
             </span>
             {/* A name wider than the item wraps between its words where it has several (an
                 extension's, say); `break-word` splits a single word only when it cannot fit on a
-                line of its own in the 44px column. */}
+                line of its own in the 40px column. */}
             <span className="w-full text-center leading-tight [overflow-wrap:break-word]">{item.name}</span>
             {item.working && <span className="sr-only">, working now</span>}
           </Item>

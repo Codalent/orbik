@@ -2,6 +2,7 @@
 
 import useSWR from "swr";
 
+import { LibraryAgent } from "./LibraryAgent";
 import { useLibrary } from "./libraryContext";
 import { useLibraryFreshness } from "./LibraryFreshness";
 import { libraryNodePath } from "@/lib/api/library";
@@ -10,7 +11,8 @@ import { cn } from "@/lib/utils";
 
 /**
  * The line along the foot of the Library: the agent and the site on the left, the open file on
- * the right.
+ * the right. The agent is its icon (LibraryAgent), which opens its switch and its records, and a
+ * few words on what it is doing.
  *
  * The left half is how much of the site is in here, as arithmetic rather than as a claim the last
  * run made about itself: pages stored against pages found, and how many are still to come. The
@@ -53,19 +55,13 @@ export function LibraryStatusBar({ activePath, activeTab }) {
 
   return (
     <footer className="hidden h-7 shrink-0 items-center gap-4 overflow-hidden border-t border-orb-line bg-orb-black px-3 text-xs whitespace-nowrap tabular-nums text-orb-muted md:flex">
-      <span title={waiting?.detail} className={cn("inline-flex items-center gap-1.5", waiting?.tone === "orange" && "text-orb-orange", waiting?.tone === "coral" && "text-orb-coral")}>
-        <span
-          aria-hidden="true"
-          className={cn(
-            "size-1.5 rounded-full",
-            work.inFlight
-              ? "bg-orb-lime motion-safe:animate-pulse"
-              : waiting?.tone === "orange" ? "bg-orb-orange"
-                : waiting?.tone === "coral" ? "bg-orb-coral"
-                  : work.working ? "border border-dashed border-orb-muted" : "bg-orb-line",
-          )}
-        />
-        Knowledge base agent {agent}
+      {/* The agent's icon, lime while it is set to work and circled while it writes, opens its
+          switch and its records; the words beside it say what it is doing. */}
+      <span className="inline-flex items-center gap-2">
+        <LibraryAgent />
+        <span title={waiting?.detail} className={cn(work.inFlight && "text-orb-lime", waiting?.tone === "orange" && "text-orb-orange", waiting?.tone === "coral" && "text-orb-coral")}>
+          Knowledge base agent {agent}
+        </span>
       </span>
       {line && (
         <span title={coverageNote(coverage)} className="cursor-help">

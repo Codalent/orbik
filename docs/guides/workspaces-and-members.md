@@ -11,7 +11,9 @@ site (see [Crawling](crawling.md)).
 
 The workspace's settings are under **Settings**: **Workspace** for its name, website and ID,
 **People** for who is in it, **Orbik MCP** for connecting your AI, and **AI calls** for every model
-call made on your account's behalf, across all your workspaces.
+call made on your account's behalf, across all your workspaces. Below them, under **You**, are
+**Account**, for your password, and for the install's admins **Admin** (see
+[Accounts and admin](accounts-and-admin.md)).
 
 ## Changing the name or the website
 

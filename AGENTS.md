@@ -190,20 +190,22 @@ verify the routes' redirects with `curl` and the service with a fake `fetch` in 
 
 While signup is closed, `/signup` is a **Request access** form: the address goes to
 `access_requests` (one row per address; `POST /v1/access-requests`, the same 202 whoever asks) and
-shows on the install's **Admin** page (`/admin`, in the account menu), where an admin approves it —
+shows under **Settings → Admin** (`/workspaces/:id/settings/admin`; `/admin` leads there, and is
+the page itself for an admin with no workspace yet), where an admin approves it —
 a one-time `/join/<token>` link, seven days, emailed when SMTP is set and shown to the admin either
 way — or dismisses it. The install's admins are the addresses in `ORBIK_ADMIN_EMAILS`, or with it
 unset its first account; everyone else gets 404 from `/v1/admin/*`. **Forgot password** on the
 sign-in page emails a one-time `/reset-password/<token>` link (an hour, `password_resets`, only the
 hash stored); using it sets the password, deletes every other session of the account and signs
-this browser in. Signed in, **Change password** in the account menu (`/account/password`, `POST
+this browser in. Signed in, **Settings → Account** (`/workspaces/:id/settings/account`; `/account/password` leads
+there, or is the page itself with no workspace yet; `POST
 /v1/auth/password` with `currentPassword` and `newPassword`, five tries per account a quarter hour)
 checks the current password, sets the new one and deletes the account's other sessions, keeping
 this one; the session's `user.hasPassword` is false for an account Google sign-in made, which has
 none to change. An install without email cannot send one, so the page says to ask the admin, who
-makes the link on the Admin page or with `pnpm --dir backend run reset:password -- --email …`.
+makes the link under Settings → Admin or with `pnpm --dir backend run reset:password -- --email …`.
 `GET /v1/edition` says which (`passwordReset`: `email` or `admin`), and the session's
-`user.isAdmin` whether to show the Admin page. The logo on every signed-out page links to
+`user.isAdmin` whether to list Settings → Admin. The logo on every signed-out page links to
 `https://orbik.io` (`NEXT_PUBLIC_ORBIK_HOME_URL` overrides it).
 
 Everything a member does is **charged to the workspace**: the crawl budget keeps one month per
@@ -229,7 +231,7 @@ terminal; from a script, wrap it: `script -qec "pnpm --dir backend run seed:user
 pnpm --dir backend run seed:user -- --email user@example.com
 
 # Print a one-time password reset link for an account (an hour), for an install that sends no
-# email; the Admin page makes the same link
+# email; Settings → Admin makes the same link
 pnpm --dir backend run reset:password -- --email user@example.com
 
 # Top up a workspace's crawl budget, which pays for page fetches. Only meaningful when an extension's
