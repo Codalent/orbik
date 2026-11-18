@@ -48,7 +48,7 @@ export function ForgotPasswordForm() {
       <AuthPanel title="Forgot your password?" description="This Orbik doesn't send email.">
         <div className={NOTICE}>
           <KeyRound aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-orb-cyan" />
-          <p>Ask the person who runs this Orbik for a password reset link. They can make one on the Admin page.</p>
+          <p>Ask the person who runs this Orbik for a password reset link. They can make one under Settings → Admin.</p>
         </div>
         {foot}
       </AuthPanel>

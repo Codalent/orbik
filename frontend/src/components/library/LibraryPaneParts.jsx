@@ -99,7 +99,7 @@ export function ViewHeader({ pane, tab, path = null, title, children }) {
  * A view's body, with the inspector beside it when there is room and somebody wants it.
  *
  * While a run is in flight the focused pane's inspector shows the run instead — what it has
- * looked at, read and written so far — until it ends or is put away from the agent strip. With two
+ * looked at, read and written so far — until it ends or is put away from the agent's menu (LibraryAgent). With two
  * panes open neither has an inspector: the second pane is the thing beside the file.
  *
  * Below `md` there is no room beside the file, so the focused pane's inspector is a sheet from the

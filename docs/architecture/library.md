@@ -1295,18 +1295,21 @@ showed one file at a time.
   folder of the mirror is given at most 25 rows for the same reason; a folder that still does not
   fit once fetched says how many more there are and that search finds them.
   Under Sources, while it is open, a key headed **The dots in Sources** says what the two dots mean.
-  At the explorer's foot is the **agent**: idle, working (with the run's headline), paused, or what
-  it is waiting on (the whole sentence on hover), when it last wrote, the Set to work / Pause
-  switch, and **What changed** and **Source ledger**, each opening a tab and each saying what it is
-  on hover — or, while a run is in flight, **This run** (the run in the inspector) and Stop.
-  There is no Run now.
+  The **agent** is not in the explorer: it is a small round icon at the start of the line along
+  the foot of the Library (`LibraryAgent.jsx`), grey while paused, lime once set to work,
+  with a dot circling it while a run is in flight. Pressing it opens a menu: what it is doing
+  (idle, working with the run's headline, paused, or what it is waiting on), when it last wrote,
+  **Set to work** (checked while it works; unchecking pauses it), and **What changed** and
+  **Source ledger**, each opening a tab and each saying what it is on hover — or, while a run is
+  in flight, **This run** (the run in the inspector) and **Stop this run**. There is no Run now.
 - `LibraryPane.jsx`, `LibraryPaneParts.jsx` — one pane: the tab strip (new tab, close, split right
   or close the second pane, show or hide the inspector), and for the tab in front a header of Back,
   Forward, a breadcrumb (the workspace, then at most the two folders above) and the view's own
   actions. With two panes open neither has an inspector: the second pane is what the file is read
   beside. While a run is in flight the focused pane's inspector shows the run instead
   (`LibraryRunRail.jsx`). Below `md` the page opens on the file: only the focused pane is shown,
-  and the explorer — the same component, agent strip included — is a sheet from the left, opened by
+  and the explorer — the same component, with the agent's icon, name and line at its foot, since the
+  line along the foot is not drawn there — is a sheet from the left, opened by
   the panel button at the start of the tab strip ("Open the explorer"). Opening anything from it (a
   file, a bookmark, a folder's page, What changed, the source ledger, the quick switcher) or
   starting a dialog (new file or folder, move, delete, History) puts the sheet away first, so the
@@ -1381,7 +1384,8 @@ showed one file at a time.
   left-out page, **Include**; the page chosen in the list is shown beside it — why it was decided as
   it was, what including it does, and **Open the copy** (`GET /library/locate?url=`). The llms.txt
   page keeps the folded `SourceLedger.jsx`.
-- `LibraryStatusBar.jsx` — the line along the foot: the agent's state (or what it is waiting on)
+- `LibraryStatusBar.jsx` — the line along the foot: the agent's icon (`LibraryAgent.jsx`, above)
+  and state (or what it is waiting on)
   and how many of the site's pages are stored beside how many addresses the crawl found — "30 pages
   stored, from 68 addresses crawled" — with where the rest went on hover (an error, not a page to
   store, not fetched yet, a duplicate), and how many are still to go; and, for the focused pane's

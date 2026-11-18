@@ -32,7 +32,7 @@ lists only a few (a case studies page, say), and then the rest, most linked firs
 logins and carts, paginated and tag listings, and pages with next to nothing on them are left out
 unless somebody asks for them.
 
-**Source ledger**, at the foot of the explorer, lists every page with the reason it was used or
+**Source ledger**, in the Knowledge base agent's menu (its icon at the bottom left of the Library), lists every page with the reason it was used or
 left out — "Linked from 72 of the site's 72 pages with content" — under **All**, **Used** and **Left out**. On a
 left-out page, **Include** asks for the knowledge base to be written from it too. The row says
 **Queued** until the next write run has used it. A copy's inspector offers the same under **In the
@@ -111,9 +111,11 @@ What you write is kept:
 
 ## When the knowledge base is rewritten
 
-Nobody starts a write run by hand. At the foot of the explorer, the **Knowledge base agent** line
-says what it is doing, or what it is waiting on (point at it for the whole sentence), and its
-switch decides whether the agent works at all:
+Nobody starts a write run by hand. At the bottom left of the Library, the **Knowledge base agent**
+is a small round icon: grey while it is paused, lime once it is set to work,
+with a dot circling it while it writes. The words beside it say what it is doing, or what it is
+waiting on (point at them for the whole sentence). Press the icon for its menu, where **Set to
+work** decides whether the agent works at all:
 
 - Set to work, it rewrites the knowledge base when a crawl finds that a page it is written from
   has changed, a page has been newly chosen, or a chosen page has left the site — once the crawl's
@@ -122,7 +124,7 @@ switch decides whether the agent works at all:
 - Paused, the site is still crawled, copied into Sources and indexed for search; the knowledge
   base is left as it is.
 
-While a run is in flight, **This run** shows it and **Stop** ends it. **What changed** lists what
+While a run is in flight, **This run** shows it and **Stop this run** ends it. **What changed** lists what
 past runs changed, and, while nothing has been written, why. A run that fails is tried again when
 the site next changes, or when the agent is paused and set to work again.
 

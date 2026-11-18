@@ -12,7 +12,6 @@ import {
   FolderPlus,
   Globe,
   House,
-  Library,
   ListTree,
   Lock,
   MoreHorizontal,
@@ -20,7 +19,6 @@ import {
   PanelLeftClose,
   Plus,
   Search,
-  Square,
   UserPen,
   X,
 } from "lucide-react";
@@ -34,11 +32,10 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { LibraryAgent } from "./LibraryAgent";
 import { FolderMenu } from "./LibraryFolder";
 import { targetOf, useLibrary } from "./libraryContext";
 import { behindLabel, useLibraryFreshness } from "./LibraryFreshness";
-import { formatDate } from "@/lib/format";
-import { describeRunEvent } from "@/lib/agents/runEvents";
 import {
   LIBRARY_LIMITS,
   LIBRARY_ROLES,
@@ -46,8 +43,6 @@ import {
   isFixedFolder,
   isSourcePath,
 } from "@/lib/library/library";
-import { runHeadline } from "@/lib/library/runActivity";
-import { VIEWS } from "@/lib/library/workspaceTabs";
 import { cn } from "@/lib/utils";
 import { useShortcut } from "@/lib/keyboard";
 
@@ -61,7 +56,7 @@ const LEGACY_ROLES = Object.freeze({ "/overview": LIBRARY_ROLES.overview, "/inde
 const ICON_BUTTON = "flex size-7 shrink-0 items-center justify-center rounded-md text-orb-muted transition-colors hover:bg-orb-raised hover:text-orb-white disabled:pointer-events-none disabled:opacity-50 aria-pressed:bg-orb-raised aria-pressed:text-orb-white";
 
 /**
- * The Library's explorer: the folders and files, the bookmarks, and the agent at the foot.
+ * The Library's explorer: the folders and files, and the bookmarks.
  *
  * The top level is the structure the person chose for this company — `00 Start Here`, `01
  * Company`, `02 Offer` by default — and each is a real folder, opened, renamed, moved, reordered
@@ -75,9 +70,9 @@ const ICON_BUTTON = "flex size-7 shrink-0 items-center justify-center rounded-md
  * row: a lock says agents stay out, and a pen says a person has written inside. While a run is in
  * flight a third says what it has done to that file so far.
  *
- * The agent sits at the foot rather than above the files because the Library is the thing and the
- * agent is one of its two writers: what it is doing, the switch that sets it to work, and the two
- * records of what it did — what changed, and which pages it read.
+ * The Knowledge base agent is not here: it is a small icon at the start of the line along the foot
+ * of the Library (LibraryAgent), which opens its switch and its two records. The explorer's drawer
+ * on a phone, where that line is not drawn, carries it at its foot instead.
  *
  * @param {object} props
  * @param {"files"|"bookmarks"} props.mode
@@ -159,7 +154,13 @@ export function LibraryExplorer({ mode, onMode, onHide, expanded, onToggle, onCo
         )}
       </div>
 
-      <AgentStrip />
+      {/* On a phone the line along the foot of the Library is not drawn, so the agent comes with
+          its name and line here; from `md` up it is the icon at the start of that line. */}
+      {drawer && (
+        <div className="shrink-0 border-t border-orb-line px-2 py-1.5">
+          <LibraryAgent withLine />
+        </div>
+      )}
     </nav>
   );
 }
@@ -512,142 +513,3 @@ function Bookmarks({ activePath }) {
   );
 }
 
-/** How a run's state reads in the strip's one line. */
-const STATUS_LABELS = Object.freeze({
-  queued: "queued",
-  running: "working now",
-  succeeded: "idle",
-  failed: "last run failed",
-  cancelled: "last run stopped",
-});
-
-/**
- * The agent, at the foot of the explorer: what it is doing, the switch that sets it to work, and
- * the two records of what it did.
- *
- * There is no Run now. Nobody starts this agent: it reads each page your crawl brings back and
- * rewrites the Library when what those pages say has changed, so a button would only ever start a
- * run with nothing new to read. What a person decides is whether it works at all, which is the
- * switch — and while a run is in flight, Stop sits beside it: ending this run and switching the
- * agent off are different things.
- */
-function AgentStrip() {
-  const library = useLibrary();
-  const { work, phases, state, wait } = library;
-  const { run, inFlight, working } = work;
-  const ready = (state?.readiness?.markdownPages ?? 0) > 0;
-  const status = inFlight ? (STATUS_LABELS[run?.status] ?? "working now") : run ? STATUS_LABELS[run.status] ?? "idle" : "not run yet";
-  const failed = !inFlight && run?.status === "failed";
-  const last = work.setup?.lastRunAt ?? run?.finishedAt ?? run?.startedAt;
-  // What it is waiting on, when anything is, rather than "not run yet" with no reason: the same
-  // account the overview and the status line give, with the whole sentence on hover.
-  const waiting = !inFlight && wait && wait.kind !== "writing" ? wait : null;
-  const line = inFlight
-    ? runHeadline(phases) ?? (work.events.length ? describeRunEvent(work.events.at(-1)) : "Starting…")
-    : waiting
-      ? [sentenceCase(waiting.short), last ? `wrote ${formatDate(last)}` : null].filter(Boolean).join(" · ")
-      : [status, last ? `wrote ${formatDate(last)}` : null, working ? null : "paused"].filter(Boolean).join(" · ");
-  const lineTone = inFlight
-    ? "text-orb-lime"
-    : failed || waiting?.tone === "coral"
-      ? "text-orb-coral"
-      : waiting?.tone === "orange"
-        ? "text-orb-orange"
-        : "text-orb-muted";
-  const switchLabel = working
-    ? "The agent is set to work: it rewrites the Library whenever a crawl finds a change. Press to pause it."
-    : "The agent is paused: your site is still crawled, the Library is left as it is. Press to set it to work.";
-
-  return (
-    <div className="flex shrink-0 flex-col gap-2 border-t border-orb-line px-3 py-2.5">
-      <div className="flex items-center gap-2.5">
-        <span
-          className={cn(
-            "relative flex size-7 shrink-0 items-center justify-center rounded-full border-[1.5px]",
-            inFlight ? "border-orb-lime/60 text-orb-lime" : "border-orb-line text-orb-gray",
-          )}
-        >
-          <Library aria-hidden="true" className="size-3.5" />
-          {inFlight && (
-            <span aria-hidden="true" className="pointer-events-none absolute -inset-px rounded-full motion-safe:animate-[orbik-orbit_6s_linear_infinite]">
-              <span className="absolute -top-[3px] left-[11px] size-1.5 rounded-full bg-orb-lime" />
-            </span>
-          )}
-        </span>
-        <div className="min-w-0 flex-1 leading-tight">
-          <p className="truncate text-compact font-medium text-orb-white">Knowledge base agent</p>
-          <p role="status" title={waiting ? waiting.detail : undefined} className={cn("truncate text-xs", lineTone)}>
-            {line}
-          </p>
-        </div>
-        {library.canEdit && <button
-          type="button"
-          role="switch"
-          aria-checked={working}
-          aria-label={switchLabel}
-          title={switchLabel}
-          onClick={work.toggleWorking}
-          disabled={work.busy || !ready}
-          className={cn(
-            "relative h-5 w-[34px] shrink-0 rounded-full transition-colors disabled:opacity-50",
-            working ? "bg-orb-lime" : "bg-orb-line",
-          )}
-        >
-          <span
-            aria-hidden="true"
-            className={cn(
-              "absolute top-0.5 size-4 rounded-full transition-all",
-              working ? "right-0.5 bg-orb-black" : "left-0.5 bg-orb-gray",
-            )}
-          />
-        </button>}
-      </div>
-      <div className="flex gap-1.5">
-        {inFlight ? (
-          <>
-            <StripButton pressed={library.inspector.run} onClick={() => library.inspector.setRun((value) => !value)}>This run</StripButton>
-            {library.canEdit && (
-              <StripButton onClick={work.stop} disabled={work.busy || run?.cancelRequested}>
-                <Square aria-hidden="true" className="size-3" /> {run?.cancelRequested ? "Stopping…" : "Stop"}
-              </StripButton>
-            )}
-          </>
-        ) : (
-          <>
-            <StripButton
-              title="What the agent's last run wrote, changed and left alone, file by file, and what it is waiting on"
-              onClick={(event) => library.openView(VIEWS.changes, event)}
-            >
-              What changed
-            </StripButton>
-            <StripButton
-              title="Every page of your site, and whether the knowledge base is written from it, with the reason"
-              onClick={(event) => library.openView(VIEWS.ledger, event)}
-            >
-              Source ledger
-            </StripButton>
-          </>
-        )}
-      </div>
-    </div>
-  );
-}
-
-/** A short state as the start of a line: "waiting for its folders" → "Waiting for its folders". */
-function sentenceCase(text) {
-  return text ? text.charAt(0).toUpperCase() + text.slice(1) : text;
-}
-
-/** One of the agent strip's two pill buttons. */
-function StripButton({ pressed, children, ...props }) {
-  return (
-    <button
-      type="button"
-      aria-pressed={pressed}
-      className="inline-flex h-7 flex-1 items-center justify-center gap-1.5 rounded-full border border-orb-line text-xs font-medium text-orb-white transition-colors hover:bg-orb-raised disabled:opacity-50 aria-pressed:bg-orb-raised"
-      {...props}
-    >
-      {children}
-    </button>
-  );
-}

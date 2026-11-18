@@ -82,7 +82,7 @@ folders.
 
 1. The Library opens on **Choose how your Library is organised**. Orbik's default — `00 Start
    Here`, `01 Company`, `02 Offer`, … — is always offered. With the **Knowledge base agent** set
-   to work (its switch is at the foot of the Library's explorer) and your keys set, Orbik also
+   to work (**Set to work** in its menu, from its icon at the bottom left of the Library) and your keys set, Orbik also
    reads your site and, within a few minutes, proposes two or three structures, each with a
    sentence on why it fits.
 2. Pick one, rename, add, remove or reorder folders if you like, and press
