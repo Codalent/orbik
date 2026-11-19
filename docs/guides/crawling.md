@@ -31,7 +31,10 @@ crawl's results but not the controls.
   nothing links to is still found if a sitemap lists it; a page that is in no sitemap and linked
   from nowhere cannot be found.
 - It crawls the start address's hostname only. A subdomain is a different site: give it a
-  workspace of its own.
+  workspace of its own. `example.com` and `www.example.com` are the one pair treated as the same
+  site, when one only redirects to the other: Orbik crawls the one that answers, whichever you
+  typed, and **Start crawling from** then shows that address (see
+  [When your address redirects to www](#when-your-address-redirects-to-www)).
 - It turns every page that answers successfully into content-only Markdown, leaving out the
   navigation, the page's header and footer, cookie banners and forms. No AI model is involved in
   crawling.
@@ -121,6 +124,26 @@ somebody asks.
 > fetching, shows **Stopped: out of crawl pages**, and leaves the pages it did not fetch for the
 > next crawl.
 
+## When your address redirects to www
+
+Many sites answer on `www.example.com` and only redirect from `example.com`, or the other way
+round. At the start of every crawl Orbik asks for the start address and looks at where it lands.
+When that is the same name with or without `www.`, the crawl moves there:
+
+- **Start crawling from** becomes the same address on the host that answered, and the crawl
+  settings say which name redirects to which. The workspace's website stays as you typed it.
+- Pages are found and fetched at their real addresses, without a redirect each. A link or a
+  sitemap entry still written with the other name is read as the same page.
+- A sitemap you list yourself can be on either name.
+
+Nothing else is treated this way. A start address that redirects to a subdomain or to another
+domain is still crawled where you pointed it.
+
+If the site was crawled before the crawl moved, the next crawl fetches its pages again at their
+real addresses. The addresses it used before stay listed under **Duplicate URLs**, each folded into
+the page it redirects to, until **Clear crawl data**. Crawl frequencies you set are kept. A page
+you asked for with **Include** in the Library's [Source ledger](library.md) needs including again.
+
 ## A site that will not let the crawler in
 
 Some sites sit behind bot protection that answers a crawler with a refusal or a "prove you are a
@@ -141,6 +164,8 @@ The workspace's own website is changed on **Settings** → **Workspace**, by an 
 
 - **The same site at a new address** (the same hostname) keeps everything crawled. The next crawl
   starts from the new address, unless a start page was chosen on the Crawler page, which is kept.
+  The name the crawl was moved from counts as the same hostname: if `example.com` redirects to
+  `www.example.com`, a website typed with either is the same site.
 - **A different site** (another hostname) starts over, so Orbik asks first. **Change the website**
   removes every page crawled from the old site and its crawl history, and a crawl of the new site
   starts within a minute. The Library keeps what people and agents wrote, and its copies of the old

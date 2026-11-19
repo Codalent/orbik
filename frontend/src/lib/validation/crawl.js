@@ -85,26 +85,38 @@ const sitemapUrlsField = z.string().optional().transform((value, context) => {
   return urls;
 });
 
+/** Whether two hostnames are the same, or one is the other behind `www.`. */
+function isSameOrWwwTwin(a, b) {
+  const left = a.toLowerCase();
+  const right = b.toLowerCase();
+  return left === right || left === `www.${right}` || right === `www.${left}`;
+}
+
 /**
  * Rejects sitemaps that describe some other site than the one being crawled.
  *
  * A sitemap on another hostname lists another site's pages, and following it would fold a second
  * site's URLs into this workspace's totals. It is also the one place a person could point the
  * crawler's outbound requests at a host of their choosing, which is reason enough on its own.
+ *
+ * The start address's `www.` twin counts as the same site. When one spelling only redirects to the
+ * other, the crawler moves the start address to the one that answers, so a person may have named
+ * their sitemap under either. No other subdomain is let through.
  */
 function requireSitemapsOnSeedHost(values, context) {
   let host;
   try {
-    host = new URL(values.seedUrl).hostname;
+    host = new URL(values.seedUrl).hostname.toLowerCase();
   } catch {
     return;
   }
+  const twin = host.startsWith("www.") ? host.slice(4) : `www.${host}`;
   for (const url of values.sitemapUrls ?? []) {
-    if (new URL(url).hostname !== host) {
+    if (!isSameOrWwwTwin(new URL(url).hostname, host)) {
       context.addIssue({
         code: "custom",
         path: ["sitemapUrls"],
-        message: `${url} is not on ${host}. A sitemap on another hostname describes another site.`,
+        message: `${url} is not on ${host} or ${twin}. A sitemap on another hostname describes another site.`,
       });
     }
   }

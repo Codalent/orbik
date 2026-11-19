@@ -28,7 +28,10 @@ Admins and the owner can rename the workspace and change its website on **Settin
   replaced as the new pages are crawled. The brand stays as it is.
 
 `www.example.com` and `example.com` are different hostnames, so moving between them counts as a
-different site. A website can't be changed while a crawl is running.
+different site, with one exception: when one of the two only redirects to the other, the crawl has
+already moved to the one that answers (see
+[Crawling your site](crawling.md#when-your-address-redirects-to-www)), and a website typed with
+either name is the same site. A website can't be changed while a crawl is running.
 
 ## Roles
 

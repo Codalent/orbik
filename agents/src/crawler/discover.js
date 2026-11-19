@@ -5,6 +5,7 @@ import { discoveryJob } from "./fetchPage.js";
 import { getAgentCollections } from "@orbik/core";
 import { collectSitemapUrls } from "./sitemap.js";
 import { createScope } from "./scope.js";
+import { findSeedHost, moveSeedHost, retireRows, rowsOnOldHost } from "./seedHost.js";
 import { createUrlRegistry, DISCOVERY_SOURCES } from "./urlRegistry.js";
 import { loadRobotsForSite } from "./robotsStore.js";
 import { parseSiteConfig } from "./siteConfig.js";
@@ -36,6 +37,10 @@ const SINGLE_PASS_HEADROOM = 1.5;
  * because they list pages the owner wants crawled — including orphan pages that nothing links to,
  * which a link-following crawl would never reach at all.
  *
+ * Before any of that is registered, the seed is asked for once to see which host answers it. A
+ * seed that redirects to its `www.` twin moves the site there (`./seedHost.js`), so everything
+ * below is registered on the host the site lives on.
+ *
  * What follows depends on the account's crawl budget. A page's links can be read for free, by a
  * discovery pass that requests every page once before any is fetched, or as part of the fetch
  * that is going to request it anyway. The pass doubles the requests of a first crawl, and buys
@@ -53,16 +58,17 @@ export function createDiscoverHandler({ createFetcherFor }) {
     const collections = getAgentCollections(database);
 
     const siteId = requireObjectId(job.payload?.siteId ?? job.siteId, "siteId");
-    const document = await collections.sites.findOne({ _id: siteId });
+    let document = await collections.sites.findOne({ _id: siteId });
     if (!document) {
       // A deleted site is not going to reappear, so retrying would only burn attempts.
       throw new AgentError({ code: "SITE_NOT_FOUND", message: `Site ${siteId.toHexString()} does not exist.` });
     }
 
     await collections.runs.updateOne({ _id: job.runId }, { $set: { phase: "discovering" } });
-    const config = parseSiteConfig(document);
-    const scope = createScope(config);
+    let config = parseSiteConfig(document);
     const registry = createUrlRegistry({ urls: collections.urls });
+    // One client for the whole of discovery, whichever host the seed ends on: the pace it keeps
+    // is per host, and a second client would not know the first had just asked.
     const fetcher = createFetcherFor(config);
     const normalizeOptions = {
       stripParams: config.stripParams,
@@ -72,7 +78,7 @@ export function createDiscoverHandler({ createFetcherFor }) {
 
     // Discovery always fetches robots.txt fresh: it is the first request of a crawl, and a stale
     // copy would let a crawl start under permissions the site has since changed.
-    const robots = await loadRobotsForSite({
+    const readRobots = () => loadRobotsForSite({
       robots: collections.robots,
       fetcher,
       siteId,
@@ -81,6 +87,24 @@ export function createDiscoverHandler({ createFetcherFor }) {
       signal,
       maxAgeMs: 0,
     });
+    let robots = await readRobots();
+
+    // Where the seed lands decides which host everything after this is registered on, so it is
+    // settled first. A seed that redirects to its `www.` twin moves the site there, and the rules
+    // that govern the crawl are then that host's own robots.txt, read again from it.
+    const landing = await findSeedHost({ fetcher, config, rules: robots.rules, signal });
+    let seedMoved = null;
+    if (landing) {
+      const relocated = await moveSeedHost({ sites: collections.sites, document, moved: landing, runId: job.runId });
+      if (relocated) {
+        document = relocated;
+        config = parseSiteConfig(document);
+        robots = await readRobots();
+        seedMoved = { from: landing.from.url, to: landing.seedUrl };
+        logger("info", "crawler.seed_host_moved", { siteId: siteId.toHexString(), ...seedMoved });
+      }
+    }
+    const scope = createScope(config);
 
     // A site that disallows us entirely is a finished crawl with a recorded reason, not a
     // failure: there is nothing to retry, and reporting it as an error would bury the actual
@@ -100,8 +124,11 @@ export function createDiscoverHandler({ createFetcherFor }) {
       depth: 0,
     });
     for (const entry of sitemap.entries) {
-      const normalized = tryNormalizeUrl(entry.url, normalizeOptions);
-      if (!normalized) continue;
+      const asWritten = tryNormalizeUrl(entry.url, normalizeOptions);
+      if (!asWritten) continue;
+      // A sitemap generated under the spelling that redirects names every page by it; each is
+      // the page on this host.
+      const normalized = scope.onSiteHost(asWritten);
       // Sitemaps routinely list other hosts — a shared sitemap index across a group of sites, or a
       // subdomain's pages. Those belong to their own crawl, so they are not registered here.
       if (normalized.hostname !== scope.seed.hostname) continue;
@@ -112,6 +139,26 @@ export function createDiscoverHandler({ createFetcherFor }) {
         // shortest-path depth honest until a link crawl establishes a real one.
         depth: null,
         sitemap: { lastmod: entry.lastmod, changefreq: entry.changefreq, priority: entry.priority },
+      });
+    }
+
+    // Pages an earlier crawl registered under the spelling the site has since moved away from.
+    // Their twins on this host join the candidates, so a site that moves keeps every page it was
+    // known to have, whether or not the new seed's links and sitemaps lead back to it.
+    const leftBehind = config.aliasHost ? await rowsOnOldHost(collections.urls, siteId, config.aliasHost) : [];
+    const carried = [];
+    for (const row of leftBehind) {
+      const asWritten = tryNormalizeUrl(row.url, normalizeOptions);
+      if (!asWritten) continue;
+      const normalized = scope.onSiteHost(asWritten);
+      carried.push({ row, twinHash: normalized.hash });
+      addCandidate(candidates, {
+        normalized,
+        // How the page was first found still holds, except "it is the seed": only the address a
+        // crawl starts from is that.
+        sources: (row.discoveredBy ?? []).filter((source) => source !== DISCOVERY_SOURCES.seed),
+        depth: Number.isInteger(row.depth) ? row.depth : null,
+        sitemap: row.sitemap,
       });
     }
 
@@ -151,6 +198,9 @@ export function createDiscoverHandler({ createFetcherFor }) {
       runId: job.runId,
       entries,
     });
+    // Only now, with their twins on record: a discovery that stops between the two is retried and
+    // finds these rows still waiting.
+    const retired = await retireRows({ urls: collections.urls, siteId, moved: carried });
 
     // Measured against everything known for the site, not only what this pass turned up: on a
     // later crawl the registry already holds the pages earlier ones found by following links,
@@ -163,7 +213,7 @@ export function createDiscoverHandler({ createFetcherFor }) {
     // Recorded so a run can be read afterwards: why it did or did not have a discovery pass.
     await collections.runs.updateOne(
       { _id: job.runId },
-      { $set: { discovery: { separatePass, knownUrls, budgetRemaining: remaining } } },
+      { $set: { discovery: { separatePass, knownUrls, budgetRemaining: remaining, ...(seedMoved ? { seedMoved } : {}) } } },
     );
 
     // Jobs are returned rather than queued directly, so the runtime enqueues them before it
@@ -200,6 +250,7 @@ export function createDiscoverHandler({ createFetcherFor }) {
         urlsRobotsBlocked: robotsBlocked,
         sitemapsFetched: sitemap.fetched.length,
         sitemapErrors: sitemap.errors.length,
+        ...(retired ? { urlsRetiredOldHost: retired } : {}),
       },
     };
   };
