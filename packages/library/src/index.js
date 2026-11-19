@@ -37,13 +37,21 @@ export {
   SOURCE_ROOT_PATH,
   SOURCE_SELECTION_SLUG,
   SOURCE_WEBSITE_PATH,
+  isReservedSourceFolder,
   isSourceLayerPath,
+  sourceFolderPath,
   sourceMirrorVerdict,
   sourcePageFolders,
   sourcePagePath,
 } from "./sourceLayer.js";
 export { indexExclusionOf, loadPageExclusions, noindexPageKeys } from "./pageExclusions.js";
-export { SYNTHESIS_PAGE_CEILING, chooseSynthesisPages, siteWidePages } from "./selection.js";
+export {
+  SOURCE_SYNTHESIS_PAGE_CEILING,
+  SYNTHESIS_PAGE_CEILING,
+  chooseSourcePages,
+  chooseSynthesisPages,
+  siteWidePages,
+} from "./selection.js";
 export { LIBRARY_STANDARD_FOLDER_NAMES, describeStandardFolders } from "./vocabulary.js";
 export {
   DEFAULT_LIBRARY_STRUCTURE,

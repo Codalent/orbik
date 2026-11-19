@@ -1,5 +1,12 @@
 import { findAgentDefinition } from "@orbik/agent-definitions";
-import { AGENT_COLLECTIONS, COLLECTIONS } from "@orbik/core";
+import {
+  AGENT_COLLECTIONS,
+  COLLECTIONS,
+  KNOWLEDGE_AGENT_SLUG,
+  SOURCE_KNOWLEDGE_USE,
+  describeSource,
+  websiteFilter,
+} from "@orbik/core";
 import { activeExtensions, agentAllowed } from "@orbik/extensions";
 import { LIBRARY_WRITE_CHANNELS } from "@orbik/library";
 import { AGENT_EVENT_TYPES, AGENT_WRITERS, RUN_STATUS, toDispatchPayload } from "@orbik/protocol";
@@ -77,6 +84,10 @@ export function createExecuteRunHandler({ runtimes, retrieval = null }) {
     }
 
     const siteId = run.siteId ?? (await findSite(database, run.workspaceId));
+    // The workspace's other sources. Pages of every source are read and cited the way the
+    // website's are — except by the knowledge base, which leaves out a source a person chose to
+    // have copied only: it neither searches nor reads it, so it can never be written from.
+    const sources = await sourcesFor(database, run.workspaceId, siteId, definition.slug);
     const actor = definition.writesAs === AGENT_WRITERS.person
       ? await personActor(database, run)
       : null;
@@ -97,7 +108,7 @@ export function createExecuteRunHandler({ runtimes, retrieval = null }) {
       // chat in the side panel, doing what somebody just asked it to. Its writes are recorded as
       // theirs, "via Ask", and the person is read from the run document — who asked — never from
       // the input, so nothing typed into the chat or read on a page can choose whose they are.
-      scope: { workspaceId: run.workspaceId, siteId, agentSlug: definition.slug, runId, ...(actor ? { actor } : {}) },
+      scope: { workspaceId: run.workspaceId, siteId, ...sources, agentSlug: definition.slug, runId, ...(actor ? { actor } : {}) },
       // The retrieval index is a collaborator rather than something a tool constructs, for the
       // same reason the database is: it holds a connection and a credential, and a tool that
       // built one per call would open one per call. A worker without an index passes null, and
@@ -254,11 +265,31 @@ async function personActor(database, run) {
   return { userId, via: { kind: LIBRARY_WRITE_CHANNELS.ask, client: "Ask" } };
 }
 
-/** Finds the crawl site a workspace's agents read from, or null when it has none yet. */
+/** Finds the website a workspace's agents read from, or null when it has none yet. */
 async function findSite(database, workspaceId) {
   if (!workspaceId) return null;
   const site = await database
     .collection(AGENT_COLLECTIONS.sites)
-    .findOne({ workspaceId: new ObjectId(workspaceId) }, { projection: { _id: 1 } });
+    .findOne(websiteFilter(new ObjectId(workspaceId)), { projection: { _id: 1 } });
   return site?._id ?? null;
+}
+
+/**
+ * The sources a run reads pages of, beside its website: `siteIds` (the website first) and, for the
+ * knowledge base, `excludeSiteIds`, the sources copied only.
+ */
+async function sourcesFor(database, workspaceId, siteId, agentSlug) {
+  if (!workspaceId || !siteId) return {};
+  const rows = await database
+    .collection(AGENT_COLLECTIONS.sites)
+    .find({ workspaceId: new ObjectId(workspaceId) }, { projection: { _id: 1, primary: 1, knowledgeUse: 1 } })
+    .toArray();
+  const copied = agentSlug === KNOWLEDGE_AGENT_SLUG
+    ? rows.filter((row) => row.primary === false && describeSource(row).knowledgeUse === SOURCE_KNOWLEDGE_USE.copy)
+    : [];
+  const read = rows.filter((row) => !copied.includes(row) && !row._id.equals(siteId));
+  return {
+    siteIds: [siteId, ...read.map((row) => row._id)],
+    excludeSiteIds: copied.map((row) => row._id.toHexString()),
+  };
 }

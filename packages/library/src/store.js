@@ -148,6 +148,11 @@ export function createLibraryStore({ database, now = () => new Date() }) {
     return {
       workspaceId: toObjectId(scope.workspaceId),
       siteId: scope.siteId ?? null,
+      // Every source the scope covers: the website, and the workspace's other sources when the
+      // caller reads across them. Pages are found and citations resolved against all of them.
+      siteIds: Array.isArray(scope.siteIds) && scope.siteIds.length
+        ? scope.siteIds.map((id) => toObjectId(id))
+        : (scope.siteId ? [toObjectId(scope.siteId)] : []),
     };
   }
 
@@ -874,10 +879,10 @@ export function createLibraryStore({ database, now = () => new Date() }) {
      * @throws {LibraryError} `NODE_MISSING`, saying why, when no copy stands for that address
      */
     async locatePage({ scope, url }) {
-      const { workspaceId, siteId } = scopeOf(scope);
+      const { workspaceId, siteIds } = scopeOf(scope);
       const missing = (message) => new LibraryError({ code: LIBRARY_ERROR_CODES.nodeMissing, message, detail: { url } });
-      if (!siteId) throw missing("This workspace has no crawled site, so no page of it is in the Library.");
-      const site = toObjectId(siteId);
+      if (!siteIds.length) throw missing("This workspace has no crawled site, so no page of it is in the Library.");
+      const site = { $in: siteIds };
       const normalized = tryNormalizeUrl(url);
       const registered = await database.collection(AGENT_COLLECTIONS.urls).findOne(
         { siteId: site, urlHash: { $in: [normalized?.hash, url].filter(Boolean) } },
@@ -887,7 +892,7 @@ export function createLibraryStore({ database, now = () => new Date() }) {
         { projection: { urlHash: 1, url: 1, variantOf: 1 } },
       );
       if (!registered) {
-        throw missing(`${url} is not an address the crawler fetched for this site. Search for the page instead.`);
+        throw missing(`${url} is not an address the crawler fetched for any source of this workspace. Search for the page instead.`);
       }
       const key = registered.variantOf ?? registered.urlHash;
       const state = await sourceState.findOne(
@@ -1003,7 +1008,7 @@ export function createLibraryStore({ database, now = () => new Date() }) {
      * left out, whatever the folder already named stands, and `null` clears it.
      */
     async mkdir({ scope, path, title, summary, listing, actor }) {
-      const { workspaceId, siteId } = scopeOf(scope);
+      const { workspaceId, siteId, siteIds } = scopeOf(scope);
       const writer = actorOf(actor);
       const target = normalizeLibraryPath(path);
       if (await fileRoleAt(workspaceId, target)) {
@@ -1032,7 +1037,7 @@ export function createLibraryStore({ database, now = () => new Date() }) {
       let listed = existing?.listing ?? null;
       if (listing === null || listing === "") listed = null;
       else if (listing !== undefined) {
-        const { resolved } = await providers[LIBRARY_SOURCE_KINDS.page].resolve({ workspaceId, siteId }, [listing]);
+        const { resolved } = await providers[LIBRARY_SOURCE_KINDS.page].resolve({ workspaceId, siteId, siteIds }, [listing]);
         if (!resolved.length) {
           throw new LibraryError({
             code: LIBRARY_ERROR_CODES.unknownSource,
@@ -1100,7 +1105,7 @@ export function createLibraryStore({ database, now = () => new Date() }) {
      * and which day each one is without opening any of them. Any other write keeps what is there.
      */
     async writeFile({ scope, path, title, summary, markdown, sources = [], tags = [], removed, page, actor }) {
-      const { workspaceId, siteId } = scopeOf(scope);
+      const { workspaceId, siteId, siteIds } = scopeOf(scope);
       const writer = actorOf(actor);
       const target = normalizeLibraryPath(path);
       const copying = writer.isAgent && writer.agentSlug === SOURCE_LAYER_WRITER_SLUG && isSourceLayerPath(target);
@@ -1205,7 +1210,7 @@ export function createLibraryStore({ database, now = () => new Date() }) {
           }
         }
       }
-      const resolvedNow = await resolveSourceReferences({ providers, scope: { workspaceId, siteId }, sources: fresh });
+      const resolvedNow = await resolveSourceReferences({ providers, scope: { workspaceId, siteId, siteIds }, sources: fresh });
       const references = [...carried, ...resolvedNow.filter((reference) => !carried.some((kept) => kept.kind === reference.kind && kept.key === reference.key))];
       const { links, unresolved } = await resolveLinks(workspaceId, text, writer, { copy: copying });
 

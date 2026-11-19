@@ -101,6 +101,44 @@ export const MIGRATIONS = [
       logger("info", "migrations.crawl_budget_per_workspace", { moved, kept });
     },
   },
+  {
+    id: "2026-11-19-sources",
+    description: "Make every existing crawl site its workspace's website source, and give the website's Library state rows their site.",
+    async up({ database, logger }) {
+      const sites = database.collection("crawl_sites");
+      const state = database.collection("source_note_state");
+      let marked = 0;
+      let rows = 0;
+      // Every site stored before sources existed is the one site of its workspace: its website.
+      for await (const site of sites.find({ primary: { $exists: false } }, { projection: { workspaceId: 1, seedUrl: 1 } })) {
+        let host = null;
+        try { host = new URL(site.seedUrl).hostname.toLowerCase(); } catch { host = null; }
+        const result = await sites.updateOne(
+          { _id: site._id, primary: { $exists: false } },
+          {
+            $set: {
+              primary: true,
+              relation: "own",
+              mode: "site",
+              name: "Website",
+              folder: "website",
+              purpose: "product",
+              knowledgeUse: "use",
+              ...(host ? { host } : {}),
+            },
+          },
+        );
+        marked += result.modifiedCount;
+        // A state row written before it recorded its site is the website's: there was no other.
+        const updated = await state.updateMany(
+          { workspaceId: site.workspaceId, siteId: { $exists: false } },
+          { $set: { siteId: site._id } },
+        );
+        rows += updated.modifiedCount;
+      }
+      logger("info", "migrations.sources", { sites: marked, stateRows: rows });
+    },
+  },
 ];
 
 /**

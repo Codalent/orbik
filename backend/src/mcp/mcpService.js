@@ -53,14 +53,16 @@ export function createMcpService({
   const brandAssets = database.collection(AGENT_COLLECTIONS.brandAssets);
 
   /**
-   * The registry scope for one member of a session's set: its workspace and crawl site, and no
-   * agent and no run, because an outside client belongs to neither.
+   * The registry scope for one member of a session's set: its workspace and its sources (the
+   * website first), and no agent and no run, because an outside client belongs to neither.
    */
   async function scopeFor(workspace) {
-    const site = await crawlRepository.findSiteByWorkspace(workspace.id);
+    // The website, and every other source of the workspace: a person's AI reads all of them.
+    const siteIds = await crawlRepository.listSourceIds(workspace.id);
     return {
       workspaceId: toObjectId(workspace.id),
-      siteId: site?._id ?? null,
+      siteId: siteIds[0] ?? null,
+      siteIds,
       agentSlug: null,
       runId: null,
     };

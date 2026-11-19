@@ -1,4 +1,13 @@
-import { AGENT_COLLECTIONS, KNOWLEDGE_AGENT_SLUG, describePageKind, log } from "@orbik/core";
+import {
+  AGENT_COLLECTIONS,
+  KNOWLEDGE_AGENT_SLUG,
+  SOURCE_RELATION,
+  WEBSITE_SOURCE,
+  describePageKind,
+  describeSource,
+  log,
+  sourcePurpose,
+} from "@orbik/core";
 import {
   BRAND_ROOT_PATH,
   LIBRARY_ERROR_CODES,
@@ -8,14 +17,15 @@ import {
   SOURCE_LAYER_WRITER_SLUG,
   SOURCE_ROOT_PATH,
   SOURCE_SELECTION_SLUG,
-  SOURCE_WEBSITE_PATH,
+  SOURCE_SYNTHESIS_PAGE_CEILING,
   SYNTHESIS_PAGE_CEILING,
-  chooseSynthesisPages,
+  chooseSourcePages,
   createLibraryStore,
   keepUserWriting,
   librarySegmentOf,
   noindexPageKeys,
   siteWidePages,
+  sourceFolderPath,
   sourceMirrorVerdict,
   sourcePageFolders,
   sourcePagePath,
@@ -24,8 +34,12 @@ import { splitFrontMatter } from "@orbik/retrieval";
 import { recordSelection, reviewSources } from "@orbik/tools";
 
 /**
- * One pass of the source layer: bring a workspace's copy of its site up to date with the crawl,
- * and decide which of those pages the knowledge base is written from.
+ * One pass of the source layer: bring a workspace's copy of one of its sources up to date with the
+ * crawl, and decide which of those pages the knowledge base is written from.
+ *
+ * Each source has a branch of its own, `/sources/<folder>`, and a pass touches that branch and the
+ * state rows of that source and nothing else: the website's pass never mistakes a documentation
+ * subdomain's pages for pages that have left the website.
  *
  * This is the piece that used to cost a model call per page. It read a page and wrote a note, and
  * a site of 4,700 posts was 4,700 calls before anything else could start. Now it copies: the
@@ -97,6 +111,14 @@ export async function mirrorWorkspace({
     chosen: 0, held: 0, orphans: 0, relocated: 0,
   };
   if (!siteId) return counters;
+  // The source being mirrored: its branch, its name on the folder, and how the knowledge base may
+  // use it. A source removed while its pass was queued has nothing left to mirror.
+  const siteDocument = await database.collection(AGENT_COLLECTIONS.sites).findOne({ _id: siteId, workspaceId });
+  if (!siteDocument) return counters;
+  const source = describeSource(siteDocument);
+  const root = sourceFolderPath(source.folder ?? WEBSITE_SOURCE);
+  const origin = originOf(source);
+  const branch = { root, source };
 
   // Everything the rules need, without a word of any page: on a five-thousand-page site, loading
   // the Markdown to find the three pages that moved would be the expensive part of a pass that
@@ -117,7 +139,11 @@ export async function mirrorWorkspace({
       .find({ workspaceId, agentSlug: KNOWLEDGE_AGENT_SLUG, sourceKind: LIBRARY_SOURCE_KINDS.page })
       .project({ sourceKey: 1, relevant: 1, reason: 1, reviewedBy: 1 })
       .toArray(),
-    state.find({ workspaceId }).toArray(),
+    // This source's rows. A row from before rows recorded their site is the website's.
+    state.find({
+      workspaceId,
+      $or: [{ siteId }, ...(source.primary ? [{ siteId: { $exists: false } }, { siteId: null }] : [])],
+    }).toArray(),
     noindexPageKeys(database, siteId),
     citedPages(nodes, workspaceId),
   ]);
@@ -133,7 +159,7 @@ export async function mirrorWorkspace({
   // first, because a path's kind depends on the whole site rather than on the page being placed.
   const folders = new Set();
   for (const page of pages) {
-    const raw = sourcePagePath(page.url);
+    const raw = sourcePagePath(page.url, { root });
     if (raw) for (const folder of sourcePageFolders(raw)) folders.add(folder.path);
   }
 
@@ -160,7 +186,7 @@ export async function mirrorWorkspace({
 
   // --------------------------------------------------------------------------------------------
   // Files no page stands behind.
-  counters.orphans = await sweepOrphans({ library, nodes, scope, actor, workspaceId, rows });
+  counters.orphans = await sweepOrphans({ library, nodes, scope, actor, workspaceId, rows, root });
 
   // --------------------------------------------------------------------------------------------
   // Which pages are stored.
@@ -211,7 +237,10 @@ export async function mirrorWorkspace({
   //
   // Decided over the whole site on every pass rather than page by page as each is copied, because
   // it is a ranking: whether the fortieth page is in depends on the thirty-nine ahead of it.
+  // The order a person listed a list's pages in is the order they are written from.
+  const listedOrder = new Map(source.pageUrls.map((url, index) => [url, index]));
   const candidates = stored.map(({ page, registry: registryRow, included }) => ({
+    order: listedOrder.get(page.url) ?? null,
     key: page.urlHash,
     url: page.url,
     words: page.words ?? 0,
@@ -222,14 +251,21 @@ export async function mirrorWorkspace({
     cited: cited.has(page.urlHash),
   }));
   const outbound = await outboundLinks(links, siteId, siteWidePages(candidates, pages.length), signals);
-  const selection = chooseSynthesisPages(candidates, { siteSize: pages.length, outbound, ceiling });
+  const selection = chooseSourcePages(candidates, {
+    source,
+    siteSize: pages.length,
+    outbound,
+    // The website keeps the knowledge base's own budget; every other source has a smaller one of
+    // its own beside it.
+    ceiling: source.primary ? ceiling : Math.min(ceiling, SOURCE_SYNTHESIS_PAGE_CEILING),
+  });
   const lists = new Map(selection.listings.map((listing) => [listing.key, listing.children.length]));
   await recordChoices({ database, state, scope, workspaceId, stored, selection, lists, ledgerByKey, cited, now });
   counters.chosen = [...selection.decisions.values()].filter((decision) => decision.chosen).length;
 
   // --------------------------------------------------------------------------------------------
   // What has to be copied, and where.
-  const moves = await plannedMoves({ nodes, workspaceId, stored, taken, folders });
+  const moves = await plannedMoves({ nodes, workspaceId, stored, taken, folders, root });
   // A path a copy is moving to is spoken for from now, so no page placed ahead of the move in
   // this loop is put there too.
   for (const to of moves.values()) taken.add(to);
@@ -243,7 +279,7 @@ export async function mirrorWorkspace({
     const displaced = Boolean(recorded && keepers.has(recorded) && keepers.get(recorded) !== page.urlHash);
     const written = displaced ? null : recorded;
     const relocateFrom = moves.has(page.urlHash) ? written : null;
-    const filePath = relocateFrom ? moves.get(page.urlHash) : written ?? sourcePagePath(page.url, { taken, folders });
+    const filePath = relocateFrom ? moves.get(page.urlHash) : written ?? sourcePagePath(page.url, { taken, folders, root });
     if (!filePath) continue;
     taken.add(filePath);
 
@@ -257,7 +293,10 @@ export async function mirrorWorkspace({
     // path it belongs at. Neither is news to the knowledge base, so neither starts a write run.
     const facts = factsOf(page);
     const moved = !row || !row.mirroredAt || row.hash !== page.hash || row.removed === true;
-    const stale = moved || displaced || Boolean(row.error) || row.facts !== factsKey(facts) || Boolean(relocateFrom);
+    const stale = moved || displaced || Boolean(row.error) || row.facts !== factsKey(facts) || Boolean(relocateFrom)
+      // The source was renamed, or now says something else about what it is: the line every copy
+      // carries about where it came from is rewritten, which is not news to the knowledge base.
+      || (row.origin ?? null) !== origin;
     if (!stale) {
       counters.unchanged += 1;
       continue;
@@ -281,20 +320,20 @@ export async function mirrorWorkspace({
   const batch = wanted.slice(0, limit);
   counters.remaining = Math.max(0, wanted.length - batch.length);
   if (!batch.length) {
-    await refreshFolderSummaries({ library, nodes, scope, actor, workspaceId });
+    await refreshFolderSummaries({ library, nodes, scope, actor, workspaceId, branch });
     return counters;
   }
 
   // Folders before files: `library.writeFile` refuses a path whose parent does not exist, and
   // creating them one file at a time would rewrite `/sources/website/services` seventy times.
-  await ensureFolders({ library, nodes, scope, actor, workspaceId, paths: batch.map((entry) => entry.filePath) });
+  await ensureFolders({ library, nodes, scope, actor, workspaceId, branch, paths: batch.map((entry) => entry.filePath) });
 
   const site = await describeSite({ markdown, siteId, pages, signals });
 
   for (const entry of batch) {
     signal?.throwIfAborted();
     try {
-      const outcome = await mirrorOnePage({ markdown, nodes, state, library, scope, actor, workspaceId, siteId, site, entry, now });
+      const outcome = await mirrorOnePage({ markdown, nodes, state, library, scope, actor, workspaceId, siteId, site, entry, origin, now });
       if (outcome === "held") counters.held += 1;
       else if (outcome === "mirrored") {
         counters.mirrored += 1;
@@ -336,9 +375,23 @@ export async function mirrorWorkspace({
   }
 
   if (!counters.remaining) {
-    await refreshFolderSummaries({ library, nodes, scope, actor, workspaceId });
+    await refreshFolderSummaries({ library, nodes, scope, actor, workspaceId, branch });
   }
   return counters;
+}
+
+/**
+ * The line a copy carries about the source it came from, or null for the website.
+ *
+ * The website's copies carry none: they are what the knowledge base is about, and their header
+ * has always been the page's own facts. Every other source's copies say which source, whose pages
+ * they are and what kind of source it is, because a model reading the copy has to know that a
+ * review is somebody else's words before it can quote it as one.
+ */
+function originOf(source) {
+  if (source.primary) return null;
+  const whose = source.relation === SOURCE_RELATION.elsewhere ? "a page about the company elsewhere" : "a site of the company's own";
+  return `- From: ${source.name} (${whose}; ${sourcePurpose(source.purpose).label.toLowerCase()})`;
 }
 
 /** Whether a state row records a file that was actually written, as a copy or as the note before it. */
@@ -364,13 +417,13 @@ function isWritten(row) {
  *
  * @returns {Promise<number>} how many were removed
  */
-async function sweepOrphans({ library, nodes, scope, actor, workspaceId, rows }) {
+async function sweepOrphans({ library, nodes, scope, actor, workspaceId, rows, root }) {
   const claimed = new Set(rows.filter((row) => row.path).map((row) => row.path));
   const files = await nodes
     .find({
       workspaceId,
       kind: LIBRARY_NODE_KINDS.file,
-      path: { $regex: `^${SOURCE_WEBSITE_PATH}/` },
+      path: { $regex: `^${root}/` },
       "authors.agent": SOURCE_LAYER_WRITER_SLUG,
       hasUserContent: { $ne: true },
       locked: { $ne: true },
@@ -406,13 +459,13 @@ async function sweepOrphans({ library, nodes, scope, actor, workspaceId, rows })
  *
  * @returns {Promise<Map<string, string>>} the page's URL hash, to the path it moves to
  */
-async function plannedMoves({ nodes, workspaceId, stored, taken, folders }) {
+async function plannedMoves({ nodes, workspaceId, stored, taken, folders, root }) {
   const wanted = new Map();
   const claimed = new Set();
   for (const { page, row } of stored) {
     const from = row && isWritten(row) && row.path ? row.path : null;
     if (!from || row.error) continue;
-    const to = sourcePagePath(page.url, { folders });
+    const to = sourcePagePath(page.url, { folders, root });
     // Into its own folder is the URL becoming a directory, which is a different problem: the file
     // is in the way of the folder it would move into.
     if (!to || to === from || taken.has(to) || claimed.has(to) || to.startsWith(`${from}/`)) continue;
@@ -750,7 +803,7 @@ function openingOf(body) {
  *
  * @returns {Promise<"mirrored"|"held"|"gone">}
  */
-async function mirrorOnePage({ markdown, nodes, state, library, scope, actor, workspaceId, siteId, site, entry, now }) {
+async function mirrorOnePage({ markdown, nodes, state, library, scope, actor, workspaceId, siteId, site, entry, origin, now }) {
   const { page, filePath } = entry;
 
   const document = await markdown.findOne(
@@ -773,6 +826,7 @@ async function mirrorOnePage({ markdown, nodes, state, library, scope, actor, wo
   const copy = composeSourceFile({
     page,
     known: entry.facts,
+    origin,
     body,
     hash: document.hash,
     limit: Math.max(1_000, LIBRARY_LIMITS.sourceMarkdown - reserved),
@@ -791,6 +845,7 @@ async function mirrorOnePage({ markdown, nodes, state, library, scope, actor, wo
     path: filePath,
     hash: document.hash ?? null,
     removed: false,
+    origin,
   };
 
   let written;
@@ -873,10 +928,11 @@ async function mirrorOnePage({ markdown, nodes, state, library, scope, actor, wo
  * A page longer than a source file may be is cut between blocks and says so. The whole page is
  * still what the retrieval index searches and what `content.readPages` opens.
  */
-function composeSourceFile({ page, known, body, hash, limit, removed = false, lastSeen = null }) {
+function composeSourceFile({ page, known, origin = null, body, hash, limit, removed = false, lastSeen = null }) {
   const crawled = page.renderedAt ?? page.updatedAt ?? null;
   const facts = [
     `- Source: ${page.url}`,
+    origin,
     known.kind && known.kind !== "website" ? `- Kind: ${known.kind}` : null,
     known.publishedAt ? `- Published: ${isoDay(known.publishedAt)}` : null,
     known.modifiedAt ? `- Page last changed: ${isoDay(known.modifiedAt)}` : null,
@@ -1001,7 +1057,7 @@ async function recordSkip({ database, state, scope, workspaceId, page, row, verd
 }
 
 /** Creates the folders a batch of files needs, outermost first, and only the missing ones. */
-async function ensureFolders({ library, nodes, scope, actor, workspaceId, paths }) {
+async function ensureFolders({ library, nodes, scope, actor, workspaceId, branch, paths }) {
   const needed = new Map();
   for (const path of paths) {
     for (const folder of sourcePageFolders(path)) needed.set(folder.path, folder);
@@ -1023,8 +1079,8 @@ async function ensureFolders({ library, nodes, scope, actor, workspaceId, paths 
     await library.mkdir({
       scope,
       path: folder.path,
-      title: folderTitle(folder.path),
-      summary: folderSummary(folder.path, null),
+      title: folderTitle(folder.path, branch),
+      summary: folderSummary(folder.path, null, branch),
       actor,
     });
   }
@@ -1037,12 +1093,14 @@ async function ensureFolders({ library, nodes, scope, actor, workspaceId, paths 
  * the mirror that depends on the whole of it. A folder whose summary says "12 pages" is the
  * difference between a tree a reader can skim and one they have to open every branch of.
  */
-async function refreshFolderSummaries({ library, nodes, scope, actor, workspaceId }) {
+async function refreshFolderSummaries({ library, nodes, scope, actor, workspaceId, branch }) {
+  const { root } = branch;
+  // `/sources` itself, and this source's branch: every other source's pass keeps its own.
   const folders = await nodes
     .find({
       workspaceId,
       kind: LIBRARY_NODE_KINDS.folder,
-      path: { $regex: `^${SOURCE_ROOT_PATH}(/|$)` },
+      $or: [{ path: SOURCE_ROOT_PATH }, { path: { $regex: `^${root}(/|$)` } }],
     })
     .project({ path: 1, summary: 1, title: 1, authors: 1, locked: 1 })
     .toArray();
@@ -1052,7 +1110,7 @@ async function refreshFolderSummaries({ library, nodes, scope, actor, workspaceI
   // under it holds thirty-nine pages, and "0 pages" is what counting only its own would say.
   const counts = await nodes
     .aggregate([
-      { $match: { workspaceId, kind: LIBRARY_NODE_KINDS.file, path: { $regex: `^${SOURCE_WEBSITE_PATH}/` } } },
+      { $match: { workspaceId, kind: LIBRARY_NODE_KINDS.file, path: { $regex: `^${root}/` } } },
       { $group: { _id: "$parentPath", files: { $sum: 1 } } },
     ])
     .toArray();
@@ -1068,7 +1126,7 @@ async function refreshFolderSummaries({ library, nodes, scope, actor, workspaceI
   const emptied = new Set();
   const empty = folders
     .filter((folder) => (beneath.get(folder.path) ?? 0) === 0
-      && folder.path.startsWith(`${SOURCE_WEBSITE_PATH}/`)
+      && folder.path.startsWith(`${root}/`)
       && folder.authors?.agent === SOURCE_LAYER_WRITER_SLUG
       && folder.authors?.user !== true
       && folder.locked !== true)
@@ -1086,9 +1144,11 @@ async function refreshFolderSummaries({ library, nodes, scope, actor, workspaceI
     if (emptied.has(folder.path)) continue;
     // A folder somebody made or locked is theirs; the mirror files into it and leaves its words.
     if (folder.locked === true || folder.authors?.user === true) continue;
-    const summary = folderSummary(folder.path, beneath.get(folder.path) ?? 0);
-    if (folder.summary === summary) continue;
-    await library.mkdir({ scope, path: folder.path, title: folder.title ?? folderTitle(folder.path), summary, actor })
+    const summary = folderSummary(folder.path, beneath.get(folder.path) ?? 0, branch);
+    // The branch is called what the source is called, and follows a rename.
+    const title = folder.path === root ? folderTitle(root, branch) : (folder.title ?? folderTitle(folder.path, branch));
+    if (folder.summary === summary && folder.title === title) continue;
+    await library.mkdir({ scope, path: folder.path, title, summary, actor })
       .catch(() => {});
   }
 }
@@ -1102,8 +1162,8 @@ async function refreshFolderSummaries({ library, nodes, scope, actor, workspaceI
  * Three characters is the line — long enough for the initialisms a site actually uses, short
  * enough that no ordinary word is caught by it.
  */
-function folderTitle(path) {
-  if (path === SOURCE_WEBSITE_PATH) return "Website";
+function folderTitle(path, { root, source }) {
+  if (path === root) return source.name;
   if (path === SOURCE_ROOT_PATH) return "Sources";
   return wordsOf(librarySegmentOf(path));
 }
@@ -1127,14 +1187,18 @@ function lastSegment(url) {
 }
 
 /** One line saying what is in a mirrored folder, for a reader skimming the tree. */
-function folderSummary(path, files) {
+function folderSummary(path, files, { root, source }) {
   if (path === SOURCE_ROOT_PATH) {
     return "A copy of every source, by where it came from. Kept in step by code; agents read it and link to it.";
   }
-  if (path === SOURCE_WEBSITE_PATH) {
-    return "Every page of the crawled website as it was last read, at a path that mirrors its URL.";
+  if (path === root) {
+    if (source.primary) return "Every page of the crawled website as it was last read, at a path that mirrors its URL.";
+    const what = sourcePurpose(source.purpose).label.toLowerCase();
+    return source.relation === SOURCE_RELATION.elsewhere
+      ? `${source.name}: pages about the company on ${source.host}, as last read (${what}).`
+      : `${source.name}: every page of ${source.host} as last read, at a path that mirrors its URL (${what}).`;
   }
-  const where = `\`${path.slice(SOURCE_WEBSITE_PATH.length)}/\``;
+  const where = `\`${path.slice(root.length)}/\``;
   if (files === null) return `Pages under ${where}.`;
   return files === 1 ? `1 page under ${where}.` : `${files.toLocaleString("en-US")} pages under ${where}.`;
 }

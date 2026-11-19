@@ -158,7 +158,7 @@ function putOff({ workspaceId, siteId, pass, waits }) {
     workspaceId,
     siteId,
     pass,
-    idempotencyKey: `sources:${workspaceId.toHexString()}:waiting:${waits % 2}`,
+    idempotencyKey: `sources:${workspaceId.toHexString()}:${siteId ? `${siteId.toHexString()}:` : ""}waiting:${waits % 2}`,
   });
   const delay = Math.min(PUT_OFF_CEILING_MS, PUT_OFF_MS * 2 ** Math.min(waits - 1, 4));
   return { ...job, payload: { ...job.payload, waits }, availableAt: new Date(Date.now() + delay) };

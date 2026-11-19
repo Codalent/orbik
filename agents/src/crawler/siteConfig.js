@@ -1,3 +1,5 @@
+import { SOURCE_LIMITS, SOURCE_MODE, describeSource, sectionPatterns } from "@orbik/core";
+
 import { AgentError } from "../runtime/errors.js";
 import { normalizeUrl } from "./url.js";
 
@@ -52,7 +54,33 @@ export function parseSiteConfig(document) {
     errors.push("seedUrl must be an absolute http(s) URL.");
   }
 
-  const maxDepth = source.maxDepth ?? SITE_DEFAULTS.maxDepth;
+  // What the site is as a source: the whole host, one section of it, or a list of pages. A
+  // section is an inclusion rule the scope already knows how to apply; a list of pages is a scope
+  // of its own (`createScope`), whose only links worth following are a listing's own next pages.
+  const described = describeSource(source);
+  const mode = described.mode;
+  let pageUrls = [];
+  if (mode === SOURCE_MODE.pages) {
+    if (!Array.isArray(described.pageUrls) || !described.pageUrls.length || described.pageUrls.length > SOURCE_LIMITS.pages) {
+      errors.push(`pageUrls must list from 1 to ${SOURCE_LIMITS.pages} pages.`);
+    } else {
+      try {
+        pageUrls = described.pageUrls.map((url) => normalizeUrl(url).href);
+      } catch {
+        errors.push("pageUrls entries must be absolute http(s) URLs.");
+      }
+      if (seedUrl && pageUrls.some((url) => new URL(url).hostname !== new URL(seedUrl).hostname)) {
+        errors.push("pageUrls must all be on the seed's host.");
+      }
+    }
+  }
+  if (mode === SOURCE_MODE.section && !described.section) {
+    errors.push("A section source needs a section.");
+  }
+
+  // A page list goes as deep as its listings page, and no deeper: depth there is the next-page
+  // chain, not the site's link structure.
+  const maxDepth = mode === SOURCE_MODE.pages ? SOURCE_LIMITS.pagination : (source.maxDepth ?? SITE_DEFAULTS.maxDepth);
   if (!Number.isInteger(maxDepth) || maxDepth < 0 || maxDepth > 50) {
     errors.push("maxDepth must be an integer from 0 through 50.");
   }
@@ -136,7 +164,11 @@ export function parseSiteConfig(document) {
   return Object.freeze({
     seedUrl,
     sitemapUrls: Array.isArray(sitemapUrls) ? sitemapUrls.map((url) => normalizeUrl(url).href) : [],
-    includePatterns: source.includePatterns ?? [],
+    mode,
+    primary: described.primary,
+    pageUrls,
+    followPagination: described.followPagination,
+    includePatterns: mode === SOURCE_MODE.section ? sectionPatterns(described.section) : (source.includePatterns ?? []),
     excludePatterns: source.excludePatterns ?? [],
     maxDepth,
     respectRobots,

@@ -41,6 +41,15 @@ import { LIBRARY_PATH_SEPARATOR } from "./library.js";
 export const SYNTHESIS_PAGE_CEILING = 80;
 
 /**
+ * The most pages of one source other than the website the knowledge base is written from.
+ *
+ * Its own budget beside the website's, so adding a documentation site cannot push the company's
+ * own pages out of the knowledge base, and half the website's, because the website is what the
+ * knowledge base is about and every other source adds to it.
+ */
+export const SOURCE_SYNTHESIS_PAGE_CEILING = 40;
+
+/**
  * The most words of page a knowledge base is written from.
  *
  * A second bound beside the count, because the write run holds what it reads: eighty pages of
@@ -116,10 +125,15 @@ const SELECTION_REASONS = Object.freeze({
   stub: "stub",
   /** The budget was full before its turn came. */
   beyondCeiling: "beyond-ceiling",
+  /** A page of a source that reads only the pages a person listed: each was asked for by name. */
+  onList: "on-list",
+  /** A page of a source a person chose to have copied only, never written from. */
+  copyOnly: "copy-only",
 });
 
 /** The reasons that mean a page is written from. */
 const CHOSEN_REASONS = new Set([
+  SELECTION_REASONS.onList,
   SELECTION_REASONS.included,
   SELECTION_REASONS.inUse,
   SELECTION_REASONS.siteWide,
@@ -303,6 +317,72 @@ export function chooseSynthesisPages(pages, {
   for (const page of remaining()) decide(page, SELECTION_REASONS.beyondCeiling);
 
   return { decisions, listings, threshold, counts };
+}
+
+/**
+ * Which pages of one source the knowledge base is written from.
+ *
+ * The website, and any other site or section of the workspace's own, is decided by
+ * {@link chooseSynthesisPages}: its link structure is the signal. Two kinds of source are decided
+ * otherwise, because they have no link structure worth the name:
+ *
+ * - **A source a person chose to have copied only** has none of its pages written from. It is in
+ *   the Library for search, Ask and the person's own AI; the knowledge base is not built on it.
+ * - **A list of pages** — a review profile, an article — is a source whose every page a person
+ *   named, so every page is written from while its budget has room, in the order they were
+ *   listed. The rules that set pages aside by their address do not apply: page two of a listing of
+ *   reviews is exactly what the person asked to have read.
+ *
+ * @param {Array<object>} pages as for {@link chooseSynthesisPages}, each with an optional `order`
+ * @param {object} options
+ * @param {{name: string, mode: string, knowledgeUse: string}} options.source what `describeSource` says
+ * @returns {ReturnType<typeof chooseSynthesisPages>}
+ */
+export function chooseSourcePages(pages, { source, ceiling = SYNTHESIS_PAGE_CEILING, words = SYNTHESIS_WORD_CEILING, ...options } = {}) {
+  if (source?.knowledgeUse !== "copy" && source?.mode !== "pages") {
+    return chooseSynthesisPages(pages, { ...options, ceiling, words });
+  }
+  const decisions = new Map();
+  const counts = Object.fromEntries(Object.values(SELECTION_REASONS).map((reason) => [reason, 0]));
+  const budget = { pages: ceiling, words };
+  const decide = (page, reason) => {
+    const chosen = CHOSEN_REASONS.has(reason);
+    if (chosen) {
+      budget.pages -= 1;
+      budget.words -= page.words ?? 0;
+    }
+    counts[reason] += 1;
+    decisions.set(page.key, {
+      chosen,
+      reason,
+      message: sourceMessageFor(reason, { source, ceiling }),
+      listedBy: [],
+    });
+  };
+  if (source.knowledgeUse === "copy") {
+    for (const page of pages) decide(page, SELECTION_REASONS.copyOnly);
+    return { decisions, listings: [], threshold: 0, counts };
+  }
+  const ordered = [...pages].sort((left, right) => (left.order ?? Number.MAX_SAFE_INTEGER) - (right.order ?? Number.MAX_SAFE_INTEGER)
+    || String(left.url).localeCompare(String(right.url)));
+  for (const page of ordered) {
+    const fits = budget.pages > 0 && budget.words - (page.words ?? 0) >= 0;
+    decide(page, fits ? SELECTION_REASONS.onList : SELECTION_REASONS.beyondCeiling);
+  }
+  return { decisions, listings: [], threshold: 0, counts };
+}
+
+/** The sentence a person reads beside a page of a copied-only source or a list of pages. */
+function sourceMessageFor(reason, { source, ceiling }) {
+  const name = source?.name ?? "This source";
+  switch (reason) {
+    case SELECTION_REASONS.copyOnly:
+      return `Stored and searchable. Not written from: ${name} is copied only.`;
+    case SELECTION_REASONS.onList:
+      return `On the list of pages ${name} reads.`;
+    default:
+      return `Stored and searchable. ${name} lists more pages than the ${ceiling.toLocaleString("en-US")} the knowledge base is written from.`;
+  }
 }
 
 /**

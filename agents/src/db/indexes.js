@@ -89,6 +89,21 @@ export async function ensureAgentIndexes(database) {
       { workspaceId: 1, seedUrl: 1 },
       { unique: true, name: "crawl_sites_workspace_seed_unique" },
     ),
+    // A workspace's sources: one website, one folder under /sources each, and one source per host,
+    // so no page is ever crawled — and copied — twice. Partial, because a site stored before
+    // sources existed carries none of these fields until the `2026-11-19-sources` migration runs.
+    sites.createIndex(
+      { workspaceId: 1 },
+      { unique: true, partialFilterExpression: { primary: true }, name: "crawl_sites_workspace_primary_unique" },
+    ),
+    sites.createIndex(
+      { workspaceId: 1, folder: 1 },
+      { unique: true, partialFilterExpression: { folder: { $type: "string" } }, name: "crawl_sites_workspace_folder_unique" },
+    ),
+    sites.createIndex(
+      { workspaceId: 1, host: 1 },
+      { unique: true, partialFilterExpression: { host: { $type: "string" } }, name: "crawl_sites_workspace_host_unique" },
+    ),
 
     // The URL registry's identity. Every discovery upsert keys on it, so uniqueness here is what
     // makes discovering the same page from a sitemap and from a link produce one row, not two.
@@ -288,6 +303,8 @@ export async function ensureAgentIndexes(database) {
     // Back the scheduler's two questions: when did this workspace last copy a page, and when did
     // a page its knowledge base is written from last move.
     sourceNotes.createIndex({ workspaceId: 1, mirroredAt: -1 }, { name: "source_note_state_workspace_mirrored" }),
+    // One source's rows, for the mirror pass that keeps its folder and for removing a source.
+    sourceNotes.createIndex({ workspaceId: 1, siteId: 1 }, { name: "source_note_state_workspace_site" }),
     sourceNotes.createIndex({ workspaceId: 1, movedAt: -1 }, { name: "source_note_state_workspace_moved" }),
 
     // Backs going the other way: from a Library path back to the page it is a copy of.

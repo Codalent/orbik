@@ -55,7 +55,7 @@ export function createDiscoverPageHandler({ createFetcherFor }) {
     // Checked before anything is read from the response: a bot-protection page has no links, and
     // a home page that turns the crawler away ends the crawl here, before any budget is spent.
     const block = detectSiteBlock(response);
-    const seed = record.urlHash === scope.seed.hash;
+    const seed = scope.isStart(record.urlHash);
     if (block && (block.kind === "challenge" || seed)) {
       await recordBlocked({ runs: collections.runs, runId: job.runId, block, url: record.url, seed });
       return {};

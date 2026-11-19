@@ -45,6 +45,7 @@ const INDEXED_PAYLOAD_FIELDS = Object.freeze({
   workspaceId: "keyword",
   sourceKind: "keyword",
   sourceKey: "keyword",
+  siteId: "keyword",
   path: "keyword",
   model: "keyword",
 });
@@ -193,15 +194,19 @@ export function createVectorStore({ url, collection, dimensions, apiKey = null, 
      * @param {string} options.workspaceId hexadecimal workspace identifier
      * @param {string[]} [options.kinds] restrict to these source kinds
      * @param {string} [options.pathPrefix] restrict Library results to one branch
+     * @param {string[]} [options.excludeSiteIds] sources whose pages are left out
      * @param {number} [options.limit] how many passages to return
      */
-    async search({ vector, workspaceId, kinds = [], pathPrefix = null, limit = 8 }) {
+    async search({ vector, workspaceId, kinds = [], pathPrefix = null, excludeSiteIds = [], limit = 8 }) {
       const must = [{ key: "workspaceId", match: { value: workspaceId } }];
       if (kinds.length) must.push({ key: "sourceKind", match: { any: [...kinds] } });
       // A path prefix is expressed as a text match on the stored path rather than as a range,
       // because Qdrant's keyword index matches whole values: the candidates it returns are then
       // narrowed exactly by the caller, which holds the same paths in MongoDB.
       const filter = { must };
+      // A point indexed before it carried its source has none, and is the website's — which is
+      // never left out — so a missing value matches nothing here and is kept.
+      if (excludeSiteIds.length) filter.must_not = [{ key: "siteId", match: { any: [...excludeSiteIds] } }];
 
       const response = await attempt("search", () =>
         qdrant.query(collection, {

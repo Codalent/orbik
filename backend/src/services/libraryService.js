@@ -100,12 +100,15 @@ export function createLibraryService({
   }
 
   /**
-   * The scope every Library call is made in: the workspace, and the site its sources come from.
+   * The scope every Library call is made in: the workspace, its website, and every source whose
+   * pages are in it.
    */
   async function scopeFor(userId, workspaceId, role) {
     const workspace = await requireWorkspaceAccess(userId, workspaceId, { role });
     const site = await crawlRepository.findSiteByWorkspace(workspace._id);
-    return { workspace, site, scope: { workspaceId: workspace._id, siteId: site?._id ?? null } };
+    // Pages of every source are found and cited the way the website's are.
+    const siteIds = site ? await crawlRepository.listSourceIds(workspace._id) : [];
+    return { workspace, site, scope: { workspaceId: workspace._id, siteId: site?._id ?? null, siteIds } };
   }
 
   /**

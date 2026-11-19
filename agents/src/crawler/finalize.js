@@ -101,7 +101,8 @@ export function createFinalizeHandler() {
     const complete = outstanding === 0 && failed === 0 && skippedNoBudget === 0 && !rateLimited
       && !blocked && pagesBlocked === 0 && !run?.cancelRequestedAt;
 
-    const depths = await computeDepths(collections.links, siteId, seedHash);
+    // A list of pages starts from every page on it; a site from its seed.
+    const depths = await computeDepths(collections.links, siteId, [seedHash, ...scope.listed.map((url) => url.hash)]);
     const updated = await applyDepths(collections.urls, siteId, depths);
     const orphans = complete ? await markOrphans(collections.urls, siteId, depths) : 0;
 
@@ -333,9 +334,9 @@ function pathOf(url) {
  * of round trips a database-side traversal would cost. A larger site would need a different
  * approach, and this is the function that would have to change.
  *
- * @returns {Promise<Map<string, number>>} URL hash to shortest link distance from the seed
+ * @returns {Promise<Map<string, number>>} URL hash to shortest link distance from the nearest start
  */
-async function computeDepths(links, siteId, seedHash) {
+async function computeDepths(links, siteId, startHashes) {
   const adjacency = new Map();
   const cursor = links.find({ siteId, internal: true }).project({ fromUrlHash: 1, toUrlHash: 1 });
   for await (const edge of cursor) {
@@ -347,8 +348,8 @@ async function computeDepths(links, siteId, seedHash) {
     targets.add(edge.toUrlHash);
   }
 
-  const depths = new Map([[seedHash, 0]]);
-  let frontier = [seedHash];
+  const depths = new Map(startHashes.map((hash) => [hash, 0]));
+  let frontier = [...depths.keys()];
   let distance = 0;
   while (frontier.length) {
     distance += 1;

@@ -90,8 +90,16 @@ export function createDiscoverHandler({ createFetcherFor }) {
       logger("warn", "crawler.blocked_by_robots", { siteId: siteId.toHexString(), source: robots.rules.source });
     }
 
-    const sitemapSeeds = resolveSitemapSeeds(config.sitemapUrls, robots.rules.sitemaps, config.seedUrl, normalizeOptions);
-    const sitemap = await collectSitemapUrls({ fetcher, seeds: sitemapSeeds, signal });
+    // A list of pages is read from its list: its host's sitemaps describe the rest of that host,
+    // which is exactly what such a source does not read.
+    const listOnly = scope.listed.length > 0;
+    const sitemap = listOnly
+      ? { entries: [], fetched: [], errors: [] }
+      : await collectSitemapUrls({
+        fetcher,
+        seeds: resolveSitemapSeeds(config.sitemapUrls, robots.rules.sitemaps, config.seedUrl, normalizeOptions),
+        signal,
+      });
 
     const candidates = new Map();
     addCandidate(candidates, {
@@ -99,6 +107,10 @@ export function createDiscoverHandler({ createFetcherFor }) {
       sources: [DISCOVERY_SOURCES.seed],
       depth: 0,
     });
+    // Every listed page is a start of its own: nothing links one to another.
+    for (const normalized of scope.listed) {
+      addCandidate(candidates, { normalized, sources: [DISCOVERY_SOURCES.seed], depth: 0 });
+    }
     for (const entry of sitemap.entries) {
       const normalized = tryNormalizeUrl(entry.url, normalizeOptions);
       if (!normalized) continue;

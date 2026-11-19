@@ -1,9 +1,17 @@
-import { AGENT_COLLECTIONS, SOURCE_STATUS, SOURCE_STATUS_VALUES, escapeRegExp } from "@orbik/core";
+import {
+  AGENT_COLLECTIONS,
+  SOURCE_RELATION,
+  SOURCE_STATUS,
+  SOURCE_STATUS_VALUES,
+  describeSource,
+  escapeRegExp,
+  sourcePurpose,
+} from "@orbik/core";
 import { CHUNK_SOURCE_KINDS, LIBRARY_LIMITS, LIBRARY_NODE_KINDS, LIBRARY_SOURCE_KINDS } from "@orbik/library";
 
 import { MAX_URL, boundedInteger, rejectUnknown, requireString, requireStringArray, requiredBoolean } from "./args.js";
 import { ToolError, defineTool } from "./registry.js";
-import { requireAgentSlug, requireSite, requireWorkspace } from "./scope.js";
+import { requireAgentSlug, requireSite, requireSites, requireWorkspace } from "./scope.js";
 import { excludedRoutes, reviewRoutes, reviewSourceUrls } from "./sources.js";
 
 /**
@@ -405,7 +413,9 @@ const readContentPages = defineTool({
     };
   },
   async handler(input, { database, scope, readingBudget }) {
-    const siteId = requireSite(scope);
+    // Any source the run may read, not only the website: a chosen page of the documentation site
+    // is opened the same way.
+    const siteIds = requireSites(scope);
 
     if (readingBudget && readingBudget.remaining() <= 0) {
       throw new ToolError({
@@ -420,7 +430,7 @@ const readContentPages = defineTool({
 
     const documents = await database
       .collection(AGENT_COLLECTIONS.markdown)
-      .find({ siteId, url: { $in: input.urls } })
+      .find({ siteId: { $in: siteIds }, url: { $in: input.urls } })
       .project({ url: 1, title: 1, heading: 1, markdown: 1, words: 1, updatedAt: 1 })
       .toArray();
 
@@ -597,27 +607,30 @@ const mapContentSite = defineTool({
     "it has changed since you did (changed), or neither (current). `listings` are pages of the " +
     "site that list a set of others — the case-studies page, the blog's index — with how many " +
     "they list, a few titles and the dates they span. `stored` describes every other page: " +
-    "stored and searchable, not chosen, grouped by the listing they are on. Call it once, early: " +
-    "it is how you learn what the site is made of without opening a page.",
+    "stored and searchable, not chosen, grouped by the listing they are on. `sources` lists the " +
+    "workspace's sources besides its website — another site of the company's, pages about it " +
+    "elsewhere — each with what it is and how its pages are to be used; a chosen page from one " +
+    "of them names it in `from`. Call it once, early: it is how you learn what the site is made " +
+    "of without opening a page.",
   inputSchema: { type: "object", properties: {}, additionalProperties: false },
   parseInput(input, errors) {
     rejectUnknown(input, [], errors);
     return {};
   },
   async handler(_input, { database, scope }) {
-    const siteId = requireSite(scope);
+    const siteIds = requireSites(scope);
     const agentSlug = requireAgentSlug(scope);
     const workspaceId = requireWorkspace(scope);
 
-    const [pages, registry, states, ledger, folders] = await Promise.all([
+    const [pages, registry, states, ledger, folders, sites] = await Promise.all([
       database
         .collection(AGENT_COLLECTIONS.markdown)
-        .find({ siteId })
-        .project({ urlHash: 1, url: 1, title: 1, heading: 1, words: 1, hash: 1, publishedAt: 1 })
+        .find({ siteId: { $in: siteIds } })
+        .project({ siteId: 1, urlHash: 1, url: 1, title: 1, heading: 1, words: 1, hash: 1, publishedAt: 1 })
         .toArray(),
       database
         .collection(AGENT_COLLECTIONS.urls)
-        .find({ siteId })
+        .find({ siteId: { $in: siteIds } })
         .project({ urlHash: 1, inboundCount: 1, depth: 1 })
         .toArray(),
       database
@@ -635,7 +648,19 @@ const mapContentSite = defineTool({
         .find({ workspaceId, kind: LIBRARY_NODE_KINDS.folder, "listing.key": { $type: "string" } })
         .project({ path: 1, "listing.key": 1 })
         .toArray(),
+      database
+        .collection(AGENT_COLLECTIONS.sites)
+        .find({ _id: { $in: siteIds } })
+        .toArray(),
     ]);
+
+    // What each source is, so a page from one is read for what it is: a review quoted as the
+    // reviewer's words, documentation read for how the product works.
+    const sourceOf = new Map(sites.map((site) => [site._id.toHexString(), describeSource(site)]));
+    const fromOf = (page) => {
+      const source = sourceOf.get(page?.siteId?.toHexString?.() ?? "");
+      return source && !source.primary ? source.name : null;
+    };
 
     const pageOf = new Map(pages.map((page) => [page.urlHash, page]));
     const signalOf = new Map(registry.map((row) => [row.urlHash, row]));
@@ -678,6 +703,7 @@ const mapContentSite = defineTool({
         status: !reviewed ? SOURCE_STATUS.new : reviewed !== page.hash ? SOURCE_STATUS.changed : SOURCE_STATUS.current,
         why: row.chosenReason ?? null,
         listedOn: listing?.url ?? null,
+        from: fromOf(page),
       };
     });
 
@@ -723,6 +749,24 @@ const mapContentSite = defineTool({
       .slice(0, MAX_MAP_GROUPS)
       .map(([key, rows]) => ({ listedOn: key ? pageOf.get(key).url : null, ...describe(rows) }));
 
+    const pagesBySite = new Map();
+    for (const page of pages) {
+      const key = page.siteId?.toHexString?.() ?? "";
+      pagesBySite.set(key, (pagesBySite.get(key) ?? 0) + 1);
+    }
+    const sources = [...sourceOf.entries()]
+      .filter(([, source]) => !source.primary)
+      .map(([key, source]) => ({
+        name: source.name,
+        host: source.host,
+        whose: source.relation === SOURCE_RELATION.elsewhere ? "about the company, on somebody else's site" : "the company's own",
+        kind: sourcePurpose(source.purpose).label,
+        use: sourcePurpose(source.purpose).guidance,
+        folder: `/sources/${source.folder}`,
+        pages: pagesBySite.get(key) ?? 0,
+        chosen: chosen.filter((entry) => entry.from === source.name).length,
+      }));
+
     return {
       site: {
         pages: pages.length,
@@ -730,6 +774,7 @@ const mapContentSite = defineTool({
         chosen: chosen.length,
         notStored: pages.length - stored.length,
       },
+      sources,
       chosen,
       listings,
       listingsOmitted: Math.max(0, listingRows.length - listings.length),
@@ -883,6 +928,9 @@ const searchContent = defineTool({
         query: input.query,
         kinds: input.kinds,
         path: input.path,
+        // A source the knowledge base is not written from is left out of its searches, so it
+        // cannot come to be cited — and so written from — by being found.
+        excludeSiteIds: scope.excludeSiteIds ?? [],
         limit: input.limit,
         // So the call log can say which run the query's embedding was made for.
         trace: { runId: scope.runId, siteId: scope.siteId, agentSlug: scope.agentSlug },

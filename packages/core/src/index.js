@@ -40,7 +40,29 @@ export {
   applyCrawlSchedule,
   effectiveIntervalHours,
   patternIntervalHours,
+  sourcePageIntervalHours,
 } from "./crawl/schedule.js";
+export {
+  SOURCE_DEFAULT_PAGE_INTERVAL_HOURS,
+  SOURCE_KNOWLEDGE_USE,
+  SOURCE_LIMITS,
+  SOURCE_MODE,
+  SOURCE_PURPOSES,
+  SOURCE_PURPOSE_IDS,
+  SOURCE_RELATION,
+  SOURCE_RESERVE_SHARE,
+  WEBSITE_SOURCE,
+  describeSource,
+  hostOf,
+  isUnderDomain,
+  normalizeSection,
+  ownDomainOf,
+  paginationBase,
+  paginationOf,
+  sectionPatterns,
+  sourcePurpose,
+  websiteFilter,
+} from "./crawl/sources.js";
 export { describePageKind } from "./crawl/pageKind.js";
 export {
   ON_REQUEST_AGENT_SLUGS,

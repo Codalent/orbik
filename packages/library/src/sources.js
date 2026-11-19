@@ -45,8 +45,15 @@ import { LIBRARY_ERROR_CODES, LIBRARY_SOURCE_KINDS, LibraryError } from "./libra
 export function createCrawlSourceProvider(database) {
   const markdown = database.collection(AGENT_COLLECTIONS.markdown);
 
-  /** The crawl site a reference resolves against; without one the provider holds nothing. */
+  /**
+   * The crawl sites a reference resolves against, as a filter on `siteId`; without one the
+   * provider holds nothing. A scope that covers several sources (`siteIds`) resolves against all
+   * of them, so a page of the documentation subdomain is cited the way a page of the website is.
+   */
   function siteOf(scope) {
+    if (Array.isArray(scope?.siteIds) && scope.siteIds.length) {
+      return { $in: scope.siteIds.map((id) => toObjectId(id)) };
+    }
     return scope?.siteId ? toObjectId(scope.siteId) : null;
   }
 
