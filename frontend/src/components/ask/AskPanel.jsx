@@ -477,7 +477,7 @@ export function AskPanel({ workspaceId, pageName = null }) {
   return (
     <aside
       ref={panelNode}
-      aria-label="Ask"
+      aria-label="Ask AI"
       inert={closing}
       onDragOver={(event) => { if (takesFiles && carriesFiles(event)) event.preventDefault(); }}
       onDrop={(event) => {
@@ -504,7 +504,7 @@ export function AskPanel({ workspaceId, pageName = null }) {
             <OrbikMark className="size-4 text-orb-logo" />
           </span>
           <h2 className="flex min-w-0 flex-1 items-baseline gap-2 text-sm">
-            <span className="shrink-0 font-semibold text-orb-white">Ask</span>
+            <span className="shrink-0 font-semibold text-orb-white">Ask AI</span>
             {(showHistory || conversation?.title) && (
               <span className="min-w-0 truncate text-compact text-orb-muted">
                 {showHistory ? "Conversations" : conversation.title}
@@ -540,7 +540,7 @@ export function AskPanel({ workspaceId, pageName = null }) {
               type="button"
               variant="ghost"
               size="icon-sm"
-              aria-label={panel.wide ? "Narrow Ask" : "Widen Ask"}
+              aria-label={panel.wide ? "Narrow Ask AI" : "Widen Ask AI"}
               title={panel.wide ? "Narrow" : "Widen"}
               className="hidden text-orb-muted hover:text-orb-white md:inline-flex"
               onClick={() => panel.setWide((current) => !current)}
@@ -551,7 +551,7 @@ export function AskPanel({ workspaceId, pageName = null }) {
               type="button"
               variant="ghost"
               size="icon-sm"
-              aria-label={shortcut ? `Close Ask (${shortcut})` : "Close Ask"}
+              aria-label={shortcut ? `Close Ask AI (${shortcut})` : "Close Ask AI"}
               title={shortcut ? `Close (${shortcut})` : "Close"}
               className="text-orb-muted hover:text-orb-white"
               onClick={() => panel.setOpen(false)}
@@ -561,9 +561,11 @@ export function AskPanel({ workspaceId, pageName = null }) {
           </div>
         </header>
 
-        <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden border-t border-orb-line bg-orb-space md:rounded-2xl md:border md:border-(--ask-edge) md:shadow-[0_30px_80px_-30px_rgb(0_0_0/0.85)]">
+        {/* No box of its own: from `md` up the conversation sits straight on the surround's dot
+            field, each turn a bubble, so Ask reads as part of the space the app is set in. */}
+        <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden max-md:border-t max-md:border-orb-line">
           {dragging && (
-            <div className="pointer-events-none absolute inset-2 z-10 grid place-items-center rounded-xl border-2 border-dashed border-orb-lime/70 bg-orb-space/90 p-6 text-center">
+            <div className="pointer-events-none absolute inset-2 z-10 grid place-items-center rounded-xl border-2 border-dashed border-orb-lime/70 bg-orb-space/90 p-6 text-center backdrop-blur-sm">
               <div className="space-y-1.5">
                 <FileUp aria-hidden="true" className="mx-auto size-6 text-orb-lime" />
                 <p className="text-sm font-medium text-orb-white">Drop to add to your brand</p>
@@ -573,7 +575,7 @@ export function AskPanel({ workspaceId, pageName = null }) {
           )}
 
           {/* The conversation fades out under the composer rather than being cut off by it. */}
-          <div ref={scroller} className="min-h-0 flex-1 overflow-y-auto px-4 py-5 [mask-image:linear-gradient(to_bottom,black_calc(100%-1.25rem),transparent)]">
+          <div ref={scroller} className="min-h-0 flex-1 overflow-y-auto px-3 py-5 md:px-1.5 [mask-image:linear-gradient(to_bottom,black_calc(100%-1.25rem),transparent)]">
             {showHistory ? (
               <ThreadList
                 threads={threads}
@@ -585,10 +587,8 @@ export function AskPanel({ workspaceId, pageName = null }) {
               />
             ) : !messages.length && !pending ? (
               <div className="flex min-h-full flex-col justify-center gap-6 pb-4">
+                {/* No mark above the greeting: the header already carries Ask's one. */}
                 <div className="space-y-3">
-                  <span className="relative grid size-11 place-items-center rounded-2xl border border-orb-line bg-orb-raised/60">
-                    <OrbikMark className="size-6 text-orb-logo" />
-                  </span>
                   <p className="font-display text-xl font-bold tracking-[-0.02em] text-orb-white">{onBrand ? "Shape your brand" : "What can I do for you?"}</p>
                   <p className="text-sm leading-relaxed text-orb-gray">{greeting(onBrand, canWrite)}</p>
                 </div>
@@ -609,7 +609,7 @@ export function AskPanel({ workspaceId, pageName = null }) {
                               if (starter.attach) picker.current?.click();
                               else box.current?.focus();
                             }}
-                            className="group flex w-full items-center gap-3 rounded-xl border border-orb-line bg-orb-raised/30 px-3 py-2.5 text-left text-sm text-orb-gray outline-none transition-colors hover:border-orb-muted/60 hover:bg-orb-raised/70 hover:text-orb-white focus-visible:ring-2 focus-visible:ring-ring/70"
+                            className="ask-bubble group flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm text-orb-gray outline-none transition-[color,border-color,transform] hover:-translate-y-px hover:border-orb-muted/60 hover:text-orb-white focus-visible:ring-2 focus-visible:ring-ring/70 motion-reduce:transform-none"
                           >
                             <Icon aria-hidden="true" className="size-4 shrink-0 text-orb-muted transition-colors group-hover:text-orb-lime" />
                             <span className="min-w-0 flex-1">{starter.label}</span>
@@ -639,14 +639,14 @@ export function AskPanel({ workspaceId, pageName = null }) {
                   />
                 ))}
                 {/* A run under way whose turn has not come back yet: its steps all the same. */}
-                {pending && !lastAssistant && <li><Thinking steps={steps} /></li>}
+                {pending && !lastAssistant && <li><div className="ask-bubble w-fit max-w-full rounded-2xl rounded-tl-md px-4 py-3"><Thinking steps={steps} /></div></li>}
               </ol>
             )}
           </div>
 
           <form
             onSubmit={(event) => { event.preventDefault(); send(question); }}
-            className="shrink-0 space-y-2 px-3 pb-3"
+            className="shrink-0 space-y-2 px-3 pb-3 md:px-1.5 md:pb-1.5"
           >
             {/* Said before anything is typed: a question asked now could only fail. */}
             {!ai.reasoning && (
@@ -660,7 +660,7 @@ export function AskPanel({ workspaceId, pageName = null }) {
                 <AlertDescription>{error}</AlertDescription>
               </Alert>
             )}
-            <div className="rounded-2xl border border-orb-line bg-orb-raised/40 shadow-[0_8px_24px_-16px_rgb(0_0_0/0.6)] transition-colors focus-within:border-orb-muted/70 focus-within:bg-orb-raised/60">
+            <div className="ask-bubble rounded-2xl transition-colors focus-within:border-orb-muted/70">
               {files.length > 0 && (
                 <ul className="flex flex-wrap gap-1.5 px-2.5 pt-2.5" aria-label="Attached files">
                   {files.map((file) => (

@@ -1,13 +1,14 @@
 "use client";
 
 import { Suspense, useState } from "react";
-import { House, MessagesSquare, Search, Settings } from "lucide-react";
+import { House, Search, Settings } from "lucide-react";
 import { useParams, usePathname, useRouter } from "next/navigation";
 import useSWR from "swr";
 
+import { AskLauncher } from "@/components/ask/AskLauncher";
 import { AskPanel } from "@/components/ask/AskPanel";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { AskPanelProvider, useAskPanel, useAskShortcut } from "@/lib/ask/askPanel";
+import { AskPanelProvider, useAskPanel } from "@/lib/ask/askPanel";
 import { OrbikLogo } from "@/components/OrbikLogo";
 import { NeutralLoading } from "@/components/NeutralLoading";
 import { buildAgentRows } from "@/lib/agents/registry";
@@ -46,8 +47,7 @@ export function WorkspaceShell({ children }) {
 function WorkspaceChrome({ children }) {
   const auth = useAuth();
   const ask = useAskPanel();
-  // The shortcuts as this platform writes them: ⌘ on Apple devices, Ctrl elsewhere.
-  const askShortcut = useAskShortcut();
+  // The shortcut as this platform writes it: ⌘ on Apple devices, Ctrl elsewhere.
   const switcherShortcut = useShortcut("o");
   const params = useParams();
   const router = useRouter();
@@ -87,13 +87,8 @@ function WorkspaceChrome({ children }) {
   // The overview of every agent: where the rail's Agents item leads, and the first row of the
   // agents' sidebar.
   const agentsHref = selectedWorkspaceId ? `/workspaces/${selectedWorkspaceId}/agents` : null;
-  const built = buildRail({ leading: homeLink, knowledge, agents, links: extensionLinks, footer: settingsLink, agentsHref, path: pathname });
-  // Ask is not a page any more but the panel at the right, so its rail item opens and closes it
-  // and is drawn as current while it is open.
-  const rail = {
-    ...built,
-    items: built.items.map((item) => (item.id === "ask" ? { ...item, onSelect: ask.toggle, active: ask.open } : item)),
-  };
+  // Ask is in neither the rail nor the header: the dot in the window's corner opens it (`AskLauncher`).
+  const rail = buildRail({ leading: homeLink, knowledge, agents, links: extensionLinks, footer: settingsLink, agentsHref, path: pathname });
 
   // The workspace the panel answers for is the one in the address, which is the page on screen;
   // the selected one stands in on the rare page under the shell that has none.
@@ -184,25 +179,6 @@ function WorkspaceChrome({ children }) {
                     {switcherShortcut && <kbd className="rounded-[5px] border border-orb-line px-1.5 font-sans text-2xs">{switcherShortcut}</kbd>}
                   </button>
                 )}
-                {/* Ask opens from here as well as the rail, with its shortcut beside it, because it is
-                    the one thing in the product meant to be reached from every page. */}
-                {selectedWorkspaceId && (
-                  <button
-                    type="button"
-                    onClick={ask.toggle}
-                    aria-pressed={ask.open}
-                    className={cn(
-                      "hidden h-8 items-center gap-2 rounded-[13px] border px-2.5 text-compact transition-colors sm:flex",
-                      ask.open
-                        ? "border-orb-muted bg-orb-raised text-orb-white"
-                        : "border-orb-line text-orb-muted hover:border-orb-muted hover:text-orb-white",
-                    )}
-                  >
-                    <MessagesSquare aria-hidden="true" className="size-3.5" />
-                    <span>Ask</span>
-                    {askShortcut && <kbd className="rounded-[5px] border border-orb-line px-1.5 font-sans text-2xs">{askShortcut}</kbd>}
-                  </button>
-                )}
                 {/* The theme sits in the bar rather than the account menu, where it was not found. */}
                 <ThemeSwitch />
                 <UserMenu email={auth.user?.email} onSignOut={signOut} disabled={busy} />
@@ -238,6 +214,7 @@ function WorkspaceChrome({ children }) {
               <AskPanel key={panelWorkspaceId} workspaceId={panelWorkspaceId} pageName={pageName} />
             </Suspense>
           )}
+          {panelWorkspaceId && <AskLauncher />}
         </div>
       )}
     </ProtectedRoute>

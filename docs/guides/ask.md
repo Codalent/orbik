@@ -5,13 +5,15 @@ source under every answer. Members can also have it save to the Library and rear
 
 ## Opening it
 
-Press **Ask** in the workspace's rail, the **Ask** button at the top of the page, or ⌘J on a Mac
-(Ctrl+J on Windows and Linux; the button shows the one for your computer). Ask opens as a column
+Press the round lime button in a corner of the window, or ⌘J on a Mac (Ctrl+J on Windows and
+Linux; hovering the button shows the one for your computer). Drag the button to move it: let go
+and it settles in the nearest corner, and stays there next time. Ask opens as a column
 of its own down the right of the window, and the rest of Orbik moves into a framed window beside
 it; on a phone it covers the page instead. It stays open, with its conversation, as you move
 between pages, and while it is answering or changing something the frame's edge glows. In its
 header, **Conversations** lists earlier ones, **New conversation** starts afresh and **Widen Ask**
-gives it more room. Escape, or ⌘J again, closes it.
+gives it more room. While Ask is open the round button is a cross; press it, Escape, or ⌘J again
+to close Ask.
 
 Once the site has been crawled, **Home** offers an ask box and a few questions to start with;
 pressing one asks it at once, in a new conversation. Until the first crawl has finished, or while

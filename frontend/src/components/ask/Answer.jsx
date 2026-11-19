@@ -103,92 +103,95 @@ export function Answer({ message, workspaceId, pending = false, progress = [], l
   const waiting = pending || (!message.text && !failed);
 
   return (
-    <li className="space-y-3.5">
-      {waiting && <Thinking steps={progress} />}
+    <li className="flex flex-col items-start gap-1">
+      {/* The answer is a bubble on Ask's dot field, as the question is; copying sits outside it. */}
+      <div className="ask-bubble w-fit max-w-full min-w-0 space-y-3.5 rounded-2xl rounded-tl-md px-4 py-3">
+        {waiting && <Thinking steps={progress} />}
 
-      {failed && (
-        <Alert variant="destructive" role="alert">
-          <AlertDescription>
-            {/* No AI to answer is said the same way everywhere: plainly, or with the setting for
-                the install's admin, who is the one person who can change it. */}
-            {isAiUnavailableError(message.error)
-              ? aiUnavailableText("this was not answered", { isAdmin, reason: message.error?.message })
-              : message.error?.message ?? "This was not answered."}
-          </AlertDescription>
-        </Alert>
-      )}
+        {failed && (
+          <Alert variant="destructive" role="alert">
+            <AlertDescription>
+              {/* No AI to answer is said the same way everywhere: plainly, or with the setting for
+                  the install's admin, who is the one person who can change it. */}
+              {isAiUnavailableError(message.error)
+                ? aiUnavailableText("this was not answered", { isAdmin, reason: message.error?.message })
+                : message.error?.message ?? "This was not answered."}
+            </AlertDescription>
+          </Alert>
+        )}
 
-      {message.text && (
-        <>
-          {/* Sized inline: `.doc-prose` sets the reading size of a Library file, which is a size
-              too large for a column this narrow, and it outranks a utility class. */}
-          <div className="doc-prose [&_ol]:pl-5 [&_ul]:pl-5" style={{ fontSize: "0.875rem", lineHeight: 1.6 }}>
-            <ReactMarkdown
-              remarkPlugins={[remarkGfm]}
-              components={{
-                // A Library path in backticks — which is how the agent is told to write one —
-                // opens the file it names. Anything else in backticks stays code.
-                code({ children, className, ...rest }) {
-                  const text = String(children ?? "");
-                  if (!className && LIBRARY_PATH.test(text)) {
-                    return (
-                      <Link href={libraryHref(workspaceId, text)} className="no-underline">
-                        <code {...rest}>{text}</code>
-                      </Link>
-                    );
-                  }
-                  return <code className={className} {...rest}>{children}</code>;
-                },
-              }}
-            >
-              {message.text}
-            </ReactMarkdown>
+        {message.text && (
+          <>
+            {/* Sized inline: `.doc-prose` sets the reading size of a Library file, which is a size
+                too large for a column this narrow, and it outranks a utility class. */}
+            <div className="doc-prose [&_ol]:pl-5 [&_ul]:pl-5" style={{ fontSize: "0.875rem", lineHeight: 1.6 }}>
+              <ReactMarkdown
+                remarkPlugins={[remarkGfm]}
+                components={{
+                  // A Library path in backticks — which is how the agent is told to write one —
+                  // opens the file it names. Anything else in backticks stays code.
+                  code({ children, className, ...rest }) {
+                    const text = String(children ?? "");
+                    if (!className && LIBRARY_PATH.test(text)) {
+                      return (
+                        <Link href={libraryHref(workspaceId, text)} className="no-underline">
+                          <code {...rest}>{text}</code>
+                        </Link>
+                      );
+                    }
+                    return <code className={className} {...rest}>{children}</code>;
+                  },
+                }}
+              >
+                {message.text}
+              </ReactMarkdown>
+            </div>
+
+            {/* Said plainly rather than shown as a badge: "the indexed content does not say" is the
+                most important thing this chat can tell somebody, and it must not look like a label
+                on an answer that otherwise reads as one. */}
+            {message.confidence === "none" && (
+              <p className="flex items-start gap-2 text-xs text-orb-gray">
+                <AlertCircle aria-hidden="true" className="mt-px size-3.5 shrink-0" />
+                <span>
+                  Nothing indexed answers this.
+                  {message.searched?.length ? ` Searched for: ${message.searched.join("; ")}.` : ""}
+                </span>
+              </p>
+            )}
+            {message.confidence && CONFIDENCE[message.confidence] && (
+              <p className="text-xs text-orb-gray">{CONFIDENCE[message.confidence]}</p>
+            )}
+          </>
+        )}
+
+        {message.changes?.length > 0 && <Changes changes={message.changes} workspaceId={workspaceId} />}
+
+        {message.brandChanges?.length > 0 && (
+          <BrandChanges changes={message.brandChanges} workspaceId={workspaceId} canUndo={canChange} onChanged={onBrandChanged} />
+        )}
+
+        {message.leftOut?.length > 0 && (
+          <LeftOut items={message.leftOut} workspaceId={workspaceId} canAdd={canChange} onChanged={onBrandChanged} />
+        )}
+
+        {message.needsConfirmation && latest && !pending && (
+          <div className="flex flex-wrap items-center gap-2">
+            <Button type="button" size="sm" onClick={() => onReply?.("Yes, go ahead.")}>
+              <Check className="size-3.5" />
+              Go ahead
+            </Button>
+            <Button type="button" size="sm" variant="outline" onClick={() => onRevise?.()}>
+              Change the plan
+            </Button>
           </div>
+        )}
 
-          {/* Said plainly rather than shown as a badge: "the indexed content does not say" is the
-              most important thing this chat can tell somebody, and it must not look like a label
-              on an answer that otherwise reads as one. */}
-          {message.confidence === "none" && (
-            <p className="flex items-start gap-2 text-xs text-orb-gray">
-              <AlertCircle aria-hidden="true" className="mt-px size-3.5 shrink-0" />
-              <span>
-                Nothing indexed answers this.
-                {message.searched?.length ? ` Searched for: ${message.searched.join("; ")}.` : ""}
-              </span>
-            </p>
-          )}
-          {message.confidence && CONFIDENCE[message.confidence] && (
-            <p className="text-xs text-orb-gray">{CONFIDENCE[message.confidence]}</p>
-          )}
-        </>
-      )}
-
-      {message.changes?.length > 0 && <Changes changes={message.changes} workspaceId={workspaceId} />}
-
-      {message.brandChanges?.length > 0 && (
-        <BrandChanges changes={message.brandChanges} workspaceId={workspaceId} canUndo={canChange} onChanged={onBrandChanged} />
-      )}
-
-      {message.leftOut?.length > 0 && (
-        <LeftOut items={message.leftOut} workspaceId={workspaceId} canAdd={canChange} onChanged={onBrandChanged} />
-      )}
-
-      {message.needsConfirmation && latest && !pending && (
-        <div className="flex flex-wrap items-center gap-2">
-          <Button type="button" size="sm" onClick={() => onReply?.("Yes, go ahead.")}>
-            <Check className="size-3.5" />
-            Go ahead
-          </Button>
-          <Button type="button" size="sm" variant="outline" onClick={() => onRevise?.()}>
-            Change the plan
-          </Button>
-        </div>
-      )}
-
-      {message.citations?.length > 0 && <Citations citations={message.citations} workspaceId={workspaceId} />}
+        {message.citations?.length > 0 && <Citations citations={message.citations} workspaceId={workspaceId} />}
+      </div>
 
       {message.text && !waiting && (
-        <div className="-ml-2 flex items-center">
+        <div className="flex items-center">
           <CopyButton text={message.text} variant="ghost" />
         </div>
       )}

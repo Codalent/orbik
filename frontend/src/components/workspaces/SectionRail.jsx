@@ -80,8 +80,8 @@ export function SectionRail({ items }) {
     <nav aria-label="Workspace" className="flex shrink-0 gap-1 md:flex-col md:pt-1">
       {items.map((item) => {
         const Icon = item.icon;
-        // An item with `onSelect` opens something rather than going somewhere — Ask, whose panel
-        // opens beside the page — so it is a button that says whether it is pressed, not a link.
+        // An item with `onSelect` opens something rather than going somewhere — a panel beside the
+        // page, say — so it is a button that says whether it is pressed, not a link.
         const Item = item.onSelect ? "button" : Link;
         const role = item.onSelect
           ? { type: "button", onClick: item.onSelect, "aria-pressed": Boolean(item.active) }

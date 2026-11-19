@@ -1,4 +1,4 @@
-import { BookMarked, MessagesSquare, Palette } from "lucide-react";
+import { BookMarked, Palette } from "lucide-react";
 
 import { LIBRARY_AGENT_SLUG } from "./library";
 
@@ -32,8 +32,8 @@ import { LIBRARY_AGENT_SLUG } from "./library";
  * could run at all — and both rows lead to the same page.
  *
  * Ordered by how often they are opened rather than by when they were built: the Library is what
- * somebody comes back to, Brand is the same thing for how the company looks, and Ask is how a
- * question gets answered without reading either.
+ * somebody comes back to, and Brand is the same thing for how the company looks. Ask is not here:
+ * it is the panel the dot in the window's corner opens (`AskLauncher`), reached from every page.
  *
  * Each is an item of its own in the rail at the left edge (`SectionRail`), not a row in a sidebar.
  * The site's pages as Markdown used to be a fourth; that page is still at `/markdown`, with no
@@ -65,15 +65,6 @@ const KNOWLEDGE = Object.freeze([
     // A palette: the colours, type and imagery the company is recognised by.
     icon: Palette,
     href: (workspaceId) => `/workspaces/${workspaceId}/brand`,
-  },
-  {
-    id: "ask",
-    name: "Ask",
-    // Two speech bubbles: a conversation, not a document — the one row here that answers back.
-    // It opens the Ask panel beside the page rather than going to one (`WorkspaceShell`); the
-    // address below is kept for links, and opens the panel too.
-    icon: MessagesSquare,
-    href: (workspaceId) => `/workspaces/${workspaceId}/ask`,
   },
 ]);
 
