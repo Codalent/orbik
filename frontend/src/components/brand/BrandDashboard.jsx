@@ -117,7 +117,7 @@ export function BrandDashboard({ workspaceId }) {
             The design system is derived from your crawled site: the agent chooses which pages to render from what the crawler found. There is no crawl yet, so there is nothing to render.
             {canEdit ? " Or start from your own files: drop a logo, a brand guide or a font in the chat, and the brand is built from them." : ""}
           </p>
-          <Link href={`/workspaces/${workspaceId}/agents/crawler`} className="mt-3 inline-block text-sm text-orb-cyan underline decoration-orb-cyan/40 underline-offset-4 hover:decoration-orb-cyan">Go to the crawler</Link>
+          <Link href={`/workspaces/${workspaceId}/sources/website/pages`} className="mt-3 inline-block text-sm text-orb-cyan underline decoration-orb-cyan/40 underline-offset-4 hover:decoration-orb-cyan">Go to the website’s crawl</Link>
         </Panel>
       )}
 

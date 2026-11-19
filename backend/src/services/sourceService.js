@@ -2,6 +2,7 @@ import {
   SOURCE_KNOWLEDGE_USE,
   SOURCE_LIMITS,
   SOURCE_MODE,
+  SOURCE_PURPOSES,
   SOURCE_RELATION,
   WEBSITE_SOURCE,
   describeSource,
@@ -202,6 +203,8 @@ export function createSourceService({
         },
         budget,
         limits: { sources: SOURCE_LIMITS.perWorkspace, pages: SOURCE_LIMITS.pages },
+        // What a source can be, in the words the knowledge base is given: the pages offer these.
+        purposes: SOURCE_PURPOSES,
       };
     },
 

@@ -423,7 +423,7 @@ function WebsiteStep({ step, home, primary, onRetryCrawl, onStartCrawl }) {
   const id = home.workspace.id;
   const detail = step.detail ?? {};
   const text = "max-w-[62ch] text-sm leading-relaxed text-orb-gray";
-  const crawlerHref = `/workspaces/${id}/agents/crawler`;
+  const crawlerHref = `/workspaces/${id}/sources/website/pages`;
   const host = detail.host ?? "your site";
   const { blocked, cost } = crawlBudgetWords(detail.budget);
 
@@ -446,7 +446,7 @@ function WebsiteStep({ step, home, primary, onRetryCrawl, onStartCrawl }) {
         {blocked && <p className={text}>{blocked}</p>}
         <div className="flex flex-wrap gap-2">
           {step.permitted && <Button type="button" size="sm" disabled={Boolean(blocked)} onClick={onRetryCrawl}>Crawl again</Button>}
-          <ActionLink href={crawlerHref}>Open the Crawler</ActionLink>
+          <ActionLink href={crawlerHref}>Open the website’s crawl</ActionLink>
         </div>
       </>
     );
@@ -454,8 +454,8 @@ function WebsiteStep({ step, home, primary, onRetryCrawl, onStartCrawl }) {
   if (step.state === STEP_STATE.done) {
     return (
       <>
-        <p className={text}>{`Orbik keeps ${host} up to date on a schedule; the Crawler page shows what it found.`}</p>
-        <ActionLink href={crawlerHref}>Open the Crawler</ActionLink>
+        <p className={text}>{`Orbik keeps ${host} up to date on a schedule; its page under Sources shows what it found.`}</p>
+        <ActionLink href={crawlerHref}>Open the website’s crawl</ActionLink>
       </>
     );
   }
@@ -463,7 +463,7 @@ function WebsiteStep({ step, home, primary, onRetryCrawl, onStartCrawl }) {
     return (
       <>
         <p className={text}>{`Orbik reads ${host} page by page, obeying robots.txt.`}</p>
-        <ActionLink href={crawlerHref}>{step.state === STEP_STATE.inProgress ? "Watch the crawl" : "Open the Crawler"}</ActionLink>
+        <ActionLink href={crawlerHref}>{step.state === STEP_STATE.inProgress ? "Watch the crawl" : "Open the website's crawl"}</ActionLink>
       </>
     );
   }

@@ -2,16 +2,42 @@ import { apiFetch, apiFetchText } from "./client";
 import { requireId } from "./ids";
 
 /**
+ * Which crawl a helper below reads: a workspace id is its website's, and `{ workspaceId, sourceId }`
+ * (from {@link crawlScope}) is one of its sources'. Every crawl route is served for both, so the
+ * crawl page and everything on it show any source's pages the way they show the website's.
+ *
+ * @typedef {string|{workspaceId: string, sourceId: string}} CrawlScope
+ */
+
+/** The scope of one source's crawl, or the website's when `sourceId` is absent or `website`. */
+export function crawlScope(workspaceId, sourceId) {
+  return sourceId && sourceId !== "website" ? { workspaceId, sourceId } : workspaceId;
+}
+
+/** The workspace a crawl scope belongs to. */
+export function crawlWorkspaceOf(scope) {
+  return scope && typeof scope === "object" ? scope.workspaceId : scope;
+}
+
+/** Where a scope's crawl routes start. */
+function crawlBase(scope) {
+  if (scope && typeof scope === "object") {
+    return `/v1/workspaces/${requireId(scope.workspaceId, "Workspace")}/sources/${requireId(scope.sourceId, "Source")}/crawl`;
+  }
+  return `/v1/workspaces/${requireId(scope, "Workspace")}/crawl`;
+}
+
+/**
  * Where a workspace's crawl overview — its crawl configuration and current status — is read from;
  * also its cache key.
  */
 export function crawlOverviewPath(workspaceId) {
-  return `/v1/workspaces/${requireId(workspaceId, "Workspace")}/crawl`;
+  return `${crawlBase(workspaceId)}`;
 }
 
 /** Creates or replaces a workspace's crawl configuration. */
 export function saveCrawlSite(workspaceId, settings) {
-  return apiFetch(`/v1/workspaces/${requireId(workspaceId, "Workspace")}/crawl`, {
+  return apiFetch(`${crawlBase(workspaceId)}`, {
     method: "PUT", body: JSON.stringify(settings),
   });
 }
@@ -23,21 +49,29 @@ export function saveCrawlSite(workspaceId, settings) {
  * request, so a bodyless POST is refused before it reaches the route.
  */
 export function requestCrawl(workspaceId, { fresh = false } = {}) {
-  return apiFetch(`/v1/workspaces/${requireId(workspaceId, "Workspace")}/crawl/runs`, {
+  return apiFetch(`${crawlBase(workspaceId)}/runs`, {
     method: "POST", body: JSON.stringify(fresh ? { fresh: true } : {}),
   });
 }
 
+/**
+ * Stops a crawl that is running — the pages it has not read are left for the next one — or takes
+ * back one that was asked for and has not started.
+ */
+export function stopCrawl(workspaceId) {
+  return apiFetch(`${crawlBase(workspaceId)}/stop`, { method: "POST", body: "{}" });
+}
+
 /** Deletes everything crawled for a workspace, keeping its crawl settings. */
 export function clearCrawlData(workspaceId) {
-  return apiFetch(`/v1/workspaces/${requireId(workspaceId, "Workspace")}/crawl/clear`, {
+  return apiFetch(`${crawlBase(workspaceId)}/clear`, {
     method: "POST", body: "{}",
   });
 }
 
 /** Where a workspace's recent crawl runs are read from; also their cache key. */
 export function crawlRunsPath(workspaceId, limit = 10) {
-  return `/v1/workspaces/${requireId(workspaceId, "Workspace")}/crawl/runs?limit=${Number(limit)}`;
+  return `${crawlBase(workspaceId)}/runs?limit=${Number(limit)}`;
 }
 
 /**
@@ -48,7 +82,7 @@ export function crawlRunsPath(workspaceId, limit = 10) {
  */
 export function getCrawlTree(workspaceId, { path = "/", limit = 20, skip = 0 } = {}) {
   const query = new URLSearchParams({ path, limit: String(limit), skip: String(skip) });
-  return apiFetch(`/v1/workspaces/${requireId(workspaceId, "Workspace")}/crawl/tree?${query}`);
+  return apiFetch(`${crawlBase(workspaceId)}/tree?${query}`);
 }
 
 /**
@@ -58,7 +92,7 @@ export function getCrawlTree(workspaceId, { path = "/", limit = 20, skip = 0 } =
  */
 export function getCrawlFindings(workspaceId, { kind, limit = 50, skip = 0 }) {
   const query = new URLSearchParams({ kind, limit: String(limit), skip: String(skip) });
-  return apiFetch(`/v1/workspaces/${requireId(workspaceId, "Workspace")}/crawl/findings?${query}`);
+  return apiFetch(`${crawlBase(workspaceId)}/findings?${query}`);
 }
 
 /**
@@ -67,7 +101,7 @@ export function getCrawlFindings(workspaceId, { kind, limit = 50, skip = 0 }) {
  */
 export function crawlPagePath(workspaceId, urlHash) {
   if (!/^[0-9a-f]{64}$/i.test(urlHash ?? "")) throw new Error("Page identifier is invalid.");
-  return `/v1/workspaces/${requireId(workspaceId, "Workspace")}/crawl/pages/${urlHash.toLowerCase()}`;
+  return `${crawlBase(workspaceId)}/pages/${urlHash.toLowerCase()}`;
 }
 
 /**
@@ -79,7 +113,7 @@ export function crawlPagePath(workspaceId, urlHash) {
 export function getCrawlActivity(workspaceId, { before, limit = 25 } = {}) {
   const query = new URLSearchParams({ limit: String(limit) });
   if (before) query.set("before", before);
-  return apiFetch(`/v1/workspaces/${requireId(workspaceId, "Workspace")}/crawl/activity?${query}`);
+  return apiFetch(`${crawlBase(workspaceId)}/activity?${query}`);
 }
 
 /**
@@ -90,7 +124,7 @@ export function getCrawlActivity(workspaceId, { before, limit = 25 } = {}) {
  */
 export function setCrawlPageSchedule(workspaceId, urlHash, override) {
   if (!/^[0-9a-f]{64}$/i.test(urlHash ?? "")) throw new Error("Page identifier is invalid.");
-  return apiFetch(`/v1/workspaces/${requireId(workspaceId, "Workspace")}/crawl/pages/${urlHash.toLowerCase()}/schedule`, {
+  return apiFetch(`${crawlBase(workspaceId)}/pages/${urlHash.toLowerCase()}/schedule`, {
     method: "PUT", body: JSON.stringify({ override }),
   });
 }
@@ -102,7 +136,7 @@ export function setCrawlPageSchedule(workspaceId, urlHash, override) {
  * site is made due, whatever their interval says.
  */
 export function recrawlPages(workspaceId, target) {
-  return apiFetch(`/v1/workspaces/${requireId(workspaceId, "Workspace")}/crawl/recrawl`, {
+  return apiFetch(`${crawlBase(workspaceId)}/recrawl`, {
     method: "POST", body: JSON.stringify(target),
   });
 }
@@ -114,7 +148,7 @@ export function recrawlPages(workspaceId, target) {
  * @param {number|null} intervalHours hours between crawls, or null for manual trigger
  */
 export function setCrawlFrequencies(workspaceId, targets, intervalHours) {
-  return apiFetch(`/v1/workspaces/${requireId(workspaceId, "Workspace")}/crawl/frequencies`, {
+  return apiFetch(`${crawlBase(workspaceId)}/frequencies`, {
     method: "PUT", body: JSON.stringify({ targets, intervalHours }),
   });
 }
@@ -122,7 +156,7 @@ export function setCrawlFrequencies(workspaceId, targets, intervalHours) {
 /** Reads a page's content as Markdown, as text. */
 export function getCrawlPageMarkdown(workspaceId, urlHash) {
   if (!/^[0-9a-f]{64}$/i.test(urlHash ?? "")) throw new Error("Page identifier is invalid.");
-  return apiFetchText(`/v1/workspaces/${requireId(workspaceId, "Workspace")}/crawl/pages/${urlHash.toLowerCase()}/markdown`);
+  return apiFetchText(`${crawlBase(workspaceId)}/pages/${urlHash.toLowerCase()}/markdown`);
 }
 
 /**
@@ -131,17 +165,17 @@ export function getCrawlPageMarkdown(workspaceId, urlHash) {
  * @param {{limit?: number, skip?: number}} [query]
  */
 export function listCrawlMarkdown(workspaceId, { limit = 200, skip = 0 } = {}) {
-  return apiFetch(`/v1/workspaces/${requireId(workspaceId, "Workspace")}/crawl/markdown?limit=${Number(limit)}&skip=${Number(skip)}`);
+  return apiFetch(`${crawlBase(workspaceId)}/markdown?limit=${Number(limit)}&skip=${Number(skip)}`);
 }
 
 /** Lists the crawled site's routes, grouped by pattern, for choosing pages. */
 export function listCrawlRoutes(workspaceId, { limit = 200 } = {}) {
-  return apiFetch(`/v1/workspaces/${requireId(workspaceId, "Workspace")}/crawl/routes?limit=${Number(limit)}`);
+  return apiFetch(`${crawlBase(workspaceId)}/routes?limit=${Number(limit)}`);
 }
 
 /** Lists the pages of one route pattern, so a person can pick which post stands for the route. */
 export function listCrawlRoutePages(workspaceId, { pattern, search = "", limit = 50 }) {
   const query = new URLSearchParams({ pattern, limit: String(limit) });
   if (search) query.set("search", search);
-  return apiFetch(`/v1/workspaces/${requireId(workspaceId, "Workspace")}/crawl/routes/pages?${query}`);
+  return apiFetch(`${crawlBase(workspaceId)}/routes/pages?${query}`);
 }

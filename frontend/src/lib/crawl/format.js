@@ -36,7 +36,7 @@ export function formatDateTime(value) {
  * An exact timestamp is precise and unhelpful: "4 minutes ago" answers "is this current?", which
  * is the only question being asked of it here.
  */
-function describeElapsed(value, { started = false } = {}) {
+export function describeElapsed(value, { started = false } = {}) {
   const elapsedMs = Date.now() - new Date(value).getTime();
   if (!Number.isFinite(elapsedMs) || elapsedMs < 0) return "";
 

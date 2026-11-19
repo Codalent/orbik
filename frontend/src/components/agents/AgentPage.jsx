@@ -10,6 +10,7 @@ import { Panel } from "@/components/ui/panel";
 import { Pill } from "@/components/ui/pill";
 import { Skeleton } from "@/components/ui/skeleton";
 import { IndexStatus } from "@/components/ask/IndexStatus";
+import { workspaceCrawlerPath } from "@/lib/workspaces/home";
 import { RunProgress } from "./RunProgress";
 import { useAiAvailability } from "@/lib/agents/aiAvailability";
 import { buildAgentRows } from "@/lib/agents/registry";
@@ -401,13 +402,13 @@ export function AllClear({ testId, children }) {
 }
 
 /**
- * The way to the crawler, beside the sentence that says an agent is waiting for a crawl: the one
- * thing a person can do about it, a click away.
+ * The way to the website's crawl, under Sources, beside the sentence that says an agent is waiting
+ * for a crawl: the one thing a person can do about it, a click away.
  */
-export function CrawlerLink({ workspaceId, children = "Go to the crawler" }) {
+export function CrawlerLink({ workspaceId, children = "Go to the website's crawl" }) {
   return (
     <Link
-      href={`/workspaces/${workspaceId}/agents/crawler`}
+      href={workspaceCrawlerPath(workspaceId)}
       className="inline-flex items-center gap-1 text-sm font-medium text-orb-cyan underline-offset-4 hover:text-orb-white hover:underline"
     >
       {children} <ArrowUpRight aria-hidden="true" className="size-3.5" />

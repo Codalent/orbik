@@ -165,7 +165,7 @@ export function LibraryDocument({ node, idPrefix, runWrite = null, onSeeChange }
                 className="inline-flex h-6 max-w-full items-center gap-1.5 rounded-md border border-orb-line bg-orb-black px-2 text-xs text-orb-cyan transition-colors hover:border-orb-cyan/50 hover:text-orb-white"
               >
                 <Globe aria-hidden="true" className="size-3 shrink-0" />
-                <span className="truncate">{item.copyPath.replace(/^\/sources\/website\//, "")}</span>
+                <span className="truncate">{item.copyPath.replace(/^\/sources\/[^/]+\//, "")}</span>
               </button>
             ))}
           </div>

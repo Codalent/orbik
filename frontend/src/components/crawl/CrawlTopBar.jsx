@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { CalendarClock, RefreshCw, ScrollText, Settings, Trash2, Waypoints } from "lucide-react";
 
@@ -46,7 +47,7 @@ import { PARTIAL_PRESENTATION, QUEUED_PRESENTATION, RUN_PRESENTATION, ranOutOfPa
  * @param {boolean} [props.limited] whether the month's crawl pages are limited, so the buttons'
  *   explanations mention what they cost only where something is counted against a ceiling
  */
-export function CrawlTopBar({ site, activeRun, latestRun, progress, queued: requested = false, onCrawlNow, onFreshCrawl, onSetFrequencies, onClearData, onEditSettings, onOpenLogs, busy, blockedReason = null, sitePages = null, limited = false }) {
+export function CrawlTopBar({ site, activeRun, latestRun, progress, queued: requested = false, onCrawlNow, onFreshCrawl, onSetFrequencies, onClearData, onEditSettings, onOpenLogs, busy, blockedReason = null, sitePages = null, limited = false, source = null, sourceHref = null }) {
   // A fresh crawl fetches every page, which on a large site is a real spend of the monthly
   // budget, so it takes two presses: the first turns the button into the question, the second
   // answers it. The question expires on its own rather than sitting armed under a stray click.
@@ -88,11 +89,15 @@ export function CrawlTopBar({ site, activeRun, latestRun, progress, queued: requ
         id="crawl-heading"
         className={HEAD_WRAP}
         icon={Waypoints}
-        title="Crawler"
-        description="Reads your site page by page. Every other agent, and the Library, works from what it keeps."
+        title={source && !source.primary ? `${source.name} · pages` : "Website · pages"}
+        description={source && !source.primary
+          ? (source.mode === "pages" ? "The pages this source reads, as its crawl keeps them." : `Every page of ${hostOf(site.seedUrl)} this source reads, as its crawl keeps them.`)
+          : "Your website, page by page. Every agent, and the Library, works from what its crawl keeps."}
         status={<span role="status" className="flex items-center">{status}</span>}
         meta={(
           <>
+            {sourceHref && <Link href={sourceHref} className="text-orb-cyan underline-offset-4 hover:underline">{source && !source.primary ? source.name : "Website"} settings</Link>}
+            {sourceHref && <span aria-hidden="true">·</span>}
             <a href={site.seedUrl} target="_blank" rel="noreferrer" className="truncate text-orb-gray underline-offset-4 hover:text-orb-white hover:underline">{host}</a>
             {/* While crawling, the count replaces "4 minutes ago": how far along it is answers the
                 question somebody watching is actually asking. */}
