@@ -5,10 +5,15 @@ source under every answer. Members can also have it save to the Library and rear
 
 ## Opening it
 
-Press **Ask** in the workspace's rail, the **Ask** button at the top of the page, or ⌘J on a Mac
-(Ctrl+J on Windows and Linux; the button shows the one for your computer). The panel opens at the
-right and stays open, with its conversation, as you move between pages. **Conversations** lists
-earlier ones and **New conversation** starts afresh. Escape, or ⌘J again, closes it.
+Press the round lime button in a corner of the window, or ⌘J on a Mac (Ctrl+J on Windows and
+Linux; hovering the button shows the one for your computer). Drag the button to move it: let go
+and it settles in the nearest corner, and stays there next time. Ask opens as a column
+of its own down the right of the window, and the rest of Orbik moves into a framed window beside
+it; on a phone it covers the page instead. It stays open, with its conversation, as you move
+between pages, and while it is answering or changing something the frame's edge glows. In its
+header, **Conversations** lists earlier ones, **New conversation** starts afresh and **Widen Ask**
+gives it more room. While Ask is open the round button is a cross; press it, Escape, or ⌘J again
+to close Ask.
 
 Once the site has been crawled, **Home** offers an ask box and a few questions to start with;
 pressing one asks it at once, in a new conversation. Until the first crawl has finished, or while
@@ -24,12 +29,14 @@ own right — not a duplicate URL, a `noindex` page, or a paginated, tag, catego
 — and every Library file people and agents wrote. Pages are cut into sections at their headings, so
 an answer can point at the part of a page that says it.
 
-- Every answer lists its **Sources**. A page opens on your live site at the section cited; a
-  Library file opens in the Library.
+- Every answer lists its **Sources**, numbered. A page opens on your live site at the section
+  cited; a Library file opens in the Library. **Copy** under an answer copies its text.
+- While it works, it shows the step it is on and the ones it has finished: searching your site,
+  opening a Library file, writing one.
 - When an answer rests on a single mention it says so. When nothing in the index answers the
   question, it says **Nothing indexed answers this** and lists what it searched for. It never fills
   the gap from what a model knows about companies like yours.
-- It knows which page you are on, and on the Library which file. That is shown above the box, and
+- It knows which page you are on, and on the Library which file. That is shown in the box, and
   you can take it off before sending. It is a hint for what "this" and "here" mean, not a limit:
   Ask searches the whole workspace either way.
 

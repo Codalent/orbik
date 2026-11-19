@@ -1,13 +1,14 @@
 "use client";
 
 import { Suspense, useState } from "react";
-import { House, MessagesSquare, Search, Settings } from "lucide-react";
+import { House, Search, Settings } from "lucide-react";
 import { useParams, usePathname, useRouter } from "next/navigation";
 import useSWR from "swr";
 
+import { AskLauncher } from "@/components/ask/AskLauncher";
 import { AskPanel } from "@/components/ask/AskPanel";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { AskPanelProvider, useAskPanel, useAskShortcut } from "@/lib/ask/askPanel";
+import { AskPanelProvider, useAskPanel } from "@/lib/ask/askPanel";
 import { OrbikLogo } from "@/components/OrbikLogo";
 import { NeutralLoading } from "@/components/NeutralLoading";
 import { buildAgentRows } from "@/lib/agents/registry";
@@ -42,12 +43,11 @@ export function WorkspaceShell({ children }) {
   );
 }
 
-/** The header, the rail, the page, and the Ask panel beside it. */
+/** The header, the rail and the page, framed as one window while Ask is open beside it. */
 function WorkspaceChrome({ children }) {
   const auth = useAuth();
   const ask = useAskPanel();
-  // The shortcuts as this platform writes them: ⌘ on Apple devices, Ctrl elsewhere.
-  const askShortcut = useAskShortcut();
+  // The shortcut as this platform writes it: ⌘ on Apple devices, Ctrl elsewhere.
   const switcherShortcut = useShortcut("o");
   const params = useParams();
   const router = useRouter();
@@ -87,13 +87,8 @@ function WorkspaceChrome({ children }) {
   // The overview of every agent: where the rail's Agents item leads, and the first row of the
   // agents' sidebar.
   const agentsHref = selectedWorkspaceId ? `/workspaces/${selectedWorkspaceId}/agents` : null;
-  const built = buildRail({ leading: homeLink, knowledge, agents, links: extensionLinks, footer: settingsLink, agentsHref, path: pathname });
-  // Ask is not a page any more but the panel at the right, so its rail item opens and closes it
-  // and is drawn as current while it is open.
-  const rail = {
-    ...built,
-    items: built.items.map((item) => (item.id === "ask" ? { ...item, onSelect: ask.toggle, active: ask.open } : item)),
-  };
+  // Ask is in neither the rail nor the header: the dot in the window's corner opens it (`AskLauncher`).
+  const rail = buildRail({ leading: homeLink, knowledge, agents, links: extensionLinks, footer: settingsLink, agentsHref, path: pathname });
 
   // The workspace the panel answers for is the one in the address, which is the page on screen;
   // the selected one stands in on the rare page under the shell that has none.
@@ -145,79 +140,81 @@ function WorkspaceChrome({ children }) {
         //
         // The chrome is a flat colour and covers the dot field the rest of the product floats on:
         // in margins this narrow the dots are noise around the rail's labels, not a backdrop.
-        <div className="flex min-h-screen flex-col bg-orb-black md:h-screen md:min-h-0 md:overflow-hidden">
-          {/* The workspace sits beside the mark because it is what everything below belongs to:
-              the rail, the sidebar and the page all change with it. */}
-          <header className="flex h-11 shrink-0 items-center gap-2 px-4">
-            <OrbikLogo className="h-[18px] w-auto shrink-0 text-orb-logo" />
-            <span aria-hidden="true" className="ml-1 h-4 w-px bg-orb-line" />
-            <div className="min-w-0 max-w-64">
-              <WorkspaceSwitcher workspaces={data.items} selectedWorkspaceId={data.selectedWorkspaceId} onSelect={select} disabled={busy} />
-            </div>
-            <div className="ml-auto flex items-center gap-2">
-              {onLibrary && (
-                <button
-                  type="button"
-                  onClick={() => window.dispatchEvent(new Event(LIBRARY_SWITCHER_EVENT))}
-                  className="hidden h-8 items-center gap-2 rounded-[13px] border border-orb-line px-2.5 text-compact text-orb-muted transition-colors hover:border-orb-muted hover:text-orb-white sm:flex"
-                >
-                  <Search aria-hidden="true" className="size-3.5" />
-                  <span>Search or jump to…</span>
-                  {switcherShortcut && <kbd className="rounded-[5px] border border-orb-line px-1.5 font-sans text-2xs">{switcherShortcut}</kbd>}
-                </button>
-              )}
-              {/* Ask opens from here as well as the rail, with its shortcut beside it, because it is
-                  the one thing in the product meant to be reached from every page. */}
-              {selectedWorkspaceId && (
-                <button
-                  type="button"
-                  onClick={ask.toggle}
-                  aria-pressed={ask.open}
-                  className={cn(
-                    "hidden h-8 items-center gap-2 rounded-[13px] border px-2.5 text-compact transition-colors sm:flex",
-                    ask.open
-                      ? "border-orb-muted bg-orb-raised text-orb-white"
-                      : "border-orb-line text-orb-muted hover:border-orb-muted hover:text-orb-white",
-                  )}
-                >
-                  <MessagesSquare aria-hidden="true" className="size-3.5" />
-                  <span>Ask</span>
-                  {askShortcut && <kbd className="rounded-[5px] border border-orb-line px-1.5 font-sans text-2xs">{askShortcut}</kbd>}
-                </button>
-              )}
-              {/* The theme sits in the bar rather than the account menu, where it was not found. */}
-              <ThemeSwitch />
-              <UserMenu email={auth.user?.email} onSignOut={signOut} disabled={busy} />
-            </div>
-          </header>
-          <div className="flex flex-1 flex-col gap-2 px-2 pb-2 md:min-h-0 md:flex-row md:gap-1.5 md:pl-1.5">
-            <SectionRail items={rail.items} />
-            {/* One panel holds the agents' sidebar, on their pages, and the page, with a line
-                between them rather than a gap: the sidebar is the page's own navigation, not a
-                second thing beside it. `overflow-hidden` keeps both inside the rounded corners. */}
-            <div className="flex min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-orb-line bg-orb-space md:min-h-0 md:flex-row">
-              {rail.agentsOpen && <AppSidebar agents={agents} currentPath={pathname} overviewHref={agentsHref} />}
-              {/* `min-h-0` is what lets this shrink below its content's height: a flex child
-                  defaults to `min-height: auto`, which would grow the row and push the sidebar's
-                  foot off screen instead of scrolling here. `relative` keeps anything absolutely
-                  positioned in a page (an `sr-only` label, say) scrolling with the panel rather
-                  than being laid out against the document and making the window scroll. */}
-              <div className="relative flex min-w-0 flex-1 flex-col md:min-h-0 md:overflow-y-auto">
-                {error && <Alert variant="destructive" role="alert" className="m-4 w-auto"><AlertDescription>{error}</AlertDescription></Alert>}
-                {panelWorkspaceId && extensionSlots.banners.map(({ id, Component }) => (
-                  <Component key={id} workspaceId={panelWorkspaceId} api={extensionApi} />
-                ))}
-                {children}
+        //
+        // With Ask open (from `md` up) the app — header, rail and page together — becomes a framed
+        // window on a darker surround, and Ask is a column of its own beside it rather than a panel
+        // inside: it holds the app, and the frame lights up while it is changing something in there.
+        <div
+          className={cn(
+            "flex min-h-screen bg-orb-black md:h-screen md:min-h-0 md:overflow-hidden",
+            "md:transition-[padding,gap] md:duration-300 md:ease-[cubic-bezier(0.2,0.8,0.2,1)] motion-reduce:transition-none",
+            ask.open && "ask-surround md:gap-2 md:p-2",
+          )}
+        >
+          <div
+            data-working={ask.open && ask.working ? "" : undefined}
+            className={cn(
+              "flex min-w-0 flex-1 flex-col bg-orb-black md:min-h-0 md:overflow-hidden md:border md:border-transparent",
+              "md:transition-[border-radius] md:duration-300",
+              ask.open && "ask-frame md:rounded-2xl",
+            )}
+          >
+            {/* The workspace sits beside the mark because it is what everything below belongs to:
+                the rail, the sidebar and the page all change with it. */}
+            <header className="flex h-11 shrink-0 items-center gap-2 px-4">
+              <OrbikLogo className="h-[18px] w-auto shrink-0 text-orb-logo" />
+              <span aria-hidden="true" className="ml-1 h-4 w-px bg-orb-line" />
+              <div className="min-w-0 max-w-64">
+                <WorkspaceSwitcher workspaces={data.items} selectedWorkspaceId={data.selectedWorkspaceId} onSelect={select} disabled={busy} />
+              </div>
+              <div className="ml-auto flex items-center gap-2">
+                {onLibrary && (
+                  <button
+                    type="button"
+                    onClick={() => window.dispatchEvent(new Event(LIBRARY_SWITCHER_EVENT))}
+                    className="hidden h-8 items-center gap-2 rounded-[13px] border border-orb-line px-2.5 text-compact text-orb-muted transition-colors hover:border-orb-muted hover:text-orb-white sm:flex"
+                  >
+                    <Search aria-hidden="true" className="size-3.5" />
+                    <span>Search or jump to…</span>
+                    {switcherShortcut && <kbd className="rounded-[5px] border border-orb-line px-1.5 font-sans text-2xs">{switcherShortcut}</kbd>}
+                  </button>
+                )}
+                {/* The theme sits in the bar rather than the account menu, where it was not found. */}
+                <ThemeSwitch />
+                <UserMenu email={auth.user?.email} onSignOut={signOut} disabled={busy} />
+              </div>
+            </header>
+            <div className="flex flex-1 flex-col gap-2 px-2 pb-2 md:min-h-0 md:flex-row md:gap-1.5 md:pl-1.5">
+              <SectionRail items={rail.items} />
+              {/* One panel holds the agents' sidebar, on their pages, and the page, with a line
+                  between them rather than a gap: the sidebar is the page's own navigation, not a
+                  second thing beside it. `overflow-hidden` keeps both inside the rounded corners. */}
+              <div className="flex min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-orb-line bg-orb-space md:min-h-0 md:flex-row">
+                {rail.agentsOpen && <AppSidebar agents={agents} currentPath={pathname} overviewHref={agentsHref} />}
+                {/* `min-h-0` is what lets this shrink below its content's height: a flex child
+                    defaults to `min-height: auto`, which would grow the row and push the sidebar's
+                    foot off screen instead of scrolling here. `relative` keeps anything absolutely
+                    positioned in a page (an `sr-only` label, say) scrolling with the panel rather
+                    than being laid out against the document and making the window scroll. */}
+                <div className="relative flex min-w-0 flex-1 flex-col md:min-h-0 md:overflow-y-auto">
+                  {error && <Alert variant="destructive" role="alert" className="m-4 w-auto"><AlertDescription>{error}</AlertDescription></Alert>}
+                  {panelWorkspaceId && extensionSlots.banners.map(({ id, Component }) => (
+                    <Component key={id} workspaceId={panelWorkspaceId} api={extensionApi} />
+                  ))}
+                  {children}
+                </div>
               </div>
             </div>
-            {/* The Ask panel: a column beside the page from `md` up, covering it below. Suspense
-                because it reads the address's query, which the Library keeps on the open file. */}
-            {panelWorkspaceId && (
-              <Suspense fallback={null}>
-                <AskPanel key={panelWorkspaceId} workspaceId={panelWorkspaceId} pageName={pageName} />
-              </Suspense>
-            )}
           </div>
+          {/* Ask: a full-height column beside the framed app from `md` up, covering it below.
+              Suspense because it reads the address's query, which the Library keeps on the open
+              file. */}
+          {panelWorkspaceId && (
+            <Suspense fallback={null}>
+              <AskPanel key={panelWorkspaceId} workspaceId={panelWorkspaceId} pageName={pageName} />
+            </Suspense>
+          )}
+          {panelWorkspaceId && <AskLauncher />}
         </div>
       )}
     </ProtectedRoute>

@@ -40,8 +40,8 @@ function remember(key, value) {
 }
 
 /**
- * The Ask panel's state, for every page of a workspace: whether it is open, whether it is wide, and
- * a question somebody else put in it.
+ * The Ask panel's state, for every page of a workspace: whether it is open, whether it is wide,
+ * whether it is working, and a question somebody else put in it.
  *
  * It lives in the workspace shell rather than in a page because the panel is meant to stay open
  * while the person moves around: they ask about a file, open what the answer cites, and carry on
@@ -80,6 +80,10 @@ export function AskPanelProvider({ children }) {
   }, []);
 
   const toggle = useCallback(() => setOpen((current) => !current), [setOpen]);
+
+  // Whether Ask is answering or changing something right now. The panel sets it; the shell lights
+  // the frame round the app with it, because what Ask changes is in there.
+  const [working, setWorking] = useState(false);
 
   /** Opens the panel with a question in the box, to be read and sent by the person, not sent. */
   const askAbout = useCallback((text) => {
@@ -124,8 +128,8 @@ export function AskPanelProvider({ children }) {
   }, [toggle]);
 
   const value = useMemo(
-    () => ({ open, setOpen, toggle, wide, setWide, draft, askAbout, askNow, dropped, sendFiles }),
-    [open, setOpen, toggle, wide, setWide, draft, askAbout, askNow, dropped, sendFiles],
+    () => ({ open, setOpen, toggle, wide, setWide, draft, askAbout, askNow, dropped, sendFiles, working, setWorking }),
+    [open, setOpen, toggle, wide, setWide, draft, askAbout, askNow, dropped, sendFiles, working],
   );
   return <AskPanelContext.Provider value={value}>{children}</AskPanelContext.Provider>;
 }

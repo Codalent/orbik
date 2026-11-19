@@ -884,8 +884,9 @@ thing a model must never be told by mistake.
 
 ## Ask: a chat over the index
 
-A panel that opens at the right of every workspace page — from **Ask** in the rail, the **Ask**
-button in the header, or ⌘J / Ctrl+J (each shown as the platform writes it, `frontend/src/lib/keyboard.js`)
+A panel that opens at the right of every workspace page — from the dot in a corner of the window
+(`frontend/src/components/ask/AskLauncher.jsx`: dragged, it snaps to the nearest corner, kept in
+`localStorage` under `orbik.ask.dot`, and is a cross while the panel is open), or ⌘J / Ctrl+J (each shown as the platform writes it, `frontend/src/lib/keyboard.js`)
 — and closes with the same keys or Escape from anywhere on the page unless a dialog, a menu or a
 field of the page takes Escape itself. It stays open, with its conversation, as the person moves
 between pages (`frontend/src/components/ask/AskPanel.jsx`, state in `frontend/src/lib/ask/askPanel.jsx`).
