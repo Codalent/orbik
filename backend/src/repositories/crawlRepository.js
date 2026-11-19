@@ -1,9 +1,10 @@
-import { applyCrawlSchedule, toObjectId } from "@orbik/core";
+import { aliasHostOf, applyCrawlSchedule, toObjectId } from "@orbik/core";
 
 /** Crawl configuration fields the API is allowed to expose or accept. */
 const SITE_PROJECTION = Object.freeze({
   workspaceId: 1,
   seedUrl: 1,
+  redirectedFrom: 1,
   sitemapUrls: 1,
   enabled: 1,
   crawlIntervalHours: 1,
@@ -33,6 +34,12 @@ export function toSiteSummary(site) {
     id: site._id.toHexString(),
     workspaceId: site.workspaceId.toHexString(),
     seedUrl: site.seedUrl,
+    // The address the crawl used to start from, when the crawler found it only redirects to the
+    // start address's host and moved there. Null once the record no longer describes the start
+    // address, so the page explains a move only while it is the reason for what it shows.
+    redirectedFrom: aliasHostOf(site)
+      ? { url: site.redirectedFrom.url ?? null, host: site.redirectedFrom.host }
+      : null,
     // Absent and empty mean the same thing here — nobody named a sitemap — and the form that
     // reads this needs one shape rather than two.
     sitemapUrls: site.sitemapUrls ?? [],
@@ -350,12 +357,26 @@ export function createCrawlRepository(collections) {
      *
      * With `newSite` — the address is on another hostname, so it is another site — the sitemaps
      * named for the old host are dropped as well: the crawler refuses a sitemap off the seed's
-     * host, so keeping them would stop every crawl. Otherwise only the start address moves.
+     * host, so keeping them would stop every crawl. So is the record of the spelling the old site
+     * was moved from (`redirectedFrom`), which says nothing about the new one. Otherwise only the
+     * start address moves.
+     *
+     * `typedUrl` is the website as a person gave it when `seedUrl` is that address read onto the
+     * host the crawl covers: the two replace the pair `redirectedFrom` remembers (`url`, `to`), so
+     * the start address is still known to be the website's.
      */
-    async moveSeed(siteId, { seedUrl, newSite, now }) {
+    async moveSeed(siteId, { seedUrl, newSite, now, typedUrl = null }) {
       await sites.updateOne(
         { _id: toObjectId(siteId) },
-        { $set: { seedUrl, updatedAt: now, ...(newSite ? { sitemapUrls: [] } : {}) } },
+        {
+          $set: {
+            seedUrl,
+            updatedAt: now,
+            ...(newSite ? { sitemapUrls: [] } : {}),
+            ...(!newSite && typedUrl ? { "redirectedFrom.url": typedUrl, "redirectedFrom.to": seedUrl } : {}),
+          },
+          ...(newSite ? { $unset: { redirectedFrom: "" } } : {}),
+        },
       );
       return sites.findOne({ _id: toObjectId(siteId) }, { projection: SITE_PROJECTION });
     },

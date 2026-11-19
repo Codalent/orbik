@@ -1,7 +1,7 @@
-import { escapeRegExp } from "@orbik/core";
+import { escapeRegExp, readOntoSiteHost } from "@orbik/core";
 
 import { AgentError } from "../runtime/errors.js";
-import { normalizeUrl } from "./url.js";
+import { hashUrl, normalizeUrl } from "./url.js";
 
 /** Reasons a URL was refused, stored so a skipped page can be explained rather than guessed at. */
 const SCOPE_REASONS = Object.freeze({
@@ -30,12 +30,21 @@ const MAX_PATTERN_LENGTH = 500;
  * own workspace rather than being folded into this one's totals. That also keeps a crawl's page
  * count honest: `blog.example.com` cannot silently double the size of a crawl of `example.com`.
  *
+ * One hostname, which may have two spellings. When the address a person typed redirects to its
+ * `www.` twin (or the reverse), discovery moves the seed to the host that answers and records the
+ * spelling it left (`./seedHost.js`). The scope is still the seed's hostname alone; an address
+ * written with the other spelling is first read as the same address on the seed's host
+ * ({@link createScope}'s `onSiteHost`), so it is one URL in the registry rather than two.
+ *
  * @param {object} config validated crawl scope
  * @param {string} config.seedUrl absolute URL the crawl starts from
+ * @param {string|null} [config.aliasHost] the other spelling of the seed's hostname, when it was
+ *   seen redirecting to the seed's
+ * @param {string|null} [config.aliasProtocol] the scheme that spelling was seen redirecting from
  * @param {string[]} [config.includePatterns] when present, a URL must match one to be in scope
  * @param {string[]} [config.excludePatterns] a URL matching any of these is out of scope
  * @param {number} [config.maxDepth=10] link hops from the seed, 0 through 50
- * @returns {{seed: object, allows: (url: object, depth: number) => {allowed: boolean, reason?: string}}}
+ * @returns {{seed: object, onSiteHost: (url: object) => object, allows: (url: object, depth: number) => {allowed: boolean, reason?: string}}}
  * @throws {AgentError} `INVALID_SCOPE` listing every rejected field
  */
 export function createScope(config) {
@@ -64,8 +73,48 @@ export function createScope(config) {
     });
   }
 
+  const alias = {
+    seedUrl: seed?.href,
+    aliasHost: typeof config.aliasHost === "string" && config.aliasHost ? config.aliasHost : null,
+    aliasProtocol: config.aliasProtocol ?? null,
+  };
+
   return {
     seed,
+
+    /**
+     * Reads an address written with the site's other spelling as the same address on its host.
+     *
+     * The hostname changes, and the scheme with it when the address has the scheme the old
+     * spelling was seen redirecting from (`readOntoSiteHost` in `@orbik/core`). The port, path and
+     * query stay as they were written, so the result is what following the host's redirect is
+     * expected to arrive at, and anything else about it is still decided by the server when it is
+     * fetched. Every other address comes back as it was given.
+     *
+     * Called wherever an address enters the registry or the link graph — a link on a page, a
+     * sitemap entry — before {@link allows}. Without it a site whose pages or sitemap still name
+     * the spelling that redirects would have each of those pages twice, once as a redirect, and
+     * would pay for both.
+     *
+     * @param {ReturnType<typeof normalizeUrl>} url normalized URL
+     * @returns {ReturnType<typeof normalizeUrl>} the same URL, or its twin on the seed's hostname
+     */
+    onSiteHost(url) {
+      const href = readOntoSiteHost(url.href, alias);
+      if (href === url.href) return url;
+      // Rebuilt by hand rather than normalised again: nothing but the origin differs, and a
+      // second pass would apply default rules where the site's own had already been applied.
+      const moved = new URL(href);
+      return {
+        href: moved.href,
+        hash: hashUrl(moved.href),
+        protocol: moved.protocol,
+        host: moved.host,
+        hostname: moved.hostname,
+        pathname: moved.pathname,
+        search: moved.search,
+      };
+    },
 
     /**
      * Decides whether one normalized URL belongs to this crawl.
