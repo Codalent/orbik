@@ -235,7 +235,15 @@ export function blockedRunError(block, unfetched) {
   const what = REFUSAL_STATUSES.has(block?.status) || block?.kind !== "challenge"
     ? `${by} refused the request`
     : `${by} answered with a browser check instead of the page`;
-  const where = block?.seed ? "the home page" : `${BLOCK_ABORT_AFTER} pages in a row`;
+  // The seed is the home page of a site; for a list of pages it is the first page listed.
+  const start = (() => {
+    try {
+      return new URL(block?.lastUrl).pathname === "/" ? "the home page" : "the first page it asked for";
+    } catch {
+      return "the home page";
+    }
+  })();
+  const where = block?.seed ? start : `${BLOCK_ABORT_AFTER} pages in a row`;
   const left = unfetched > 0 ? ` ${unfetched.toLocaleString("en-US")} page(s) were left unfetched.` : "";
   const allow = block?.service ? `${block.service}'s bot rules` : "its firewall or server rules";
   return {

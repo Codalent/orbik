@@ -240,7 +240,9 @@ export function createCrawlRepository(collections) {
       return links.aggregate([
         { $match: { siteId: toObjectId(siteId), internal: false } },
         { $group: { _id: { to: "$toUrl", from: "$fromUrlHash" } } },
-        { $group: { _id: "$_id.to", pages: { $sum: 1 }, from: { $first: "$_id.from" } } },
+        // A few of the pages making each link, to say where on the site it is.
+        { $group: { _id: "$_id.to", pages: { $sum: 1 }, from: { $push: "$_id.from" } } },
+        { $set: { from: { $slice: ["$from", 50] } } },
         { $sort: { pages: -1, _id: 1 } },
         { $limit: limit },
       ]).toArray();

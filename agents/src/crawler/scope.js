@@ -130,7 +130,10 @@ export function createScope(config) {
         return { allowed: false, reason: SCOPE_REASONS.excludedPath };
       }
       if (listOnly) {
-        if (listedHashes.has(url.hash)) return { allowed: true };
+        // A normalized URL carries the crawler's key in `hash`; a plain `URL` (what the fetch step
+        // passes) carries its fragment there, so it is normalized first.
+        const key = /^[0-9a-f]{64}$/.test(url.hash ?? "") ? url.hash : keyOf(url.href);
+        if (listedHashes.has(key)) return { allowed: true };
         const page = config.followPagination ? paginationOf(url) : null;
         if (page && listings.has(page.base)) return { allowed: true };
         return { allowed: false, reason: SCOPE_REASONS.notListed };
@@ -141,6 +144,15 @@ export function createScope(config) {
       return { allowed: true };
     },
   };
+}
+
+/** The crawler's key for an address, or null when it cannot be normalized. */
+function keyOf(href) {
+  try {
+    return normalizeUrl(href).hash;
+  } catch {
+    return null;
+  }
 }
 
 /**

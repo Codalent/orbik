@@ -184,11 +184,11 @@ export function createSourceRepository(database) {
       return rows[0]?.pages ?? 0;
     },
 
-    /** The addresses of pages of one site, by hash: where "Found on your website" says a link is. */
+    /** Pages of one site by hash, with their depth: where "Found on your website" says a link is. */
     async urlsOf(siteId, hashes) {
       if (!hashes.length) return new Map();
-      const rows = await urls.find({ siteId, urlHash: { $in: hashes } }).project({ urlHash: 1, url: 1 }).toArray();
-      return new Map(rows.map((row) => [row.urlHash, row.url]));
+      const rows = await urls.find({ siteId, urlHash: { $in: hashes } }).project({ urlHash: 1, url: 1, depth: 1 }).toArray();
+      return new Map(rows.map((row) => [row.urlHash, { url: row.url, depth: row.depth ?? null }]));
     },
 
     /** The keys of every page of a source the Library holds a row for. */

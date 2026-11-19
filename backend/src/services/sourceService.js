@@ -125,6 +125,16 @@ export function createSourceService({
     }
   }
 
+  /**
+   * The folder a source's pages are copied into: named after where they come from — `docs` for
+   * docs.example.com, `clutch` for clutch.co — so it reads the same whatever the source is called.
+   */
+  function folderFor(url, relation, sites) {
+    const parts = url.hostname.toLowerCase().replace(/^www\./, "").split(".");
+    const label = relation === SOURCE_RELATION.own && parts.length > 2 ? parts[0] : (parts.at(-2) ?? parts[0]);
+    return freeFolder(label, sites);
+  }
+
   /** A folder under /sources the workspace has not used, from a name. */
   function freeFolder(name, sites) {
     const taken = new Set(sites.map((site) => describeSource(site).folder));
@@ -147,7 +157,10 @@ export function createSourceService({
       return sub ? sub.charAt(0).toUpperCase() + sub.slice(1) : site;
     }
     if (known?.purpose === "reviews") return `${site} reviews`;
-    if (title) return title.split(/\s[|·—–-]\s/)[0].slice(0, SOURCE_LIMITS.nameLength);
+    // A title is usually "What it is · Where it is": the part naming the site is the better name.
+    const parts = String(title ?? "").split(/\s[|·—–-]\s/).map((part) => part.trim()).filter(Boolean);
+    const named = parts.find((part) => part.toLowerCase().replace(/\s/g, "").includes(brand.toLowerCase()));
+    if (named) return named.slice(0, SOURCE_LIMITS.nameLength);
     return site;
   }
 
@@ -257,7 +270,7 @@ export function createSourceService({
           relation,
           purpose: known?.purpose ?? (relation === SOURCE_RELATION.own ? (/^docs?\./.test(host) ? "docs" : /^blog\./.test(host) ? "blog" : "product") : "other"),
           name,
-          folder: freeFolder(name, sites),
+          folder: folderFor(target, relation, sites),
           followPagination: relation === SOURCE_RELATION.elsewhere,
         },
         known: known ? { label: known.label, readable: known.readable, reason: known.reason } : null,
@@ -308,7 +321,7 @@ export function createSourceService({
         relation: source.relation,
         mode: elsewhere ? SOURCE_MODE.pages : SOURCE_MODE.site,
         name: source.name,
-        folder: freeFolder(source.name, sites),
+        folder: folderFor(target, source.relation, sites),
         purpose: source.purpose,
         knowledgeUse: source.knowledgeUse,
         pageIntervalHours: source.pageIntervalHours,
@@ -463,13 +476,18 @@ export function createSourceService({
         const key = comparableUrl(url);
         if (seen.has(key) || dismissed.has(target._id) || hosts.has(url.hostname.replace(/^www\./, ""))) continue;
         seen.add(key);
-        items.push({ url: target._id, label: known.label, purpose: known.purpose, readable: known.readable, reason: known.reason, pages: target.pages, from: target.from });
+        items.push({ url: target._id, label: known.label, purpose: known.purpose, readable: known.readable, reason: known.reason, pages: target.pages, from: target.from ?? [] });
       }
       items.sort((left, right) => Number(right.readable) - Number(left.readable) || right.pages - left.pages);
       const shown = items.slice(0, MAX_SUGGESTIONS);
-      const from = await sourceRepository.urlsOf(website._id, shown.map((item) => item.from));
+      // Where a person would see the link: the page nearest the home page that has it.
+      const from = await sourceRepository.urlsOf(website._id, shown.flatMap((item) => item.from));
       return {
-        items: shown.map(({ from: hash, ...item }) => ({ ...item, linkedFrom: from.get(hash) ?? null })),
+        items: shown.map(({ from: hashes, ...item }) => {
+          const nearest = hashes.map((hash) => from.get(hash)).filter(Boolean)
+            .sort((left, right) => (left.depth ?? 99) - (right.depth ?? 99) || left.url.length - right.url.length)[0];
+          return { ...item, linkedFrom: nearest?.url ?? null };
+        }),
       };
     },
 
