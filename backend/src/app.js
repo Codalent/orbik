@@ -17,6 +17,10 @@ import { createWorkspaceErasureRepository } from "./repositories/workspaceErasur
 import { createCrawlRepository } from "./repositories/crawlRepository.js";
 import { createCrawlService } from "./services/crawlService.js";
 import { createCrawlRouter } from "./routes/crawlRoutes.js";
+import { createSourceRepository } from "./repositories/sourceRepository.js";
+import { createSourceService } from "./services/sourceService.js";
+import { createPageProbe } from "./services/pageProbe.js";
+import { createSourceRouter } from "./routes/sourceRoutes.js";
 import { createHealthRouter } from "./routes/healthRoutes.js";
 import { createRunRepository } from "./repositories/runRepository.js";
 import { createAgentScheduleRepository } from "./repositories/agentScheduleRepository.js";
@@ -165,6 +169,18 @@ export function createApp({ config, database, readiness, extensions = createExte
     crawlRepository,
     crawlBudget,
     database,
+  });
+  // Everything the workspace reads, as sources: the website and the rest. A removed source's pages
+  // leave the index through the same Qdrant-only eraser a deleted workspace uses.
+  const sourceService = createSourceService({
+    workspaceRepository,
+    crawlRepository,
+    sourceRepository: createSourceRepository(database),
+    userRepository,
+    crawlBudget,
+    pageProbe: createPageProbe(),
+    indexEraser: createIndexEraser({ config }),
+    logger: log,
   });
   const setupStore = createAgentSetupStore({ database });
   const runRepository = createRunRepository(agentCollections);
@@ -351,6 +367,7 @@ export function createApp({ config, database, readiness, extensions = createExte
   app.use(createMemberRouter({ memberService, inviteService, csrfProtection, rateLimitCollection: collections.rateLimits }));
   app.use(createInviteRouter({ inviteService, csrfProtection, rateLimitCollection: collections.rateLimits }));
   app.use(createCrawlRouter({ crawlService, csrfProtection }));
+  app.use(createSourceRouter({ sourceService, csrfProtection }));
   app.use(createRunRouter({ runService, csrfProtection }));
   app.use(createAiCallRouter({
     aiCallService: createAiCallService({ workspaceRepository, aiCallRepository }),

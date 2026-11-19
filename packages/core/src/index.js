@@ -64,6 +64,7 @@ export {
   websiteFilter,
 } from "./crawl/sources.js";
 export { describePageKind } from "./crawl/pageKind.js";
+export { CRAWLER_PRODUCT_NAME, DEFAULT_CRAWLER_CONTACT_URL, crawlerUserAgent } from "./crawl/userAgent.js";
 export {
   ON_REQUEST_AGENT_SLUGS,
   UPSTREAM_AGENT_SLUGS,

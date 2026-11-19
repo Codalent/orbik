@@ -9,7 +9,7 @@ import { parseSiteConfig } from "./siteConfig.js";
 import { createUrlRegistry } from "./urlRegistry.js";
 import { loadRobotsForSite } from "./robotsStore.js";
 import { awaitedJobs, recrawlPriority } from "./priority.js";
-import { detectSiteBlock, isRunBlocked, recordBlocked, recordNotBlocked } from "./siteBlock.js";
+import { detectSiteBlock, isRunBlocked, isRunStopped, recordBlocked, recordNotBlocked } from "./siteBlock.js";
 import { canRetry, isRunRateLimited, rateLimitedError, recordServed, recordThrottled, THROTTLE_STATUSES } from "./throttle.js";
 
 /**
@@ -38,6 +38,7 @@ export function createDiscoverPageHandler({ createFetcherFor }) {
     // explores nothing more either.
     if (await isRunRateLimited(collections.runs, job.runId)) return { counters: { pagesSkippedRateLimited: 1 } };
     if (await isRunBlocked(collections.runs, job.runId)) return {};
+    if (await isRunStopped(collections.runs, job.runId)) return {};
     const config = parseSiteConfig(site);
     const scope = createScope(config);
     const fetcher = createFetcherFor(config);

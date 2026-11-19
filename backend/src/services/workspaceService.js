@@ -171,6 +171,19 @@ export function createWorkspaceService({
               message: "A crawl is running. Wait for it to finish before changing the website.",
             });
           }
+          // Each host is read by one source: a website moved onto a host another source reads would
+          // read its pages twice.
+          const newHost = hostOf(changes.websiteUrl);
+          const other = newSite
+            ? (await crawlRepository.listSources(workspace._id)).find((source) => source.primary === false && source.host === newHost)
+            : null;
+          if (other) {
+            throw new AppError({
+              status: 409,
+              code: "SOURCE_HOST_TAKEN",
+              message: `${newHost} is already read by the source ${other.name ?? newHost}. Remove that source first, then change the website.`,
+            });
+          }
           const at = now();
           if (newSite) {
             const pages = await crawlRepository.clearSiteData(site._id);

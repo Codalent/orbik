@@ -1,3 +1,5 @@
+import { describeSource } from "@orbik/core";
+
 import { toRunSummary as toAgentRunSummary } from "../repositories/runRepository.js";
 
 /**
@@ -69,9 +71,14 @@ export function createActivityService({ workspaceRepository, crawlRepository, ru
         const workspaceId = site.workspaceId.toHexString();
         const remaining = run ? outstanding.get(run._id.toHexString()) ?? 0 : 0;
         const fetched = run ? (run.counters?.pagesFetched ?? 0) + (run.counters?.pagesNotModified ?? 0) : 0;
+        const source = describeSource(site);
         crawls.push({
           workspaceId,
           workspaceName: names.get(workspaceId) ?? null,
+          // Which of the workspace's sources is being read: a workspace can be reading two.
+          sourceId: site._id.toHexString(),
+          sourceName: source.name,
+          primary: source.primary,
           seedUrl: site.seedUrl,
           runId: run ? run._id.toHexString() : null,
           // Queued: asked for, and the scheduler has not yet started it.

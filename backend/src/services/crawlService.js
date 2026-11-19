@@ -1,4 +1,4 @@
-import { effectiveIntervalHours, patternIntervalHours } from "@orbik/core";
+import { WEBSITE_SOURCE, describeSource, effectiveIntervalHours, patternIntervalHours } from "@orbik/core";
 import { BUDGET_STATE } from "@orbik/crawl-budget";
 
 import { AppError } from "../errors/appError.js";
@@ -82,18 +82,23 @@ export function createCrawlService({ workspaceRepository, crawlRepository, crawl
     }
   }
 
-  /** Resolves the workspace and its crawl configuration, requiring the configuration to exist. */
-  async function requireSite(userId, workspaceId, role) {
+  /**
+   * Resolves the workspace and one of its sources — its website unless a source is named —
+   * requiring it to exist. A source of another workspace is not found, as a missing one is not.
+   */
+  async function requireSite(userId, workspaceId, role, sourceId) {
     const workspace = await requireWorkspaceAccess(userId, workspaceId, { role });
-    const site = await crawlRepository.findSiteByWorkspace(workspace._id);
-    if (!site) {
-      throw new AppError({
-        status: 404,
-        code: "CRAWL_NOT_CONFIGURED",
-        message: "This workspace has no crawl configuration yet.",
-      });
-    }
+    const site = await crawlRepository.findSource(workspace._id, sourceId);
+    if (!site) throw missingSource(sourceId);
     return { workspace, site };
+  }
+
+  /** The answer for a source that is not there: the website not set up, or no such source. */
+  function missingSource(sourceId) {
+    if (sourceId && sourceId !== WEBSITE_SOURCE) {
+      return new AppError({ status: 404, code: "SOURCE_NOT_FOUND", message: "This workspace has no such source." });
+    }
+    return new AppError({ status: 404, code: "CRAWL_NOT_CONFIGURED", message: "This workspace has no crawl configuration yet." });
   }
 
   return {
@@ -104,9 +109,11 @@ export function createCrawlService({ workspaceRepository, crawlRepository, crawl
      * what every workspace looks like before its first crawl is set up, so the endpoint reports
      * `site: null` and lets the interface offer setup instead of an error page.
      */
-    async getOverview({ userId, workspaceId }) {
+    async getOverview({ userId, workspaceId, sourceId }) {
       const workspace = await requireWorkspaceAccess(userId, workspaceId, { role: "read-only" });
-      const site = await crawlRepository.findSiteByWorkspace(workspace._id);
+      const site = await crawlRepository.findSource(workspace._id, sourceId);
+      // A source that is not there is an error; a website not set up yet is a state.
+      if (!site && sourceId && sourceId !== WEBSITE_SOURCE) throw missingSource(sourceId);
 
       // The budget is reported whether or not crawling is set up. It is the workspace's rather
       // than any one site's, so somebody deciding whether to crawl another site from it needs to
@@ -130,8 +137,11 @@ export function createCrawlService({ workspaceRepository, crawlRepository, crawl
         crawlRepository.summarizeUrls(site._id),
       ]);
 
+      const described = describeSource(site);
       return {
         site: toSiteSummary(site),
+        // Which source this is, for a page that shows any of them.
+        source: { id: site._id.toHexString(), name: described.name, primary: described.primary, relation: described.relation, mode: described.mode },
         activeRun: activeRun ? toRunSummary(activeRun) : null,
         latestRun: latestRun ? toRunSummary(latestRun) : null,
         // Asked for, not yet started: the scheduler picks a due site up on its next pass, which
@@ -179,8 +189,8 @@ export function createCrawlService({ workspaceRepository, crawlRepository, crawl
      * so nothing comes back "unchanged": every page is fetched and read in full again. History is
      * kept — it is a new reading of the site, not a new site.
      */
-    async requestCrawl({ userId, workspaceId, fresh = false }) {
-      const { workspace, site } = await requireSite(userId, workspaceId, "member");
+    async requestCrawl({ userId, workspaceId, sourceId, fresh = false }) {
+      const { workspace, site } = await requireSite(userId, workspaceId, "member", sourceId);
       const activeRun = await crawlRepository.findActiveRun(site._id);
       if (activeRun) {
         return { status: ACTIVE_STATUS, run: toRunSummary(activeRun), alreadyRunning: true, fresh: false, pages: 0 };
@@ -201,8 +211,8 @@ export function createCrawlService({ workspaceRepository, crawlRepository, crawl
      * Refused while a crawl is running: the workers would keep writing pages into a registry
      * that had just been emptied, and what was left would be neither the old crawl nor a new one.
      */
-    async clearData({ userId, workspaceId }) {
-      const { site } = await requireSite(userId, workspaceId, "admin");
+    async clearData({ userId, workspaceId, sourceId }) {
+      const { site } = await requireSite(userId, workspaceId, "admin", sourceId);
       if (await crawlRepository.findActiveRun(site._id)) {
         throw new AppError({
           status: 409,
@@ -214,14 +224,30 @@ export function createCrawlService({ workspaceRepository, crawlRepository, crawl
     },
 
     /**
+     * Stops the source's crawl that is running: the pages it has not read yet are left for the
+     * next one, and what it read stays. A crawl that has not started yet is simply no longer asked
+     * for. Answers what there was to stop.
+     */
+    async stopCrawl({ userId, workspaceId, sourceId }) {
+      const { site } = await requireSite(userId, workspaceId, "member", sourceId);
+      const activeRun = await crawlRepository.findActiveRun(site._id);
+      if (activeRun) {
+        await crawlRepository.requestStop(activeRun._id, now());
+        return { stopped: "running", run: toRunSummary(activeRun) };
+      }
+      const withdrawn = await crawlRepository.withdrawRequest(site._id);
+      return { stopped: withdrawn ? "queued" : null, run: null };
+    },
+
+    /**
      * Reports how often each route pattern is crawled, and where that decision came from.
      *
      * Every pattern the registry knows is listed, not only the ones the AI decided about. The
      * difference is the point: a pattern with no decision is never recrawled, and the only way
      * that becomes visible — and fixable — is to show it next to the ones that have one.
      */
-    async getSchedule({ userId, workspaceId }) {
-      const { site } = await requireSite(userId, workspaceId, "read-only");
+    async getSchedule({ userId, workspaceId, sourceId }) {
+      const { site } = await requireSite(userId, workspaceId, "read-only", sourceId);
       const rows = await crawlRepository.listPatterns(site._id);
       const planned = new Map((site.crawlSchedule?.patterns ?? []).map((row) => [row.pattern, row]));
       const overrides = new Map((site.crawlScheduleOverrides ?? []).map((row) => [row.pattern, row]));
@@ -252,8 +278,8 @@ export function createCrawlService({ workspaceRepository, crawlRepository, crawl
      * once as they like. Nothing is decided on their behalf — a page nobody has chosen for is
      * crawled only when they ask.
      */
-    async setFrequencies({ userId, workspaceId, targets, intervalHours }) {
-      const { site } = await requireSite(userId, workspaceId, "member");
+    async setFrequencies({ userId, workspaceId, sourceId, targets, intervalHours }) {
+      const { site } = await requireSite(userId, workspaceId, "member", sourceId);
       const pages = await crawlRepository.setFrequencyForTargets({ site, targets, intervalHours, now: now() });
       if (pages === 0) {
         throw new AppError({ status: 404, code: "PAGE_NOT_FOUND", message: "None of the selected pages are in the crawl." });
@@ -262,8 +288,8 @@ export function createCrawlService({ workspaceRepository, crawlRepository, crawl
     },
 
     /** Lists the pages that have Markdown, as a library index. */
-    async listMarkdown({ userId, workspaceId, limit, skip }) {
-      const { site } = await requireSite(userId, workspaceId, "read-only");
+    async listMarkdown({ userId, workspaceId, sourceId, limit, skip }) {
+      const { site } = await requireSite(userId, workspaceId, "read-only", sourceId);
       const { items, total } = await crawlRepository.listMarkdown({ siteId: site._id, limit, skip });
       return {
         items: items.map((row) => ({
@@ -287,8 +313,8 @@ export function createCrawlService({ workspaceRepository, crawlRepository, crawl
      * Served as text rather than wrapped in JSON, so the same route works for a browser, a
      * download, and a script piping it somewhere.
      */
-    async getPageMarkdown({ userId, workspaceId, urlHash }) {
-      const { site } = await requireSite(userId, workspaceId, "read-only");
+    async getPageMarkdown({ userId, workspaceId, sourceId, urlHash }) {
+      const { site } = await requireSite(userId, workspaceId, "read-only", sourceId);
       const document = await crawlRepository.findMarkdown({ siteId: site._id, urlHash });
       if (!document) {
         throw new AppError({ status: 404, code: "MARKDOWN_NOT_FOUND", message: "This page has no Markdown yet. It is written when the page is next crawled." });
@@ -297,8 +323,8 @@ export function createCrawlService({ workspaceRepository, crawlRepository, crawl
     },
 
     /** Pins one page to its own crawl frequency, or returns it to its pattern's. */
-    async setPageSchedule({ userId, workspaceId, urlHash, override }) {
-      const { site } = await requireSite(userId, workspaceId, "member");
+    async setPageSchedule({ userId, workspaceId, sourceId, urlHash, override }) {
+      const { site } = await requireSite(userId, workspaceId, "member", sourceId);
       const registry = await crawlRepository.findUrl({ siteId: site._id, urlHash });
       if (!registry) {
         throw new AppError({ status: 404, code: "PAGE_NOT_FOUND", message: "This page is not in the crawl." });
@@ -314,8 +340,8 @@ export function createCrawlService({ workspaceRepository, crawlRepository, crawl
      * wanted and the site is made due, and the scheduler starts the crawl exactly as it would
      * for the whole site.
      */
-    async requestRecrawl({ userId, workspaceId, target }) {
-      const { workspace, site } = await requireSite(userId, workspaceId, "member");
+    async requestRecrawl({ userId, workspaceId, sourceId, target }) {
+      const { workspace, site } = await requireSite(userId, workspaceId, "member", sourceId);
       await requireCrawlBudget(workspace);
       const pages = await crawlRepository.requestRecrawl({ siteId: site._id, target, now: now(), startedBy: userId });
       if (pages === 0) {
@@ -326,8 +352,8 @@ export function createCrawlService({ workspaceRepository, crawlRepository, crawl
     },
 
     /** Lists the workspace's recent crawl runs, newest first. */
-    async listRuns({ userId, workspaceId, limit }) {
-      const { site } = await requireSite(userId, workspaceId, "read-only");
+    async listRuns({ userId, workspaceId, sourceId, limit }) {
+      const { site } = await requireSite(userId, workspaceId, "read-only", sourceId);
       const runs = await crawlRepository.listRuns(site._id, limit);
       return { items: runs.map(toRunSummary) };
     },
@@ -343,8 +369,8 @@ export function createCrawlService({ workspaceRepository, crawlRepository, crawl
      * @param {object} options
      * @param {string} [options.before] ISO time to page back from, for older entries
      */
-    async getActivity({ userId, workspaceId, before, limit }) {
-      const { site } = await requireSite(userId, workspaceId, "read-only");
+    async getActivity({ userId, workspaceId, sourceId, before, limit }) {
+      const { site } = await requireSite(userId, workspaceId, "read-only", sourceId);
       const run = (await crawlRepository.findActiveRun(site._id))
         ?? (await crawlRepository.findLatestRun(site._id));
       if (!run) return { run: null, entries: [], progress: null };
@@ -419,8 +445,8 @@ export function createCrawlService({ workspaceRepository, crawlRepository, crawl
      * @param {object} options
      * @param {string} [options.path] node to expand, as a URL path; the root when absent
      */
-    async getTree({ userId, workspaceId, path, limit, skip }) {
-      const { site } = await requireSite(userId, workspaceId, "read-only");
+    async getTree({ userId, workspaceId, sourceId, path, limit, skip }) {
+      const { site } = await requireSite(userId, workspaceId, "read-only", sourceId);
       const prefix = segmentsOf(path);
 
       const [{ items, total }, self] = await Promise.all([
@@ -449,8 +475,8 @@ export function createCrawlService({ workspaceRepository, crawlRepository, crawl
      * @param {object} options
      * @param {"broken"|"orphans"|"duplicates"} options.kind
      */
-    async getFindings({ userId, workspaceId, kind, limit, skip }) {
-      const { site } = await requireSite(userId, workspaceId, "read-only");
+    async getFindings({ userId, workspaceId, sourceId, kind, limit, skip }) {
+      const { site } = await requireSite(userId, workspaceId, "read-only", sourceId);
       const { items, total } = await crawlRepository.listFindings({ siteId: site._id, kind, limit, skip });
       return {
         kind,
@@ -477,8 +503,8 @@ export function createCrawlService({ workspaceRepository, crawlRepository, crawl
      * inbound link list without the anchors, or a status without the history that says whether it
      * is new.
      */
-    async getPage({ userId, workspaceId, urlHash }) {
-      const { site } = await requireSite(userId, workspaceId, "read-only");
+    async getPage({ userId, workspaceId, sourceId, urlHash }) {
+      const { site } = await requireSite(userId, workspaceId, "read-only", sourceId);
       const registry = await crawlRepository.findUrl({ siteId: site._id, urlHash });
       if (!registry) {
         throw new AppError({ status: 404, code: "PAGE_NOT_FOUND", message: "This page is not in the crawl." });
@@ -553,8 +579,8 @@ export function createCrawlService({ workspaceRepository, crawlRepository, crawl
      * Defaults to the latest run that produced pages, so the interface can ask for "the pages"
      * without first resolving which crawl they came from.
      */
-    async listPages({ userId, workspaceId, runId, indexable, status, limit, page }) {
-      const { site } = await requireSite(userId, workspaceId, "read-only");
+    async listPages({ userId, workspaceId, sourceId, runId, indexable, status, limit, page }) {
+      const { site } = await requireSite(userId, workspaceId, "read-only", sourceId);
 
       const run = runId
         ? (await crawlRepository.listRuns(site._id, 50)).find((candidate) => candidate._id.toHexString() === runId)

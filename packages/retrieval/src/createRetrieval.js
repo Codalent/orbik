@@ -97,5 +97,8 @@ export function createIndexEraser({ config, timeoutMs = 10_000 }) {
   });
   return {
     eraseWorkspace: (workspaceId) => store.deleteWorkspace({ workspaceId: String(workspaceId) }),
+    // The pages of one removed source, by their keys: the rest of the workspace's index stays.
+    erasePages: (workspaceId, sourceKeys) =>
+      store.deleteSources({ workspaceId: String(workspaceId), sourceKind: "page", sourceKeys }),
   };
 }

@@ -26,6 +26,7 @@ export {
   libraryDepth,
   librarySegmentOf,
   normalizeLibraryPath,
+  slugifySegment,
 } from "./library.js";
 export { USER_BLOCK_OPEN, diffMarkdownBlocks, keepUserWriting, markUserBlocks } from "./blocks.js";
 export { BRAND_ROOT_PATH, BRAND_WRITER_SLUG, isBrandLayerPath } from "./brand.js";

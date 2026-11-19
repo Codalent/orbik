@@ -475,6 +475,33 @@ export function createCrawlRepository(collections) {
       return sites.findOne({ _id: toObjectId(siteId) }, { projection: SITE_PROJECTION });
     },
 
+    /**
+     * Asks a running crawl to stop. The crawler's jobs check it before each request and read
+     * nothing more; finalize closes the run as cancelled.
+     */
+    async requestStop(runId, now) {
+      await runs.updateOne(
+        { _id: toObjectId(runId), status: "running", cancelRequestedAt: { $in: [null] } },
+        { $set: { cancelRequestedAt: now, updatedAt: now } },
+      );
+    },
+
+    /**
+     * Takes back a crawl that was asked for and has not started: the site is visited again on its
+     * own cadence, from its last visit. Answers whether there was one to take back.
+     */
+    async withdrawRequest(siteId) {
+      const site = await sites.findOne({ _id: toObjectId(siteId) }, { projection: { crawlRequestedAt: 1, lastScheduledAt: 1, discoveryIntervalHours: 1, crawlIntervalHours: 1 } });
+      if (!site?.crawlRequestedAt) return false;
+      const hours = site.discoveryIntervalHours ?? site.crawlIntervalHours ?? 168;
+      const from = site.lastScheduledAt ?? new Date();
+      await sites.updateOne(
+        { _id: site._id },
+        { $set: { nextCrawlAt: new Date(from.getTime() + hours * 3_600_000) }, $unset: { crawlRequestedAt: "", crawlRequestedBy: "" } },
+      );
+      return true;
+    },
+
     /** The crawl configurations of several workspaces at once, for the activity monitor. */
     listSitesByWorkspaces(workspaceIds) {
       if (!workspaceIds.length) return [];

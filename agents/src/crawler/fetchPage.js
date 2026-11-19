@@ -11,7 +11,7 @@ import { SOURCE_RESERVE_SHARE, describePageKind, getAgentCollections } from "@or
 import { loadRobotsForSite } from "./robotsStore.js";
 import { parseSiteConfig } from "./siteConfig.js";
 import { recrawlPriority } from "./priority.js";
-import { detectSiteBlock, isRunBlocked, recordBlocked, recordNotBlocked } from "./siteBlock.js";
+import { detectSiteBlock, isRunBlocked, isRunStopped, recordBlocked, recordNotBlocked } from "./siteBlock.js";
 import {
   canRetry,
   isRunRateLimited,
@@ -80,6 +80,10 @@ export function createFetchHandler({ createFetcherFor }) {
     // The same for a site that will not let the crawler in at all.
     if (await isRunBlocked(collections.runs, job.runId)) {
       return { counters: await countSkipOnce(collections.urls, job, record, "pagesSkippedBlocked"), enqueue: [] };
+    }
+    // And for a crawl a person stopped.
+    if (await isRunStopped(collections.runs, job.runId)) {
+      return { counters: await countSkipOnce(collections.urls, job, record, "pagesSkippedStopped"), enqueue: [] };
     }
 
     const scope = createScope(config);

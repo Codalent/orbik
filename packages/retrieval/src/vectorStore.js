@@ -165,6 +165,31 @@ export function createVectorStore({ url, collection, dimensions, apiKey = null, 
     },
 
     /**
+     * Removes every point of some sources of one workspace, by key: what removing one of its
+     * crawled sources asks of the index. In batches, so a large source is several bounded filters
+     * rather than one with thousands of values.
+     */
+    async deleteSources({ workspaceId, sourceKind, sourceKeys }) {
+      const existence = await attempt("check the collection", () => qdrant.collectionExists(collection));
+      if (!existence?.exists) return { deleted: true, existed: false };
+      for (let offset = 0; offset < sourceKeys.length; offset += 500) {
+        const keys = sourceKeys.slice(offset, offset + 500);
+        await attempt("delete sources", () =>
+          qdrant.delete(collection, {
+            wait: true,
+            filter: {
+              must: [
+                { key: "workspaceId", match: { value: workspaceId } },
+                { key: "sourceKind", match: { value: sourceKind } },
+                { key: "sourceKey", match: { any: keys } },
+              ],
+            },
+          }));
+      }
+      return { deleted: true, existed: true };
+    },
+
+    /**
      * Removes every point of one workspace: what deleting the workspace asks of the index.
      *
      * By filter, like {@link deleteSource}, so it needs no list of what was written. A collection
