@@ -123,6 +123,80 @@ The interval is measured from when the previous request to the host was actually
 - The allowance is fixed when a UTC calendar month's budget is first opened. Plan allowance changes apply to the next month; the `grant:crawl-budget` command (`--workspace <id>`, or `--email` of an account that owns one workspace) can top up the current month. Extra grants do not carry into the following month.
 - Budgets were kept per account until the `2026-11-13-crawl-budget-per-workspace` migration. It gave the months of an account that owned one workspace to that workspace; an account that owned several keeps its old months as history, without `workspaceId`, and each of its workspaces opened the month it ran in afresh. A deleted workspace's months are kept as the record of what it spent.
 
+## Sources
+
+A workspace reads its website and any other source a person adds (docs/guides/sources.md), and
+each source is a crawl site: one `crawl_sites` document, crawled, scheduled, budgeted and handed to
+the Library the way the website always was. `describeSource` (`packages/core/src/crawl/sources.js`)
+is the one reading of what a site document says about the source it is, with the defaults for a
+missing field; the API, the crawler and the Library all go through it.
+
+- **The website** is the source with `primary: true` — one per workspace, made by its first setup
+  (`PUT /crawl`), folder `website`. Sites stored before sources existed are made websites by the
+  `2026-11-19-sources` migration, and `websiteFilter` also matches one with no `primary` at all, for
+  the moment between a process starting and the migration running.
+- **Another source** has `primary: false`, a `relation` — `own` (a site of the workspace's) or
+  `elsewhere` (pages about it on somebody else's site) — and a `mode`: `site` (the whole host, as
+  the website), `section` (`section: "/guides/"`, applied as the include patterns
+  `sectionPatterns` gives) or `pages` (`pageUrls`, at most 50, all on one host; `elsewhere` is
+  always `pages`). It also carries `name`, `folder`, `purpose`, `knowledgeUse`,
+  `excludePatterns` ("Leave out", which the scope has always compiled), `pageIntervalHours`,
+  `followPagination` and `host`.
+- **One source per host.** Unique indexes on `{workspaceId, host}` and `{workspaceId, folder}` (and
+  `{workspaceId}` where `primary`) keep a page from being crawled, copied and indexed twice, which
+  is also what lets the Library key a page by its URL hash across the workspace. A website moved to
+  a host another source reads is refused (`409 SOURCE_HOST_TAKEN`).
+
+**A list of pages** (`mode: "pages"`) is a scope of its own in `createScope`: an address is in it
+when it is one of the listed pages, or — with `followPagination` — a later page of a listing among
+them, recognised from the address alone by `paginationOf`: exactly one of the query parameters
+`page`, `p`, `pg`, `paged`, `pagenum`, `page_num`, `offset` or `start` holding a number, or a path
+ending `/page/N`, with the rest of the address the listed page's. Decided from the address, not the
+link that led there, so discovery and the fetch step give the same answer. Everything else on the
+host is refused as `NOT_LISTED` and, like an address on another host (`FOREIGN_REASONS`), recorded
+as an edge and never registered. Discovery registers every listed page as a seed and reads no
+sitemaps; depth is the next-page chain, capped at 30 (`SOURCE_LIMITS.pagination`); finalize
+measures depth from every listed page, and a refusal of any listed page is a refusal of the site.
+
+**How often.** A source's `pageIntervalHours` is the frequency of a page nobody chose for: after a
+per-page override and a per-pattern one, before "never" (`effectiveIntervalHours`). A source a
+person adds starts weekly — adding it was the choice — and the website with none, as before.
+
+**The budget is the workspace's.** A fetch for a source other than the website passes
+`reserveShare: SOURCE_RESERVE_SHARE` (0.2) to `consume`, so the last fifth of the month is left to
+the website, which everything else is built on.
+
+**Stopping a crawl.** `POST …/crawl/stop` sets `cancelRequestedAt` on the running run. Every fetch
+and discovery job checks it before its request (`isRunStopped`), counts `pagesSkippedStopped`
+and asks for nothing; finalize closes the run as `cancelled`, and what was read stays. A crawl that
+was asked for and has not started is withdrawn instead, and the site's next visit goes back to its
+cadence.
+
+**Routes.** Every crawl route is served twice: at `/v1/workspaces/:id/crawl`, the website's as it
+always was, and at `/v1/workspaces/:id/sources/:sourceId/crawl` for any source (`website` names the
+website there too). Only the website's crawl is set up with `PUT /crawl`; another source's settings
+are `PATCH /v1/workspaces/:id/sources/:sourceId`. The sources themselves are
+`backend/src/routes/sourceRoutes.js`:
+
+- `GET /sources` — every source with its state (`queued`, `first-read`, `reading`, `up-to-date`,
+  `refused`, `rate-limited`, `failed`, `stopped`, `out-of-budget`, `never-read`), its pages known,
+  copied and chosen, and the figures All sources heads with.
+- `POST /sources/check` — what an address is before it is added: whose it looks like (under the
+  website's domain, `isUnderDomain`, or not), whether a known review, directory or social site
+  (`backend/src/services/sourceHosts.js`) says what kind of page it is or that the site cannot be
+  read, and what the page answers (`pageProbe.js`: as OrbikBot, robots.txt first, every hop checked
+  to be on the public internet, as the crawler's fetcher checks). Nothing is saved.
+- `POST /sources` (member) — adds a source and makes it due at once; `GET` / `PATCH` / `DELETE
+  /sources/:sourceId` — one source, its settings, and (admin; not the website, not while it is
+  read) its removal: its crawl data, its branch of the Library, its state and ledger rows and its
+  pages' index points.
+- `GET /sources/suggestions`, `POST /sources/suggestions/dismiss` — the website's links to known
+  profile pages (`crawl_links` with `internal: false`) that are not sources yet, most linked first.
+
+The activity monitor names the source of each crawl (`sourceId`, `sourceName`, `primary` on a
+crawl item), since a workspace can be reading two at once, and reports a crawl once: crawler runs
+are not listed as agent runs as well.
+
 ## Feedback
 
 A run's phase is one of: **queued** (waiting for the sites ahead of it), **discovering**, **fetching** (shown as "Crawling"), and **finalizing** (shown as "Working out the site's structure" on the crawl page and "Finishing" in the sidebar, which also says "Starting" for a run that has begun but counted nothing yet). Discovery is a few seconds of robots.txt and sitemaps when there is no discovery pass, and indeterminate until its frontier drains when there is one. Crawl progress is "fetched of about N", where N is the pages fetched plus the fetches still queued: it grows while a crawl is finding pages by their links, which is why it is a count and not a percentage. It includes unchanged pages; deferred pages remain incomplete.

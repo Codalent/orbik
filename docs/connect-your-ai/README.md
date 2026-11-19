@@ -3,8 +3,9 @@
 Orbik MCP lets your own AI — Claude, ChatGPT, Claude Code, Cursor or an agent you built — read a
 workspace's knowledge base, and save to its Library if you allow it.
 
-A connected AI reads the Library, the word-for-word copy of every crawled page under
-`/sources/website`, the site's llms.txt and its brand (colours, type, logo and images). Your AI does
+A connected AI reads the Library, the word-for-word copy of every crawled page under `/sources`
+(the website under `/sources/website`, and each other [source](../guides/sources.md) beside it), the
+site's llms.txt and its brand (colours, type, logo and images). Your AI does
 the reasoning; Orbik only serves what it reads. The one model call Orbik makes for it is turning a
 search question into an embedding, with the install's OpenAI key.
 

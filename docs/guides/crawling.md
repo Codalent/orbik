@@ -1,25 +1,27 @@
 # Crawling your site
 
 Orbik reads your website page by page and keeps a Markdown copy of each one. Everything else — the
-Library, search, Ask, llms.txt and the brand — works from what the crawl keeps.
+Library, search, Ask, llms.txt and the brand — works from what the crawl keeps. The website is the
+first of a workspace's [sources](sources.md); other sites of yours and pages about you elsewhere are
+crawled the same way, each as a source of its own.
 
 ## Start the first crawl
 
 1. Create a workspace: give it a **Workspace name**, then the **Website URL** it is about, and
    press **Create workspace**.
 2. On **Home**, the first step is **Connect your website**. **Start first crawl** starts the crawl
-   from the workspace's website and opens the **Crawler** page, which is also listed under
-   **Agents** in the workspace's rail. The crawl is queued, starts within a minute, and the page
-   follows it without a reload: the pages appear in the table as they are found. If it cannot
-   start — the month's crawl budget is used up, say — the step says why.
+   from the workspace's website and opens the website's pages under **Sources** in the workspace's
+   rail (**Sources** → **Website** → **All N pages**). The crawl is queued, starts within a minute,
+   and the page follows it without a reload: the pages appear in the table as they are found. If it
+   cannot start — the month's crawl budget is used up, say — the step says why.
 3. To begin somewhere else on the same site, or to list sitemaps first, press **Choose the start
-   address or add sitemaps first** instead. On the Crawler's set-up, **Start crawling from** is
+   address or add sitemaps first** instead. On the crawl's set-up, **Start crawling from** is
    filled in with the workspace's website; an address typed without `https://` (`example.com`) is
    read as one. Orbik finds sitemaps through robots.txt and the usual locations; only if yours
    live somewhere unusual, open **Add sitemap URLs** and list them, one per line. Then press
    **Start crawling this site**, right under the address. What a crawl does is explained under the
    button.
-4. When the first crawl is in, the Crawler page says what comes next: choosing how the Library is
+4. When the first crawl is in, the crawl page says what comes next: choosing how the Library is
    organised, in the [Library](library.md).
 
 Setting up and starting crawls needs the member role or above. A read-only member sees the
@@ -30,19 +32,22 @@ crawl's results but not the controls.
 - It reads robots.txt and your sitemaps, then follows links outward from the start address. A page
   nothing links to is still found if a sitemap lists it; a page that is in no sitemap and linked
   from nowhere cannot be found.
-- It crawls the start address's hostname only. A subdomain is a different site: give it a
-  workspace of its own.
+- It crawls the start address's hostname only. A subdomain is a different site: add it as a
+  [source](sources.md) of its own, beside the website.
 - It turns every page that answers successfully into content-only Markdown, leaving out the
   navigation, the page's header and footer, cookie banners and forms. No AI model is involved in
   crawling.
 - When it finishes, it hands the site to the Library, which copies every page into its Sources
   folder and indexes them for search (see [The Library](library.md)).
 
-## The Crawler page
+## The crawl page
+
+Every source has one: **All N pages** on the source's page under **Sources** (the website's is at
+**Sources** → **Website**). The old address, `/agents/crawler`, leads to the website's.
 
 Along the top are the crawl's state and its controls: **Crawl now**, **Fresh crawl**, **Set crawl
 frequencies**, **Crawl logs** (every run, how it was started and how it ended), the settings gear
-and **Clear crawl data**. Hover over a button for what it does. **Next visit in …** is when Orbik
+(on the website's; another source's settings are on its page) and **Clear crawl data**. Hover over a button for what it does. **Next visit in …** is when Orbik
 next comes back on its own (see [Keeping pages up to date](#keeping-pages-up-to-date)).
 
 While a crawl runs, the page shows its progress as pages fetched "of about N". N grows as the
@@ -77,7 +82,8 @@ Select a page to see what was read from it — status, title, description, headi
 **Markdown**, its own crawl frequency and a **Crawl now** for that page alone.
 
 While a crawl is queued or running it is also listed in the **Activity** box at the foot of the
-Agents section's sidebar (on a phone, the one line under the agents).
+Sources and Agents sidebars (on a phone, the one line under them), named by its workspace and, for
+a source other than the website, the source.
 
 ## How OrbikBot treats your server
 
@@ -113,7 +119,7 @@ somebody asks.
   once.
 
 > [!NOTE]
-> The Crawler page can show a monthly crawl budget. In this open-source edition every month is
+> The crawl page can show a monthly crawl budget. In this open-source edition every month is
 > unlimited; a budget applies only when an extension sets one. Where one does, a month whose
 > pages are spent, or a plan that includes no crawl pages at all, disables **Crawl now**, **Fresh
 > crawl** and **Start crawling this site** and says why under them; the page promises a date
@@ -134,13 +140,14 @@ press **Crawl now**. Orbik does not disguise itself or solve challenges to get p
 
 ## Changing where the crawl starts
 
-**Crawl settings** (the gear on the Crawler page) changes **Start crawling from** and the sitemap
-addresses. Changes apply to the next crawl, and the schedule is not reset.
+**Crawl settings** (the gear on the website's crawl page, or **Where it starts** on its page under
+Sources) changes **Start crawling from** and the sitemap addresses. Changes apply to the next
+crawl, and the schedule is not reset.
 
 The workspace's own website is changed on **Settings** → **Workspace**, by an admin or the owner:
 
 - **The same site at a new address** (the same hostname) keeps everything crawled. The next crawl
-  starts from the new address, unless a start page was chosen on the Crawler page, which is kept.
+  starts from the new address, unless a start page was chosen for the crawl, which is kept.
 - **A different site** (another hostname) starts over, so Orbik asks first. **Change the website**
   removes every page crawled from the old site and its crawl history, and a crawl of the new site
   starts within a minute. The Library keeps what people and agents wrote, and its copies of the old

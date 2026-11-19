@@ -202,7 +202,7 @@ them. A deployment's package may leave any of them out.
 
 | Export | Rendered |
 |---|---|
-| `railItems: [{ id, name, icon, path, feature? }]` | in the workspace rail, after the agents and before Settings, linking to `/workspaces/:id/<path>` |
+| `railItems: [{ id, name, icon, path, feature? }]` | in the workspace rail, after Sources and the agents and before Settings, linking to `/workspaces/:id/<path>` |
 | `pages: { [path]: { title, Component, feature? } }` | at `/workspaces/:id/<path>` by the app's one catch-all route; a core page at the same address always wins |
 | `settingsSections: [{ id, title, description?, Component, feature? }]` | at the end of a workspace's Settings navigation, each its own page at `/workspaces/:id/settings/extensions/<id>` |
 | `banners: [{ id, Component, feature? }]` | above every page of a workspace |
@@ -211,7 +211,7 @@ them. A deployment's package may leave any of them out.
 | `signupFields: [{ id, Component, feature? }]` | in the signup form, above its button. The component gets `onChange(value)`, to set the field's text (or `null` to drop it), and `attempt`, which counts the times the form was sent, so a one-use token such as a captcha's can be renewed after a refusal. The values travel with the signup as `extensions` and reach the API's `checkSignup` as `fields` (`id`: lowercase letters, digits and dashes; at most 10 fields of 4096 characters) |
 | `userMenuItems: [{ id, label, href, icon?, feature? }]` | in the account menu, before Documentation and the source link; `href` is a path in the app (`/account/billing`) or an `https://` address, opened in a new tab |
 | `workspaceCreateNotices: [{ id, Component, feature? }]` | in the create-workspace wizard (`/workspaces/new`), above its buttons, on both steps (the name, then the website), to tell the person something before a workspace is made: what it will cost, a limit reached. The component gets `api` only and renders nothing when it has nothing to say; it sits inside the wizard's form, so a button in it needs `type="button"` |
-| `crawlBudgetLink: { label, path, feature? }` | on the Crawler page, beside "this month's crawl pages are spent" and "this workspace's plan includes no crawl pages": where more crawl pages are got. `path` is under the workspace, as a rail item's, or an `https://` address, opened in a new tab. Without it the page offers nothing to press |
+| `crawlBudgetLink: { label, path, feature? }` | on a source's crawl page (the website's is what the Crawler page was), beside "this month's crawl pages are spent" and "this workspace's plan includes no crawl pages": where more crawl pages are got. `path` is under the workspace, as a rail item's, or an `https://` address, opened in a new tab. Without it the page offers nothing to press |
 
 Components are client components and receive `workspaceId` (on a workspace's pages) and `api` — the app's own client
 (`api.fetch(path, init)`), so requests carry the session, the CSRF token and the error envelope as

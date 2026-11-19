@@ -12,6 +12,7 @@
     {
       "title": "Guides",
       "pages": [
+        "guides/sources.md",
         "guides/crawling.md",
         "guides/library.md",
         "guides/ask.md",

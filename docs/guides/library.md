@@ -5,10 +5,14 @@ every crawled page, and a knowledge base written from them that people and agent
 
 ## Two layers
 
-- **Sources** (`/sources/website`) holds a copy of every crawled page, at a path that follows the
-  page's address. It is written by code when a crawl finishes — no AI model reads a page in order
-  to store it — and kept in step with the site after every crawl. A copy is marked **Copy of the
-  site · read-only**, with the live page one press away.
+- **Sources** (`/sources`) holds a copy of every crawled page, at a path that follows the page's
+  address: the website's under `/sources/website`, and each other [source](sources.md) — a
+  documentation site, a review profile — in a folder of its own beside it (`/sources/docs`). It is
+  written by code when a crawl finishes — no AI model reads a page in order to store it — and kept
+  in step with each source after every crawl. A copy is marked **Copy of the site · read-only**,
+  with the live page one press away; a copy from a source other than the website says which in its
+  first lines (`- From: Clutch reviews (a page about the company elsewhere; testimonials &
+  reviews)`).
 - **The knowledge base** is the folders above it: what the company is, said once and in one place
   — an overview, an index, and subjects such as services, pricing and case studies. The
   **Knowledge base agent** writes it with an AI model from a selection of the site's pages, and
