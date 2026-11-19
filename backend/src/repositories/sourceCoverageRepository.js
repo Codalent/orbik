@@ -39,14 +39,17 @@ export function createSourceCoverageReader({ database }) {
      * @param {object} options
      * @param {import("mongodb").ObjectId} options.workspaceId
      * @param {import("mongodb").ObjectId|null} [options.siteId] the crawl whose pages count
+     * @param {import("mongodb").ObjectId[]} [options.siteIds] every source whose pages count
      * @returns {Promise<{pages: number, stored: number, notStored: number, failed: number,
      *   removed: number, pending: number, chosen: number, cited: number, uncited: number,
      *   mirroredAt: string|null, crawl: {addresses: number, errors: number, notPages: number,
      *   notFetched: number}}>}
      */
-    async coverageOf({ workspaceId, siteId = null }) {
+    async coverageOf({ workspaceId, siteId = null, siteIds = null }) {
+      // Every source's pages, as the state rows below are every source's copies.
+      const sites = siteIds ?? (siteId ? [siteId] : []);
       const [pages, buckets, cited, crawl] = await Promise.all([
-        siteId ? markdown.countDocuments({ siteId }) : 0,
+        sites.length ? markdown.countDocuments({ siteId: { $in: sites } }) : 0,
         state
           .aggregate([
             { $match: { workspaceId } },
@@ -71,7 +74,7 @@ export function createSourceCoverageReader({ database }) {
           ])
           .toArray(),
         citedPages(nodes, workspaceId),
-        siteId ? crawledAddresses(urls, siteId) : null,
+        sites.length ? crawledAddresses(urls, sites) : null,
       ]);
 
       const row = buckets[0] ?? {};
@@ -144,10 +147,10 @@ async function citedPages(nodes, workspaceId) {
  *   crawler records a non-HTML file, a redirect or `noindex`.
  * - `notFetched`: found and not fetched yet, or not allowed to be.
  */
-async function crawledAddresses(urls, siteId) {
+async function crawledAddresses(urls, siteIds) {
   const [row] = await urls
     .aggregate([
-      { $match: { siteId, $or: [{ variantOf: null }, { variantOf: { $exists: false } }] } },
+      { $match: { siteId: { $in: siteIds }, $or: [{ variantOf: null }, { variantOf: { $exists: false } }] } },
       {
         $group: {
           _id: null,

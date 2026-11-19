@@ -482,7 +482,15 @@ export function createSourceService({
         items.push({ url: target._id, label: known.label, purpose: known.purpose, readable: known.readable, reason: known.reason, pages: target.pages, from: target.from ?? [] });
       }
       items.sort((left, right) => Number(right.readable) - Number(left.readable) || right.pages - left.pages);
-      const shown = items.slice(0, MAX_SUGGESTIONS);
+      // A site Orbik cannot read is named once — the profile most of the website links to — so a
+      // footer of social links does not crowd out what can be added.
+      const named = new Set();
+      const shown = items.filter((item) => {
+        if (item.readable) return true;
+        if (named.has(item.label)) return false;
+        named.add(item.label);
+        return true;
+      }).slice(0, MAX_SUGGESTIONS);
       // Where a person would see the link: the page nearest the home page that has it.
       const from = await sourceRepository.urlsOf(website._id, shown.flatMap((item) => item.from));
       return {

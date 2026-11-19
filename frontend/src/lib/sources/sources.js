@@ -59,8 +59,12 @@ export const ATTENTION_STATES = Object.freeze(["refused", "rate-limited", "faile
  * @returns {{label: string, tone: "lime"|"orange"|"coral"|"muted", pulse: boolean}}
  */
 export function describeState(source) {
-  const read = source.lastReadAt ? describeElapsed(source.lastReadAt) : "";
-  const changed = source.latestRun?.counters?.pagesChanged ?? 0;
+  const when = source.lastReadAt ? describeElapsed(source.lastReadAt) : "";
+  // A first read finds every page new; "changed" is said only of a read that found some pages as
+  // they were.
+  const counters = source.latestRun?.counters ?? {};
+  const read = (counters.pagesFetched ?? 0) + (counters.pagesNotModified ?? 0);
+  const changed = (counters.pagesChanged ?? 0) < read ? (counters.pagesChanged ?? 0) : 0;
   switch (source.state) {
     case "first-read":
       return { label: "First crawl · copying pages", tone: "lime", pulse: true };
@@ -77,16 +81,16 @@ export function describeState(source) {
     case "failed":
       return { label: "The last read failed", tone: "coral", pulse: false };
     case "stopped":
-      return { label: `Stopped${read ? ` · ${read}` : ""}`, tone: "muted", pulse: false };
+      return { label: `Stopped${when ? ` · ${when}` : ""}`, tone: "muted", pulse: false };
     case "out-of-budget":
       return { label: "Stopped: out of crawl pages", tone: "orange", pulse: false };
     case "never-read":
       return { label: "Not read yet", tone: "muted", pulse: false };
     default:
       if (!source.primary && changed > 0 && source.pages?.copied) {
-        return { label: `${changed.toLocaleString("en-US")} page${changed === 1 ? "" : "s"} changed${read ? ` · ${read}` : ""}`, tone: "lime", pulse: false };
+        return { label: `${changed.toLocaleString("en-US")} page${changed === 1 ? "" : "s"} changed${when ? ` · ${when}` : ""}`, tone: "lime", pulse: false };
       }
-      return { label: `Up to date${read ? ` · read ${read}` : ""}`, tone: "lime", pulse: false };
+      return { label: `Up to date${when ? ` · read ${when}` : ""}`, tone: "lime", pulse: false };
   }
 }
 

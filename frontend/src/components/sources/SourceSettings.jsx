@@ -151,14 +151,14 @@ export function SourceSettings({ workspaceId, source, detail, purposes, onSaved,
         ) : (
           <>
             <Section title="Where it starts">
-              <label htmlFor="source-seed" className="text-sm font-medium text-orb-white">Start crawling from</label>
+              <label htmlFor="source-seed" className="block text-sm font-medium text-orb-white">Start crawling from</label>
               <input id="source-seed" type="text" inputMode="url" spellCheck={false} value={values.seedUrl} onChange={(event) => set("seedUrl")(event.target.value)} aria-invalid={Boolean(fieldErrors.seedUrl) || undefined} className={cn(FIELD, "mt-2 max-w-md")} />
               <p className="mt-2 text-compact text-orb-muted">
                 {source.primary ? `Your website, ${source.host}.` : `On ${source.host}.`} Every crawl begins here and follows links and sitemaps outward, on {source.host} only.
               </p>
             </Section>
             <Section title={source.primary ? "How much of it" : "What to leave out"}>
-              <label htmlFor="source-exclude" className="text-sm font-medium text-orb-white">Leave out</label>
+              <label htmlFor="source-exclude" className="block text-sm font-medium text-orb-white">Leave out</label>
               <textarea id="source-exclude" rows={3} spellCheck={false} value={values.exclude} onChange={(event) => set("exclude")(event.target.value)} placeholder={"/v1/*\n/changelog/archive/*"} aria-invalid={Boolean(fieldErrors.excludePatterns) || undefined} className={cn(FIELD, "mt-2 h-auto max-w-md resize-y rounded-2xl py-2 font-mono text-compact leading-5")} />
               <p className="mt-2 text-compact text-orb-muted">
                 {source.primary ? "Orbik reads the whole site. " : ""}Addresses starting with these are skipped. One per line; * matches anything.{detail.leftOut?.total ? ` ${detail.leftOut.total.toLocaleString("en-US")} ${detail.leftOut.total === 1 ? "page" : "pages"} left out so far.` : ""}

@@ -44,12 +44,14 @@ export function createActivityService({ workspaceRepository, crawlRepository, ru
       const workspaceIds = workspaces.map((workspace) => workspace._id);
 
       const sites = await crawlRepository.listSitesByWorkspaces(workspaceIds);
-      const [activeRuns, agentRuns, aiCalls, mirroring] = await Promise.all([
+      const [activeRuns, allRuns, aiCalls, mirroring] = await Promise.all([
         crawlRepository.listActiveRuns(sites.map((site) => site._id)),
         runRepository.listActiveForWorkspaces(workspaceIds),
         aiCallRepository.listRunning(workspaceIds),
         runRepository.listMirroringWorkspaces(workspaceIds),
       ]);
+      // A crawl is reported once, as the source being read; its run is not an agent's as well.
+      const agentRuns = allRuns.filter((run) => run.agent !== "crawler");
       const runsBySite = new Map(activeRuns.map((run) => [run.siteId.toHexString(), run]));
       // A crawl that is running was started by whoever its run names; one still queued, by whoever
       // asked for it on the site.

@@ -157,9 +157,9 @@ function SourceList({ workspaceId, sources, website }) {
                 {pages.of !== null ? ` of ${pages.of.toLocaleString("en-US")}` : ` ${pages.value === 1 ? "page" : "pages"}`}
               </span>
               <span className="hidden w-36 truncate font-mono text-xs text-orb-muted sm:block">{source.libraryPath}</span>
-              <span className={cn("flex w-52 items-center gap-1.5 text-compact", state.tone === "coral" ? "text-orb-coral" : state.pulse ? "text-orb-white" : "text-orb-gray")}>
-                <StatusDot tone={state.tone === "muted" ? "neutral" : state.tone} pulse={state.pulse} />
-                <span className="truncate">{state.label}</span>
+              <span className={cn("flex w-52 items-start gap-1.5 text-compact", state.tone === "coral" ? "text-orb-coral" : state.pulse ? "text-orb-white" : "text-orb-gray")}>
+                <StatusDot tone={state.tone === "muted" ? "neutral" : state.tone} pulse={state.pulse} className="mt-1.5" />
+                <span>{state.label}</span>
               </span>
               <ChevronRight aria-hidden="true" className="size-4 shrink-0 text-orb-muted" />
               <span className="sr-only">{describeRelation(source, website?.host)}</span>

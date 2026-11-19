@@ -680,7 +680,8 @@ export function createCrawlRepository(collections) {
     },
 
     /** How many pages have Markdown, which is what the knowledge agents read. */
-    countMarkdown({ siteId }) {
+    countMarkdown({ siteId, siteIds = null }) {
+      if (siteIds) return markdown.countDocuments({ siteId: { $in: siteIds.map((id) => toObjectId(id)) } });
       return markdown.countDocuments({ siteId: toObjectId(siteId) });
     },
 

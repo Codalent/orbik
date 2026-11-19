@@ -287,7 +287,12 @@ function LatestPages({ source, detail, pagesHref }) {
 
 /** What the last read of a list of pages found, page by page. */
 function LastRead({ source, detail }) {
-  const pages = detail.pages ?? [];
+  // Every page on the list, read or not yet, then the next pages found from them.
+  const known = detail.pages ?? [];
+  const unread = (source.pageUrls ?? [])
+    .filter((url) => !known.some((page) => page.url === url))
+    .map((url) => ({ url, urlHash: url, title: null, status: null, crawledAt: null, changedAt: null, listed: true }));
+  const pages = [...known, ...unread];
   const last = detail.lastRead;
   const since = last?.at ? new Date(last.at).getTime() - (last.durationMs ?? 0) - 60_000 : null;
   return (

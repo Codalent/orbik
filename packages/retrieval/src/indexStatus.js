@@ -51,23 +51,29 @@ export function createIndexStatusReader({ database }) {
      * @param {object} options
      * @param {unknown} options.workspaceId owning workspace
      * @param {unknown} [options.siteId] the crawl the pages come from; without one there are none
+     * @param {unknown[]} [options.siteIds] every source the pages come from, when there are several
      * @returns {Promise<{chunks: number, pages: number, libraryFiles: number, pending: number,
      *   failed: number, sources: number, indexedAt: string|null, model: string|null,
      *   error: {code: string, message: string}|null}>}
      */
-    async statusOf({ workspaceId, siteId = null }) {
+    async statusOf({ workspaceId, siteId = null, siteIds = null }) {
       const owner = toObjectId(workspaceId);
-      const site = siteId ? toObjectId(siteId) : null;
+      // Every source's pages are the workspace's to index, as the indexer reads them.
+      const sites = (siteIds ?? (siteId ? [siteId] : [])).map((id) => toObjectId(id));
       const [rows, rendered, nodeRows, exclusions] = await Promise.all([
         state.find({ workspaceId: owner }).project({ sourceKind: 1, sourceKey: 1, hash: 1, revision: 1, chunks: 1, indexedAt: 1, model: 1, error: 1 }).toArray(),
-        site ? markdown.find({ siteId: site }).project({ urlHash: 1, url: 1, hash: 1 }).toArray() : [],
+        sites.length ? markdown.find({ siteId: { $in: sites } }).project({ siteId: 1, urlHash: 1, url: 1, hash: 1 }).toArray() : [],
         nodes
           .find({ workspaceId: owner, kind: LIBRARY_NODE_KINDS.file })
           .project({ path: 1, revision: 1, authors: 1, removed: 1, hasUserContent: 1 })
           .toArray(),
-        site ? loadPageExclusions({ database, workspaceId: owner, siteId: site }) : null,
+        Promise.all(sites.map((site) => loadPageExclusions({ database, workspaceId: owner, siteId: site }))),
       ]);
-      const pages = exclusions ? rendered.filter((page) => !indexExclusionOf(page, exclusions)) : rendered;
+      const bySite = new Map(sites.map((site, index) => [site.toHexString(), exclusions[index]]));
+      const pages = rendered.filter((page) => {
+        const excluded = bySite.get(page.siteId?.toHexString?.() ?? "");
+        return !excluded || !indexExclusionOf(page, excluded);
+      });
       const files = nodeRows.filter((file) => !(
         isSourceLayerPath(file.path ?? "")
         && file.authors?.agent === SOURCE_LAYER_WRITER_SLUG

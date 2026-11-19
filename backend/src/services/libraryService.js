@@ -236,9 +236,9 @@ export function createLibraryService({
         library.stats({ scope }),
         knowledgeRepository.countSources({ workspaceId: workspace._id, agentSlug: KNOWLEDGE_AGENT_SLUG }),
         runRepository.findLatest({ workspaceId: workspace._id, agentSlug: KNOWLEDGE_AGENT_SLUG }),
-        site ? crawlRepository.countMarkdown({ siteId: site._id }) : 0,
-        indexStatus.statusOf({ workspaceId: workspace._id, siteId: site?._id ?? null }),
-        coverage.coverageOf({ workspaceId: workspace._id, siteId: site?._id ?? null }),
+        site ? crawlRepository.countMarkdown({ siteIds: scope.siteIds }) : 0,
+        indexStatus.statusOf({ workspaceId: workspace._id, siteIds: scope.siteIds }),
+        coverage.coverageOf({ workspaceId: workspace._id, siteIds: scope.siteIds }),
         library.roles({ scope }),
         setups.findOne(setupFilter(workspace._id), { projection: SETUP_PROJECTION }),
       ]);
@@ -441,8 +441,8 @@ export function createLibraryService({
      * be a strange thing to have built.
      */
     async getIndexStatus({ userId, workspaceId }) {
-      const { workspace, site } = await scopeFor(userId, workspaceId, "read-only");
-      return { index: await indexStatus.statusOf({ workspaceId: workspace._id, siteId: site?._id ?? null }) };
+      const { workspace, scope } = await scopeFor(userId, workspaceId, "read-only");
+      return { index: await indexStatus.statusOf({ workspaceId: workspace._id, siteIds: scope.siteIds }) };
     },
 
     /** One branch of the tree. */
@@ -500,7 +500,7 @@ export function createLibraryService({
       const [current, reviewed] = keys.length
         ? await Promise.all([
           database.collection(AGENT_COLLECTIONS.markdown)
-            .find({ siteId: site._id, urlHash: { $in: keys } }, { projection: { urlHash: 1, hash: 1, url: 1, title: 1 } })
+            .find({ siteId: { $in: scope.siteIds }, urlHash: { $in: keys } }, { projection: { urlHash: 1, hash: 1, url: 1, title: 1 } })
             .toArray(),
           database.collection(AGENT_COLLECTIONS.knowledgeSources)
             .find(
