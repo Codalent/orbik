@@ -16,7 +16,8 @@ export const ORBIK_VERSION = (() => {
 
 /**
  * What this install is, for anyone who asks, signed in or not: the edition and the features its
- * extensions turn on, the release, how a password is reset and how one signs in, and whether the install
+ * extensions turn on, the release, how a password is reset, whether one can ask for access and how one
+ * signs in, and whether the install
  * is still waiting for its first account.
  *
  * The web app is one build for every edition. It reads this before it renders anything an
@@ -31,6 +32,8 @@ export const ORBIK_VERSION = (() => {
  * @param {() => Promise<boolean>} options.setupRequired whether no account exists yet
  * @param {"email"|"admin"} [options.passwordReset] how a forgotten password is reset: a link the
  *   person is emailed, or one the install's admin makes for them (no email configured)
+ * @param {boolean} [options.accessRequests] whether a person can ask the install's admins for access
+ *   (the Request access form); false with no install admin (`ORBIK_INSTALL_ADMIN=off`)
  * @param {string[]} [options.signInWith] the other ways to sign in the sign-in page offers besides
  *   a password: `google` when GOOGLE_CLIENT_ID is set
  * @param {() => Promise<{reasoning?: boolean, search: boolean}|null>} [options.aiAvailability] whether
@@ -38,7 +41,7 @@ export const ORBIK_VERSION = (() => {
  *   a page can say that AI is unavailable before a person starts something that needs it; `ai` is
  *   left out without it
  */
-export function createEditionRouter({ extensions, setupRequired, passwordReset = "admin", signInWith = [], aiAvailability = null }) {
+export function createEditionRouter({ extensions, setupRequired, passwordReset = "admin", accessRequests = true, signInWith = [], aiAvailability = null }) {
   const router = Router();
   router.get("/v1/edition", async (_req, res, next) => {
     try {
@@ -50,6 +53,7 @@ export function createEditionRouter({ extensions, setupRequired, passwordReset =
         version: ORBIK_VERSION,
         features,
         passwordReset,
+        accessRequests,
         signInWith,
         setupRequired: await setupRequired(),
         ...(ai ? { ai } : {}),

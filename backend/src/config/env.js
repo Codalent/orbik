@@ -65,6 +65,13 @@ export function parseEnvironment(source) {
   // The install's admins: who sees and answers access requests on the Admin page, and can make a
   // password reset link for someone. A comma-separated list of account addresses; unset, the
   // install's first account (the one setup made) is its admin.
+  //
+  // ORBIK_INSTALL_ADMIN=off is for a deployment that administers itself another way: no account
+  // is the install's admin, there is no Admin page, and nobody can ask for access, since nobody
+  // would answer. People then join by invite or a way an extension adds. A forgotten password
+  // has no admin to ask, so it needs email; the terminal's reset:password still works.
+  const installAdmin = (source.ORBIK_INSTALL_ADMIN ?? "on").trim().toLowerCase() || "on";
+  if (!["on", "off"].includes(installAdmin)) errors.push("ORBIK_INSTALL_ADMIN must be on or off.");
   const adminEmails = [...new Set(String(source.ORBIK_ADMIN_EMAILS ?? "")
     .split(",")
     .map((value) => value.trim().normalize("NFC").toLowerCase())
@@ -93,6 +100,10 @@ export function parseEnvironment(source) {
       errors.push("SMTP_URL must be an smtp:// or smtps:// address.");
     }
     if (!emailFrom) errors.push("EMAIL_FROM is required when SMTP_URL is set, e.g. Orbik <orbik@example.com>.");
+  }
+  if (installAdmin === "off") {
+    if (adminEmails.length) errors.push("ORBIK_ADMIN_EMAILS names admins, and ORBIK_INSTALL_ADMIN=off says there are none; remove one.");
+    if (!smtpUrl) errors.push("ORBIK_INSTALL_ADMIN=off needs SMTP_URL and EMAIL_FROM: with no admin to make a reset link, a forgotten password is reset by email.");
   }
 
   // Signing in with Google: an OAuth client of the "Web application" type from Google Cloud's
@@ -190,6 +201,7 @@ export function parseEnvironment(source) {
     sessionSecret: sessionSecret || null,
     generateSecrets,
     adminEmails,
+    installAdmin: installAdmin === "on",
     firstRunSetup: firstRunSetup === "on",
     smtpUrl: smtpUrl || null,
     googleClientId: googleClientId || null,

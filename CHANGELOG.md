@@ -18,6 +18,11 @@ What changed in each release of Orbik. Releases are tagged `vX.Y.Z`; upgrading i
   `http.rateLimit`; `host.checkGoogleSignup` lets Google sign-in make an account for a new address;
   the `signupPage` slot puts a page at `/signup` in place of Request access. See
   [docs/architecture/extensions.md](docs/architecture/extensions.md).
+- **An install can have no admin.** `ORBIK_INSTALL_ADMIN=off` is for a deployment administered
+  another way: no account is the install's admin (not even the first), there is no Admin page and
+  no Request access form, and `/signup` and the sign-in page tell a person to ask for an invite.
+  It needs email and refuses `ORBIK_ADMIN_EMAILS` beside it. `GET /v1/edition` says
+  `accessRequests`. See [docs/guides/accounts-and-admin.md](docs/guides/accounts-and-admin.md#no-install-admin).
 - **Setup can be turned off.** `ORBIK_FIRST_RUN_SETUP=off` is for an install whose first account
   is made another way: the API prints no setup code, `POST /v1/setup` is not served, and the
   sign-in page no longer sends anyone to `/setup` while the install has no account. See [docs/guides/accounts-and-admin.md](docs/guides/accounts-and-admin.md#the-first-account).

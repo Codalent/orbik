@@ -105,7 +105,12 @@ export function createApp({ config, database, readiness, extensions = createExte
   const userRepository = createUserRepository(collections.users);
   const workspaceRepository = createWorkspaceRepository(collections.workspaces, collections.workspaceMembers);
   // The install's own admins (ORBIK_ADMIN_EMAILS, or its first account): the Admin page's people.
-  const admins = createInstallAdmins({ users: collections.users, adminEmails: config.adminEmails ?? [] });
+  // None with ORBIK_INSTALL_ADMIN=off, and then nobody can ask for access either.
+  const admins = createInstallAdmins({
+    users: collections.users,
+    adminEmails: config.adminEmails ?? [],
+    enabled: config.installAdmin ?? true,
+  });
   const sendEmail = createEmailSender({ config, extensionSender: extensions.emailSender });
   const authService = createAuthService({
     userRepository,
@@ -341,6 +346,7 @@ export function createApp({ config, database, readiness, extensions = createExte
     extensions,
     setupRequired: async () => (setupService ? setupService.required() : false),
     passwordReset: passwordResetService.selfService ? "email" : "admin",
+    accessRequests: admins.enabled,
     signInWith: googleSignIn ? ["google"] : [],
     aiAvailability: createAiAvailabilityReader({ database, searchConfigured: Boolean(retrieval) }),
   }));
