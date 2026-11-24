@@ -31,10 +31,10 @@ export class GoogleSignInRefusal extends Error {
  *
  * The account is found by the Google account's own id once it is linked, and otherwise by its
  * address — only one Google says is verified, which proves the same thing a password reset link
- * does, that the person holds that mailbox — and linked then. With nothing found, an account is
- * made only when this install's signup is open; extensions' signup checks run first (told
- * `method: "google"`) and `account.created` follows with `via: "google"`. Such an account has no
- * password; Forgot password can give it one.
+ * does, that the person holds that mailbox — and linked then. With nothing found, no account is
+ * made, unless an extension registered `checkGoogleSignup`: its check runs first, and
+ * `account.created` follows with `via: "google"`. Such an account has no password; Forgot password
+ * can give it one.
  *
  * The ID token comes straight from Google's token endpoint over TLS, in exchange for a code only
  * this client's secret redeems, so its claims are checked (issuer, audience, expiry, nonce) but its
@@ -43,11 +43,13 @@ export class GoogleSignInRefusal extends Error {
  * @param {object} options
  * @param {{googleClientId: string, googleClientSecret: string, publicApiUrl: string}} options.config
  * @param {object} options.userRepository
- * @param {{open: boolean, check: Function, events: {emit: Function}}} options.signup
+ * @param {((attempt: {email: string, request: object}) => Promise<void>)|null} [options.signupCheck]
+ *   an extension's check for making an account for an address with none; null makes none
+ * @param {{emit: Function}} options.events told `account.created` for an account made here
  * @param {typeof fetch} [options.fetch]
  * @param {Function} [options.logger]
  */
-export function createGoogleSignInService({ config, userRepository, signup, fetch: send = fetch, logger = () => {}, now = () => new Date() }) {
+export function createGoogleSignInService({ config, userRepository, signupCheck = null, events, fetch: send = fetch, logger = () => {}, now = () => new Date() }) {
   const clientId = config.googleClientId;
   const clientSecret = config.googleClientSecret;
   const redirectUri = `${config.publicApiUrl}${GOOGLE_CALLBACK_PATH}`;
@@ -108,9 +110,9 @@ export function createGoogleSignInService({ config, userRepository, signup, fetc
       logger("info", "auth.google_linked", { userId: existing._id.toHexString() });
       return existing;
     }
-    if (!signup.open) throw new GoogleSignInRefusal("no-account");
+    if (!signupCheck) throw new GoogleSignInRefusal("no-account");
     try {
-      await signup.check({ email, fields: {}, request, method: "google" });
+      await signupCheck({ email, request });
     } catch (error) {
       if (Number.isInteger(error?.status) && error.status >= 400 && error.status < 500) {
         throw new GoogleSignInRefusal("refused", typeof error.code === "string" ? error.code : null);
@@ -127,7 +129,7 @@ export function createGoogleSignInService({ config, userRepository, signup, fetc
       if (!made) throw new GoogleSignInRefusal("linked-elsewhere");
       return made;
     }
-    await signup.events.emit("account.created", { user: { id: user._id.toHexString(), email: user.email }, via: "google" });
+    await events.emit("account.created", { user: { id: user._id.toHexString(), email: user.email }, via: "google" });
     return user;
   }
 

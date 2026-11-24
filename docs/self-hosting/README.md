@@ -71,7 +71,7 @@ The first start builds three images, which takes several minutes and about 2 GB 
 web app compiles. Then open the link the API printed, `http://localhost:8080/setup?key=…`: the setup
 code is filled in, and the page creates the first account. Opening <http://localhost:8080> instead
 asks for the code, which the log also prints on its own. The code works once; after that the install is claimed, and people join
-by invite (or by signing up, if you open signup). [Accounts and admin](../guides/accounts-and-admin.md)
+by invite or by asking an admin for access. [Accounts and admin](../guides/accounts-and-admin.md)
 covers both. Once claimed, the API's log says so under the setup link, and the link sends you to
 the sign-in page.
 

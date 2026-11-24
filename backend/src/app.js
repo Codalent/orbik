@@ -7,7 +7,7 @@ import { createCsrfProtection } from "./middleware/csrf.js";
 import { createAgentSetupStore, createAiCallLog, getAgentCollections, getCollections, log } from "@orbik/core";
 import { createUserRepository } from "./repositories/userRepository.js";
 import { createWorkspaceRepository } from "./repositories/workspaceRepository.js";
-import { createAuthService } from "./services/authService.js";
+import { createAuthService, signInSession } from "./services/authService.js";
 import { createAuthRouter } from "./routes/authRoutes.js";
 import { createGoogleSignInService } from "./services/googleSignInService.js";
 import { createGoogleSignInRouter } from "./routes/googleSignInRoutes.js";
@@ -85,6 +85,7 @@ import { createAccessRouter } from "./routes/accessRoutes.js";
 import { createWorkspaceAccessCheck } from "./services/workspaceAccess.js";
 import { requireAuthentication } from "./middleware/auth.js";
 import { AppError } from "./errors/appError.js";
+import { createRateLimit } from "./middleware/rateLimits.js";
 
 /**
  * Assembles the complete API without opening a network listener.
@@ -106,26 +107,20 @@ export function createApp({ config, database, readiness, extensions = createExte
   // The install's own admins (ORBIK_ADMIN_EMAILS, or its first account): the Admin page's people.
   const admins = createInstallAdmins({ users: collections.users, adminEmails: config.adminEmails ?? [] });
   const sendEmail = createEmailSender({ config, extensionSender: extensions.emailSender });
-  // Signup that waits for the address to be confirmed can only work if the link can be sent.
-  if (config.signup === "open" && config.signupVerifyEmail && !sendEmail) {
-    throw new Error("ORBIK_SIGNUP_VERIFY_EMAIL needs email: set SMTP_URL and EMAIL_FROM, or load an extension that sends email.");
-  }
   const authService = createAuthService({
     userRepository,
     workspaceRepository,
-    signup: { open: config.signup === "open", check: (attempt) => extensions.checkSignup(attempt), events: extensions },
     admins,
     sessions: collections.sessions,
-    verification: config.signup === "open" && config.signupVerifyEmail
-      ? { collection: collections.signupVerifications, sendEmail, origin: config.frontendOrigins[0], logger: log }
-      : null,
   });
   // Signing in with Google, when GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET are set; null otherwise.
+  // It makes an account for an address with none only when an extension asks it to.
   const googleSignIn = config.googleClientId
     ? createGoogleSignInService({
       config,
       userRepository,
-      signup: { open: config.signup === "open", check: (attempt) => extensions.checkSignup(attempt), events: extensions },
+      signupCheck: extensions.googleSignupCheck,
+      events: extensions,
       logger: log,
     })
     : null;
@@ -134,8 +129,8 @@ export function createApp({ config, database, readiness, extensions = createExte
   const setupService = config.firstRunSetup
     ? createSetupService({ database, userRepository, events: extensions, origin: config.frontendOrigins[0] })
     : null;
-  // Getting in when signup is closed (an access request an admin approves), and back in without
-  // the password (a reset link).
+  // Getting in by asking (an access request an admin approves), and back in without the password
+  // (a reset link).
   const accessRequestService = createAccessRequestService({ database, userRepository, admins, config, sendEmail, events: extensions, logger: log });
   const passwordResetService = createPasswordResetService({ database, userRepository, config, sendEmail, logger: log });
   // Who besides the owner belongs to a workspace, and the invite links that add them.
@@ -344,7 +339,6 @@ export function createApp({ config, database, readiness, extensions = createExte
   if (devbar) app.use(DEVBAR_PATH, devbar.handle);
   app.use(createEditionRouter({
     extensions,
-    config,
     setupRequired: async () => (setupService ? setupService.required() : false),
     passwordReset: passwordResetService.selfService ? "email" : "admin",
     signInWith: googleSignIn ? ["google"] : [],
@@ -407,6 +401,35 @@ export function createApp({ config, database, readiness, extensions = createExte
   // An extension's routes, after every core route so none can shadow one. Each factory is handed
   // what a route of the API's own is built from; a route that needs a session uses
   // `requireAuthentication`, and one that writes uses `csrfProtection` as well.
+  //
+  // `accounts` lets a route make an account and sign a browser in to it, as core's own ways in
+  // (setup, an invite, an approved access request) do: `create` keeps the address canonical and
+  // unique (a taken one is `409 ACCOUNT_EXISTS`) and tells extensions `account.created` with the
+  // `via` the route names; `signIn` regenerates the session and answers it as login does.
+  // `sendEmail` is the install's mail (SMTP, or an extension's sender), null without any, and
+  // `rateLimit` a limiter kept in the database, as core's routes use.
+  const accounts = Object.freeze({
+    findByEmail: (email) => userRepository.findByEmail(email),
+    async create({ email, passwordHash = null, googleSub = null, via }) {
+      if (typeof via !== "string" || !/^[a-z][a-z0-9-]{0,31}$/.test(via)) {
+        throw new TypeError("accounts.create needs `via`: lowercase letters, digits and dashes, saying how the account was made.");
+      }
+      if (passwordHash === null && googleSub === null) throw new TypeError("accounts.create needs a passwordHash or a googleSub.");
+      let user;
+      try {
+        user = await userRepository.create({ email, passwordHash, status: "active", googleSub });
+      } catch (error) {
+        if (error.code !== 11000) throw error;
+        throw new AppError({ status: 409, code: "ACCOUNT_EXISTS", message: "An account already uses that address. Sign in instead." });
+      }
+      await extensions.emit("account.created", { user: { id: user._id.toHexString(), email: user.email }, via });
+      return user;
+    },
+    async signIn(request, user) {
+      await signInSession(request, user);
+      return { ...(await authService.getSession(request)), csrfToken: request.session.csrfToken };
+    },
+  });
   const http = Object.freeze({
     database,
     config,
@@ -415,6 +438,11 @@ export function createApp({ config, database, readiness, extensions = createExte
     requireAuthentication,
     csrfProtection,
     requireWorkspaceAccess: createWorkspaceAccessCheck(workspaceRepository),
+    accounts,
+    sendEmail,
+    rateLimit: ({ keyPrefix, points, durationSeconds, keyFromRequest }) => createRateLimit({
+      collection: collections.rateLimits, keyPrefix: `extension:${keyPrefix}`, points, durationSeconds, keyFromRequest,
+    }),
   });
   for (const routes of extensions.routes) app.use(routes(http));
   app.use(notFound);

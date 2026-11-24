@@ -16,7 +16,7 @@ export const ORBIK_VERSION = (() => {
 
 /**
  * What this install is, for anyone who asks, signed in or not: the edition and the features its
- * extensions turn on, the release, whether self-service signup is open, and whether the install
+ * extensions turn on, the release, how a password is reset and how one signs in, and whether the install
  * is still waiting for its first account.
  *
  * The web app is one build for every edition. It reads this before it renders anything an
@@ -28,7 +28,6 @@ export const ORBIK_VERSION = (() => {
  *
  * @param {object} options
  * @param {{edition: () => {name: string, features: string[]}}} options.extensions
- * @param {{signup: "open"|"closed"}} options.config
  * @param {() => Promise<boolean>} options.setupRequired whether no account exists yet
  * @param {"email"|"admin"} [options.passwordReset] how a forgotten password is reset: a link the
  *   person is emailed, or one the install's admin makes for them (no email configured)
@@ -39,7 +38,7 @@ export const ORBIK_VERSION = (() => {
  *   a page can say that AI is unavailable before a person starts something that needs it; `ai` is
  *   left out without it
  */
-export function createEditionRouter({ extensions, config, setupRequired, passwordReset = "admin", signInWith = [], aiAvailability = null }) {
+export function createEditionRouter({ extensions, setupRequired, passwordReset = "admin", signInWith = [], aiAvailability = null }) {
   const router = Router();
   router.get("/v1/edition", async (_req, res, next) => {
     try {
@@ -50,7 +49,6 @@ export function createEditionRouter({ extensions, config, setupRequired, passwor
         edition: name,
         version: ORBIK_VERSION,
         features,
-        signup: config.signup,
         passwordReset,
         signInWith,
         setupRequired: await setupRequired(),

@@ -9,6 +9,7 @@ import { useForm } from "react-hook-form";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useEdition } from "@/lib/api/edition";
+import { useExtensionSlots } from "@/lib/extensions/slots";
 import { useAuth } from "@/lib/auth/AuthProvider";
 import { returnPathFromCurrentUrl } from "@/lib/auth/returnPath";
 import { loginSchema } from "@/lib/validation/auth";
@@ -25,7 +26,9 @@ export function LoginForm() {
   useEffect(() => {
     if (edition?.setupRequired) router.replace("/setup");
   }, [edition?.setupRequired, router]);
-  const signupOpen = edition?.signup === "open";
+  // A deployment that adds a way to make an account says so here; everywhere else, people ask.
+  const { signupPage } = useExtensionSlots();
+  const signupOpen = signupPage().status === "ready";
   const google = googleSignInOffered(edition);
   const { register, handleSubmit, setError, formState: { errors, isSubmitting } } = useForm({
     resolver: zodResolver(loginSchema),

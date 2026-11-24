@@ -194,8 +194,8 @@ your shell history):
 pnpm --dir backend run seed:user -- --email you@example.com
 ```
 
-After that, people join by an invite from a workspace's settings, or sign themselves up when
-`ORBIK_SIGNUP=open` is set in `backend/.env`.
+After that, people join by an invite from a workspace's settings, or ask for access at `/signup`
+and an install admin approves them.
 
 The agents need no step of their own: their definitions are code
 (`packages/agent-definitions`), read by the API and the worker when they start.

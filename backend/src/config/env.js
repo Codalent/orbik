@@ -51,13 +51,16 @@ export function parseEnvironment(source) {
     errors.push("SESSION_SECRET must contain at least 32 non-placeholder characters.");
   }
 
-  // Self-service signup: `closed` (the default) adds people only by invite, `open` lets anyone
-  // who reaches the sign-in page create an account.
-  const signup = (source.ORBIK_SIGNUP ?? "closed").trim().toLowerCase();
-  if (!["open", "closed"].includes(signup)) errors.push("ORBIK_SIGNUP must be open or closed.");
-  // With signup open, whether an account is made only once its address has been confirmed through
-  // an emailed link. Needs email (SMTP_URL, or an extension's sender), which the API checks at start.
-  const signupVerifyEmail = parseFlag(source.ORBIK_SIGNUP_VERIFY_EMAIL, "ORBIK_SIGNUP_VERIFY_EMAIL", errors);
+  // People join an install by invite, by asking an admin (Request access), or by `seed:user`; Orbik
+  // has no self-service signup. An install still asking for it is told so rather than started
+  // quietly without it: `closed`, which was the default, is the only value left that means anything.
+  const signupSetting = (source.ORBIK_SIGNUP ?? "").trim().toLowerCase();
+  if (signupSetting && signupSetting !== "closed") {
+    errors.push("ORBIK_SIGNUP: self-service signup is no longer part of Orbik. People join by invite or by asking an admin for access; remove the setting.");
+  }
+  if (parseFlag(source.ORBIK_SIGNUP_VERIFY_EMAIL, "ORBIK_SIGNUP_VERIFY_EMAIL", errors)) {
+    errors.push("ORBIK_SIGNUP_VERIFY_EMAIL: self-service signup is no longer part of Orbik; remove the setting.");
+  }
 
   // The install's admins: who sees and answers access requests on the Admin page, and can make a
   // password reset link for someone. A comma-separated list of account addresses; unset, the
@@ -72,14 +75,10 @@ export function parseEnvironment(source) {
 
   // First-run setup: `on` (the default) prints a one-time setup code while the install has no
   // account, and the web app sends people to the setup page to claim it. `off` is for an install
-  // whose accounts all come another way (signup, invites, `seed:user`): no code, no setup page.
-  // With signup open as well, the first account would otherwise be whoever signed up first, and
-  // with no admins named that account would administer the install; so that needs its admins named.
+  // whose first account comes another way (`seed:user`, or an extension that makes accounts): no
+  // code, no setup page.
   const firstRunSetup = (source.ORBIK_FIRST_RUN_SETUP ?? "on").trim().toLowerCase() || "on";
   if (!["on", "off"].includes(firstRunSetup)) errors.push("ORBIK_FIRST_RUN_SETUP must be on or off.");
-  if (firstRunSetup === "off" && signup === "open" && !adminEmails.length) {
-    errors.push("ORBIK_FIRST_RUN_SETUP=off with ORBIK_SIGNUP=open needs ORBIK_ADMIN_EMAILS: otherwise whoever signs up first administers the install.");
-  }
 
   // Email, through any SMTP server: smtp://user:pass@host:587 or smtps://user:pass@host:465.
   // Optional. Without it nothing is emailed and nothing needs to be: an invite link is shown to
@@ -190,8 +189,6 @@ export function parseEnvironment(source) {
     // Null when it is to be generated: `resolveSecrets` fills it in before the app is built.
     sessionSecret: sessionSecret || null,
     generateSecrets,
-    signup,
-    signupVerifyEmail,
     adminEmails,
     firstRunSetup: firstRunSetup === "on",
     smtpUrl: smtpUrl || null,

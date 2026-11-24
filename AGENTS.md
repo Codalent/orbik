@@ -173,26 +173,25 @@ only an extension sets (below); core has no limit.
 An invite link from the settings page is the way to add a person. The first account of an install
 is made on the setup page (`/setup`), with the one-time code the API prints to its log while no
 account exists, or by `seed:user` (`ORBIK_FIRST_RUN_SETUP=off` prints no code and serves no
-`POST /v1/setup`, and `GET /v1/edition` never says `setupRequired`; with signup open it needs
-`ORBIK_ADMIN_EMAILS`); `ORBIK_SIGNUP=open` in `backend/.env` lets anyone sign up
-(`/signup`). With `ORBIK_SIGNUP_VERIFY_EMAIL=true` too, signup makes no account: it keeps the
-address and the password's hash in `signup_verifications` (one row per address, a day) and emails a
-`/verify-email/<token>` link; confirming it (`POST /v1/auth/signup-verifications/:token/confirm`)
-makes the account, signs the browser in and only then tells extensions `account.created`. It needs
-email (SMTP or an extension's sender), or the API refuses to start.
+`POST /v1/setup`, and `GET /v1/edition` never says `setupRequired`). **Orbik has no self-service
+signup**, by the maintainers' decision: every account comes from setup, an invite, an approved
+access request, `seed:user`, or an extension's own route (`http.accounts`,
+docs/architecture/extensions.md). Do not add a way for anyone to make their own account, and do not
+bring back `ORBIK_SIGNUP`: an API still given `ORBIK_SIGNUP=open` or
+`ORBIK_SIGNUP_VERIFY_EMAIL=true` refuses to start.
 
-With `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` set, the sign-in and signup pages offer
+With `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` set, the sign-in page offers
 **Continue with Google** (`GET /v1/edition` lists `google` in `signInWith`). Two browser navigations,
 no JSON: `GET /v1/auth/google/start?next=<path>` keeps a state, a nonce and a PKCE verifier in the
 session and redirects to Google; Google returns to `PUBLIC_API_URL` + `/v1/auth/google/callback`,
 which redeems the code, checks the ID token's claims and signs the browser in, then redirects to the
 web app (`next`, or `/`), or to `/login?google=<reason>` when it does not. An account is found by
-`users.google.sub`, or else by an address Google says is verified and linked then; a new one
-(no `passwordHash`) is made only with signup open, after the extensions' `checkSignup` (told
-`method: "google"`), and `account.created` says `via: "google"`. Without real Google credentials,
+`users.google.sub`, or else by an address Google says is verified and linked then; an address with
+none gets `no-account`, unless an extension registered `checkGoogleSignup`, whose check runs before a
+new one (no `passwordHash`) is made, and `account.created` says `via: "google"`. Without real Google credentials,
 verify the routes' redirects with `curl` and the service with a fake `fetch` in a throwaway script.
 
-While signup is closed, `/signup` is a **Request access** form: the address goes to
+`/signup` is a **Request access** form (or an extension's `signupPage`, in its place): the address goes to
 `access_requests` (one row per address; `POST /v1/access-requests`, the same 202 whoever asks) and
 shows under **Settings → Admin** (`/workspaces/:id/settings/admin`; `/admin` leads there, and is
 the page itself for an admin with no workspace yet), where an admin approves it —
@@ -231,7 +230,7 @@ terminal; from a script, wrap it: `script -qec "pnpm --dir backend run seed:user
 
 ```sh
 # Make an account from a terminal (the setup page does the same for an install's first one;
-# everyone else joins by invite link, or signs up when ORBIK_SIGNUP=open)
+# everyone else joins by invite link, or by asking for access)
 pnpm --dir backend run seed:user -- --email user@example.com
 
 # Print a one-time password reset link for an account (an hour), for an install that sends no

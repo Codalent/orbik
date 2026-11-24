@@ -15,7 +15,9 @@ export const PROCESSES = Object.freeze(["api", "worker", "scheduler", "script"])
  * throws is logged and otherwise ignored: an extension metering or mailing never fails the action
  * it is told about.
  *
- * - `account.created` (API): `{ user: { id, email }, via: "setup" | "signup" | "invite" | "access-request" | "google" }`
+ * - `account.created` (API): `{ user: { id, email }, via }`, where `via` is `setup`, `invite`,
+ *   `access-request` or `google` for an account core made, or what an extension's route named
+ *   when it made one with `http.accounts.create`
  * - `workspace.created` (API): `{ workspace: { id, name, websiteUrl, ownerId }, userId }`
  * - `workspace.deleted` (API): `{ workspace: { id, name, websiteUrl, ownerId }, userId }`, after
  *   every record of it core keeps is gone; an extension removes what it stored about it
@@ -46,7 +48,7 @@ export function createExtensionHost({ processName = null, logger = defaultLog, n
   let emailSender = null;
   let edition = null;
   const features = new Set();
-  const signupChecks = [];
+  let googleSignup = null;
   const listeners = new Map(EVENTS.map((event) => [event, []]));
   const routes = [];
   const loops = [];
@@ -143,18 +145,18 @@ export function createExtensionHost({ processName = null, logger = defaultLog, n
       },
 
       /**
-       * Runs before a self-service signup creates an account (or, when signup waits for the address
-       * to be confirmed, before the link is sent). Throwing refuses it; an error with `status` and
-       * `code` is answered as given, anything else as a 500. `fields` is what the web extension's
-       * `signupFields` collected on the signup page, by field id.
+       * Lets signing in with Google make an account for an address that has none. Without it, core
+       * never does: Google signs in only to an account that exists. `check` runs first, and
+       * throwing refuses it (an error with a 4xx `status` and a `code` is a refusal the sign-in
+       * page names; anything else is a fault). One extension per deployment.
        *
-       * @param {(attempt: {email: string, fields: Record<string, string>,
-       *   request: import("express").Request}) => Promise<void>} check
+       * @param {(attempt: {email: string, request: import("express").Request}) => Promise<void>} check
        */
-      checkSignup(check) {
-        only("api", "checkSignup");
-        if (typeof check !== "function") throw new TypeError("checkSignup takes a function.");
-        signupChecks.push({ extension: extensionName, check });
+      checkGoogleSignup(check) {
+        only("api", "checkGoogleSignup");
+        if (typeof check !== "function") throw new TypeError("checkGoogleSignup takes a function.");
+        once(googleSignup, "Google signup is");
+        googleSignup = { extension: extensionName, check };
       },
 
       /**
@@ -285,11 +287,6 @@ export function createExtensionHost({ processName = null, logger = defaultLog, n
     }
   }
 
-  /** Runs every signup check in order; the first to throw refuses the signup. */
-  async function checkSignup(attempt) {
-    for (const { check } of signupChecks) await check(attempt);
-  }
-
   const host = {
     process: processName,
     /** Names of the extensions loaded, in load order. */
@@ -303,7 +300,8 @@ export function createExtensionHost({ processName = null, logger = defaultLog, n
      */
     forgetLimits,
     emit,
-    checkSignup,
+    /** An extension's check for Google sign-in making a new account, or null: then it makes none. */
+    get googleSignupCheck() { return googleSignup?.check ?? null; },
     edition() {
       return { name: edition?.name ?? COMMUNITY_EDITION, features: [...features].sort() };
     },

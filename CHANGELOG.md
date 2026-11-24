@@ -5,11 +5,22 @@ What changed in each release of Orbik. Releases are tagged `vX.Y.Z`; upgrading i
 
 ## Unreleased
 
-- **Setup can be turned off.** `ORBIK_FIRST_RUN_SETUP=off` is for an install whose accounts all
-  come by signup or invite: the API prints no setup code, `POST /v1/setup` is not served, and the
-  sign-in page no longer sends anyone to `/setup` while the install has no account. With
-  `ORBIK_SIGNUP=open` it needs `ORBIK_ADMIN_EMAILS`, so the first person to sign up does not
-  become the install's admin. See [docs/guides/accounts-and-admin.md](docs/guides/accounts-and-admin.md#the-first-account).
+- **No self-service signup.** Orbik is for a person or an organization running it for its own
+  people: accounts come from the setup page, invites, access requests an admin approves, and
+  `seed:user`. `ORBIK_SIGNUP` and `ORBIK_SIGNUP_VERIFY_EMAIL` are gone, with the signup form, the
+  confirmation link and its page, and Google sign-in making new accounts (it still signs in to
+  existing ones). `/signup` is the Request access form. An install still setting
+  `ORBIK_SIGNUP=open` or `ORBIK_SIGNUP_VERIFY_EMAIL=true` does not start until the setting is
+  removed; `ORBIK_SIGNUP=closed` is accepted and means nothing. The `signup_verifications`
+  collection is left to empty itself ([Collections left by earlier releases](docs/self-hosting/backups-and-upgrades.md#collections-left-by-earlier-releases)).
+- **Extensions.** `host.checkSignup` and the `signupFields` slot are gone with signup. An
+  extension's routes get `http.accounts` (find, create and sign in an account), `http.sendEmail` and
+  `http.rateLimit`; `host.checkGoogleSignup` lets Google sign-in make an account for a new address;
+  the `signupPage` slot puts a page at `/signup` in place of Request access. See
+  [docs/architecture/extensions.md](docs/architecture/extensions.md).
+- **Setup can be turned off.** `ORBIK_FIRST_RUN_SETUP=off` is for an install whose first account
+  is made another way: the API prints no setup code, `POST /v1/setup` is not served, and the
+  sign-in page no longer sends anyone to `/setup` while the install has no account. See [docs/guides/accounts-and-admin.md](docs/guides/accounts-and-admin.md#the-first-account).
 - **Sources.** A workspace reads more than its website. **Sources**, in the rail between Brand and
   Agents, lists everything Orbik reads, and **Add a source** takes another site of yours (a
   documentation subdomain, a second domain, the whole of it, one section or a few pages) or pages

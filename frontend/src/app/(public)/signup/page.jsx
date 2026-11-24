@@ -1,13 +1,13 @@
 import { AuthFrame } from "@/components/auth/AuthFrame";
-import { SignupForm } from "@/components/auth/SignupForm";
+import { SignupPage } from "@/components/auth/SignupPage";
 import { GuestOnlyRoute } from "@/lib/auth/GuestOnlyRoute";
 
-export const metadata = { title: "Create an account" };
+export const metadata = { title: "Join" };
 
 /**
- * Self-service signup when this install allows it (`ORBIK_SIGNUP=open`); how to join otherwise.
- * Someone already signed in is sent on.
+ * Asking the install's admins for access, or, where a deployment's extension adds one, its own way
+ * to make an account. Someone already signed in is sent on.
  */
-export default function SignupPage() {
-  return <AuthFrame><GuestOnlyRoute><SignupForm /></GuestOnlyRoute></AuthFrame>;
+export default function SignupRoute() {
+  return <AuthFrame><GuestOnlyRoute><SignupPage /></GuestOnlyRoute></AuthFrame>;
 }

@@ -4,8 +4,6 @@ const email = z.string().trim().min(1, "Email is required.").max(254, "Email is 
 const newPassword = z.string().min(8, "Choose a password of at least 8 characters.").max(1024, "Password is too long.")
   .refine((value) => new TextEncoder().encode(value).length <= 1024, "Password must not exceed 1024 bytes.");
 
-/** A self-service signup: the API's rule for a new account's password, 8 to 1024 characters. */
-export const signupSchema = z.object({ email, password: newPassword }).strict();
 
 /** First-run setup: the code from the API's log, and the first account. */
 export const setupSchema = z.object({

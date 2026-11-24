@@ -10,8 +10,8 @@ There are two halves, one for the server processes and one for the web app:
 
 | | Where | What it can do |
 |---|---|---|
-| Server extensions | `ORBIK_EXTENSIONS`, loaded by the API, the worker, the scheduler and `grant:crawl-budget` | plan limits, events, the edition and its features, API routes, scheduler loops, worker agents, agents in the catalog with their tools and runtimes, the email sender, signup checks |
-| Web extensions | the `@orbik/web-extensions` package the web app imports | rail items, pages, settings sections, banners, agents' pages, account pages, account menu items, signup fields, notices in the create-workspace wizard |
+| Server extensions | `ORBIK_EXTENSIONS`, loaded by the API, the worker, the scheduler and `grant:crawl-budget` | plan limits, events, the edition and its features, API routes, scheduler loops, worker agents, agents in the catalog with their tools and runtimes, the email sender, making accounts from its own routes, Google sign-in for new accounts |
+| Web extensions | the `@orbik/web-extensions` package the web app imports | rail items, pages, settings sections, banners, agents' pages, account pages, account menu items, the `/signup` page, notices in the create-workspace wizard |
 
 The rule that keeps the two repositories honest: **core starts and serves every page with no
 extension loaded**, and core never imports an extension. ESLint enforces the second
@@ -42,7 +42,7 @@ export default {
       host.setEdition("cloud");
       host.addFeatures("billing");
       host.addRoutes((http) => billingRouter(http));
-      host.checkSignup(async ({ email }) => refuseDisposable(email));
+      host.checkGoogleSignup(async ({ email }) => refuseDisposable(email));
       host.setEmailSender(async ({ to, subject, text }) => sendWithProvider(to, subject, text));
     }
     if (host.process === "scheduler") host.addLoop(createUsageReporter(host.database));
@@ -87,8 +87,8 @@ extension never fails the action it is told about.
 
 | Event | Where | Payload |
 |---|---|---|
-| `account.created` | API | `{ user: { id, email }, via: "setup" \| "signup" \| "invite" \| "access-request" \| "google" }` |
-| `access.requested` | API | `{ request: { id, email } }`, the first time an address asks for access on the closed signup page |
+| `account.created` | API | `{ user: { id, email }, via }`: `setup`, `invite`, `access-request` or `google` for an account core made, or the `via` an extension's route gave `http.accounts.create` |
+| `access.requested` | API | `{ request: { id, email } }`, the first time an address asks for access on the Request access page |
 | `workspace.created` | API | `{ workspace: { id, name, websiteUrl, ownerId }, userId }` |
 | `workspace.deleted` | API | `{ workspace: { id, name, websiteUrl, ownerId }, userId }`, after every record core keeps of it is gone; remove what the extension stored about it |
 | `ai.call.finished` | API, worker | `{ call }`: the `ai_calls` row as written — workspace, run, agent, model, usage, `costUsd`, status |
@@ -100,21 +100,28 @@ extension never fails the action it is told about.
 - `host.addRoutes((http) => router)` — mounted after every core route and before the 404 handler,
   so none can shadow a core route. `http` carries `database`, `config`, `logger`, `AppError`,
   `requireAuthentication`, `csrfProtection` and `requireWorkspaceAccess(userId, workspaceId,
-  { role })`, the same ones core's routes are built from.
+  { role })`, the same ones core's routes are built from, and:
+  - `accounts`, for a route that makes accounts. Orbik has no self-service signup; a deployment
+    that offers one builds it here. `accounts.findByEmail(email)`; `accounts.create({ email,
+    passwordHash, googleSub, via })` makes an active account (an argon2id `passwordHash`, or a
+    Google `googleSub`, or both), keeps the address canonical and unique (a taken one is
+    `409 ACCOUNT_EXISTS`) and tells extensions `account.created` with `via` (lowercase letters,
+    digits and dashes); `accounts.signIn(request, user)` signs the browser in to it as login does
+    (a new session identifier, a new CSRF token) and answers the session, to send back as JSON.
+  - `sendEmail({ to, subject, text, html? })`, the install's mail (SMTP, or an extension's
+    sender), or null when it has none.
+  - `rateLimit({ keyPrefix, points, durationSeconds, keyFromRequest? })`, middleware that allows
+    `points` requests per key (the client's address by default) per window, kept in the database
+    as core's own limits are, and answers `429 RATE_LIMITED` beyond them.
 - Routes under `/v1/hooks/` are for other software's servers, such as a payment provider's
   webhook: no CORS check, no JSON requirement and no body parsing, so the route reads the raw body
   itself (`express.raw()`) and authenticates by signature, never by session.
-- `host.checkSignup(check)` — runs before a self-service signup (`ORBIK_SIGNUP=open`) creates an
-  account, or, with `ORBIK_SIGNUP_VERIFY_EMAIL=true`, before the confirmation link is sent. `check`
-  gets `{ email, fields, request, method }`: `fields` is what the extension's `signupFields` collected on the
-  signup page (below), by field id, such as a captcha's token or a consent; `{}` when there are none.
-  `method` is `password` for the signup form and `google` for an account made by signing in with
-  Google (`GOOGLE_CLIENT_ID`), which has no form and so no `fields`: a check that needs a field
-  should decide what a Google signup needs instead. A refusal there sends the person back to the
-  sign-in page with a general "cannot sign up here".
-  Throw an error with a 4xx `status` and a `code` to refuse it with that answer, which the signup
-  page shows. With confirmation on, `account.created` is told when the link is confirmed, not when
-  the form is sent.
+- `host.checkGoogleSignup(check)` — one extension per deployment. Without it, signing in with
+  Google (`GOOGLE_CLIENT_ID`) only signs in to an account that exists, and an address with none is
+  sent back to the sign-in page with "no account". With it, `check({ email, request })` runs for
+  such an address, and when it returns the account is made (no password; `account.created` with
+  `via: "google"`). Throw an error with a 4xx `status` and a `code` to refuse it: the person is sent
+  back to the sign-in page with a general "cannot sign up here".
 - `host.setEmailSender(send)` — one extension per deployment; replaces SMTP. `send({ to, subject,
   text, html? })`.
 
@@ -208,7 +215,7 @@ them. A deployment's package may leave any of them out.
 | `banners: [{ id, Component, feature? }]` | above every page of a workspace |
 | `agentPages: { [slug]: { name, icon?, Component?, feature? } }` | an agent a server extension added to the catalog ([Agents](#agents)), in the Agents overview and the workspace's agent lists, linking to `/workspaces/:id/agents/<slug>`; with a `Component` that page is the extension's (it gets `agentSlug` too), without one the generic agent page. A slug core has a page for keeps core's |
 | `accountPages: { [path]: { Component, feature? } }` | at `/account/<path>` (core's own `/account/password` keeps its address, which leads to Settings → Account), about the signed-in account rather than a workspace, for anyone signed in (a person with no workspace yet included), in the Admin page's frame; the component draws the page, heading included, and gets `path` and `api` |
-| `signupFields: [{ id, Component, feature? }]` | in the signup form, above its button. The component gets `onChange(value)`, to set the field's text (or `null` to drop it), and `attempt`, which counts the times the form was sent, so a one-use token such as a captcha's can be renewed after a refusal. The values travel with the signup as `extensions` and reach the API's `checkSignup` as `fields` (`id`: lowercase letters, digits and dashes; at most 10 fields of 4096 characters) |
+| `signupPage: { Component, feature? }` | at `/signup`, in place of the Request access form, for someone signed out; the sign-in page's "Need an account?" then says **Create one**. For a deployment whose server extension makes accounts (`http.accounts`, above). The component gets `api` (`api.fetch(path, { signsIn: true })` for a request whose answer is the session of an account it signed in, so the app's session follows) and `ui`, the pieces the sign-in pages are built from: `AuthPanel`, `AuthField`, `AuthError`, `AuthPanelFoot`, `AuthDivider`, `GoogleSignInButton`, `Button`, `Input`, `Link`, the `AUTH_LINK` class, and `googleSignIn`, whether the install offers Continue with Google |
 | `userMenuItems: [{ id, label, href, icon?, feature? }]` | in the account menu, before Documentation and the source link; `href` is a path in the app (`/account/billing`) or an `https://` address, opened in a new tab |
 | `workspaceCreateNotices: [{ id, Component, feature? }]` | in the create-workspace wizard (`/workspaces/new`), above its buttons, on both steps (the name, then the website), to tell the person something before a workspace is made: what it will cost, a limit reached. The component gets `api` only and renders nothing when it has nothing to say; it sits inside the wizard's form, so a button in it needs `type="button"` |
 | `crawlBudgetLink: { label, path, feature? }` | on a source's crawl page (the website's is what the Crawler page was), beside "this month's crawl pages are spent" and "this workspace's plan includes no crawl pages": where more crawl pages are got. `path` is under the workspace, as a rail item's, or an `https://` address, opened in a new tab. Without it the page offers nothing to press |
@@ -254,7 +261,7 @@ The shape Orbik's own cloud uses, and the one this seam was built for:
 ```
 orbik-cloud/
   orbik/          this repository, as a git submodule pinned to a commit
-  cloud/api/      a server extension: plans, billing, signup checks, metering
+  cloud/api/      a server extension: plans, billing, metering
   cloud/web/      @orbik/web-extensions: billing pages, upgrade prompts
   infra/          the deployment's own configuration
 ```

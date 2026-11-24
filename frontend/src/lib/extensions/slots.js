@@ -28,8 +28,12 @@ const banners = list("banners");
 const agentPages = record("agentPages");
 const accountPages = record("accountPages");
 const userMenuItems = list("userMenuItems");
-const signupFields = list("signupFields");
 const workspaceCreateNotices = list("workspaceCreateNotices");
+// The page /signup shows instead of asking for access: one entry, with a component.
+const signupPage = (() => {
+  const value = exported("signupPage");
+  return value && typeof value === "object" && value.Component ? value : null;
+})();
 const crawlBudgetLink = (() => {
   const value = exported("crawlBudgetLink");
   return value && typeof value.label === "string" && typeof value.path === "string" ? value : null;
@@ -64,7 +68,6 @@ export function useExtensionSlots() {
     settingsSections: settingsSections.filter(shown),
     banners: banners.filter(shown),
     userMenuItems: userMenuItems.filter(shown),
-    signupFields: signupFields.filter(shown),
     workspaceCreateNotices: workspaceCreateNotices.filter(shown),
     /** Where more crawl pages are got, as `{ label, path }`, or null when the install offers none. */
     crawlBudgetLink: crawlBudgetLink && shown(crawlBudgetLink) ? crawlBudgetLink : null,
@@ -91,6 +94,14 @@ export function useExtensionSlots() {
     /** The account page at a path under /account, as `{ status, page }`, decided the same way. */
     accountPage(path) {
       const { status, entry } = lookup(own(accountPages, path.join("/")) ?? own(accountPages, path[0]));
+      return { status, page: entry };
+    },
+    /**
+     * The page /signup shows instead of the Request access form, as `{ status, page }`, decided the
+     * same way: `missing` on an install whose extensions add none, which is every self-hosted one.
+     */
+    signupPage() {
+      const { status, entry } = lookup(signupPage);
       return { status, page: entry };
     },
   };

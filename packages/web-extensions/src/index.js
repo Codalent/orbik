@@ -98,16 +98,21 @@ export const accountPages = {};
 export const userMenuItems = [];
 
 /**
- * Fields added to the signup form, above its button — a captcha, a consent to terms. Each is a
- * component that sets its field's text with `onChange(value)` (`null` drops it); `attempt` counts
- * the times the form was sent, so a one-use token can be renewed after a refusal. The values are
- * sent with the signup as `extensions`, by `id`, and reach the server extension's `checkSignup` as
- * `fields`, where it accepts or refuses them.
+ * The page at `/signup` in place of the Request access form, for a deployment whose server
+ * extension adds a way to make an account (its own routes, with `http.accounts`). Orbik itself has
+ * no self-service signup, so this is null here and `/signup` asks the install's admins for access;
+ * with it, the sign-in page's "Need an account?" links to this page as "Create one".
  *
- * @type {Array<{id: string, feature?: string,
- *   Component: import("react").ComponentType<{onChange: (value: string|null) => void, attempt: number}>}>}
+ * `api` is the app's client (`api.fetch(path, { signsIn: true })` for a route that signs the browser
+ * in, so the app's session follows). `ui` is what the sign-in pages are built from, so the page looks
+ * like them: `AuthPanel`, `AuthField`, `AuthError`, `AuthPanelFoot`, `AuthDivider`,
+ * `GoogleSignInButton`, `Button`, `Input`, `Link`, the `AUTH_LINK` class, and `googleSignIn`, whether
+ * this install offers Continue with Google.
+ *
+ * @type {{feature?: string,
+ *   Component: import("react").ComponentType<{api: object, ui: object}>}|null}
  */
-export const signupFields = [];
+export const signupPage = null;
 
 /**
  * Notices in the create-workspace wizard, above its buttons on both steps — what the new workspace

@@ -13,18 +13,6 @@ export function login(credentials) {
   });
 }
 
-/**
- * Creates an account and signs it in, on an install whose signup is open. Where signup waits for
- * the address to be confirmed it makes none yet, and answers `{verificationSent: true, email}`.
- * `extensions`, when given, is what the deployment's signup fields collected, by field id.
- */
-export function signup(credentials) {
-  return apiFetch("/v1/auth/signup", {
-    method: "POST",
-    body: JSON.stringify(credentials),
-  });
-}
-
 /** Claims a new install with its setup code: creates the first account and signs it in. */
 export function claimSetup({ code, email, password }) {
   return apiFetch("/v1/setup", {

@@ -6,8 +6,8 @@ Orbik MCP are, and how they fit together.
 ## Install
 
 One running copy of Orbik, with its own accounts and data. The first account claims it with the
-one-time setup code the API prints to its log. After that, people join by an invite link, or sign
-themselves up if the install's signup is open. The install's admins — the addresses in
+one-time setup code the API prints to its log. After that, people join by an invite link, or ask
+for access and an admin approves them. The install's admins — the addresses in
 `ORBIK_ADMIN_EMAILS`, or else its first account — have an **Admin** section in **Settings** for
 access requests and password resets. See [Accounts and admin](../guides/accounts-and-admin.md).
 
