@@ -76,23 +76,11 @@ export function createPasswordResetLink({ email }) {
   return apiFetch("/v1/admin/password-resets", { method: "POST", body: JSON.stringify({ email }) });
 }
 
-/** What a signup's confirmation link is for: the address, and until when it works. */
-export async function readSignupVerification(token) {
-  return apiFetch(`/v1/auth/signup-verifications/${requireToken(token)}`);
-}
-
-/** Confirms a signup's address with its link: makes the account, and signs this browser in. */
-export async function confirmSignup(token) {
-  return apiFetch(`/v1/auth/signup-verifications/${requireToken(token)}/confirm`, { method: "POST", body: JSON.stringify({}) });
-}
-
 /** The API's refusals on these pages, as sentences a person reads. */
 export function describeAccessError(error, fallback = "Something went wrong. Try again.") {
   switch (error?.code) {
     case "RATE_LIMITED": return "Too many tries. Wait a few minutes and try again.";
-    case "SIGNUP_OPEN": return "Signup is open here: create an account instead.";
     case "EMAIL_NOT_CONFIGURED": return "This Orbik can't send email. Ask its admin for a reset link.";
-    case "EMAIL_NOT_SENT": return "The confirmation email could not be sent to that address. Check it and try again.";
     case "ACCOUNT_EXISTS": return "That address already has an account. Sign in instead.";
     case "ACCOUNT_NOT_FOUND": return "No active account uses that address.";
     case "VALIDATION_FAILED": return error.fields?.[0]?.message ?? "Check what you entered.";

@@ -74,13 +74,15 @@ export function getApiBaseUrl() {
  * Performs a credentialed JSON request and rejects every undocumented response shape safely.
  *
  * @param {string} path absolute API path beginning with `/`
- * @param {RequestInit & {idempotencyKey?: string}} options request options
+ * @param {RequestInit & {idempotencyKey?: string, signsIn?: boolean}} options request options;
+ *   `signsIn` for a request whose answer is the whole session of an account it signed in, as
+ *   login's is (an extension's route that makes an account), so the app's session follows it
  */
 export async function apiFetch(path, options = {}) {
   if (!/^\/[A-Za-z0-9/_{}.-]*(?:\?[A-Za-z0-9%&=_.-]+)?$/.test(path)) {
     throw new Error("API path is invalid.");
   }
-  const { idempotencyKey, headers: suppliedHeaders, ...requestOptions } = options;
+  const { idempotencyKey, signsIn: answersSession = false, headers: suppliedHeaders, ...requestOptions } = options;
   const headers = new Headers(suppliedHeaders);
   headers.set("Accept", "application/json");
   if (requestOptions.body !== undefined) headers.set("Content-Type", "application/json");
@@ -136,9 +138,9 @@ export async function apiFetch(path, options = {}) {
     csrfToken = payload.csrfToken;
   }
   // An approved access link and a password reset both sign the browser in and answer with the
-  // whole session, as login does.
-  const signsIn = /^\/v1\/(access-links\/[^/]+\/accept|auth\/password-resets\/[^/]+\/complete)$/.test(path);
-  if (revision === sessionRevision && (signsIn || ["/v1/auth/session", "/v1/auth/login", "/v1/auth/signup", "/v1/setup"].includes(path))) {
+  // whole session, as login does; so does an extension's route that its caller marks `signsIn`.
+  const signsIn = answersSession || /^\/v1\/(access-links\/[^/]+\/accept|auth\/password-resets\/[^/]+\/complete)$/.test(path);
+  if (revision === sessionRevision && (signsIn || ["/v1/auth/session", "/v1/auth/login", "/v1/setup"].includes(path))) {
     publishSession(payload);
   }
   return payload;

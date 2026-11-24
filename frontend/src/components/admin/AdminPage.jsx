@@ -75,7 +75,7 @@ export function NotAnAdmin() {
 }
 
 /**
- * The install's admin tools: who asked for access on the closed signup page, and a password reset
+ * The install's admin tools: who asked for access on the Request access page, and a password reset
  * link for someone who cannot get one by email. Drawn on the standalone Admin page and as the
  * Admin section of Settings; only for the install's admins.
  *
@@ -179,7 +179,7 @@ export function AdminTools({ head }) {
           </RowList>
         ) : (
           <EmptyState icon={Inbox}>
-            {filter === "pending" ? "Nobody is waiting. Requests from the signup page appear here." : "Nobody has asked for access yet."}
+            {filter === "pending" ? "Nobody is waiting. Requests from the Request access page appear here." : "Nobody has asked for access yet."}
           </EmptyState>
         )}
       </section>

@@ -69,6 +69,10 @@ Nothing reads or writes them. Deleting a workspace still removes its rows from t
 A Search Console connection's row is deleted with it, but Orbik no longer revokes its Google token;
 to withdraw that access, remove the app at <https://myaccount.google.com/permissions>.
 
+`signup_verifications` held signups waiting for their address to be confirmed, from the releases
+that had self-service signup. Its rows are removed within two days of being made, so it empties
+itself; it is in the list below all the same.
+
 To drop them all, after a backup:
 
 ```sh
@@ -78,7 +82,8 @@ docker compose exec -T mongo mongosh orbik --quiet --eval '[
   "search_console_connections", "search_console_oauth_states", "search_console_property_days",
   "search_console_page_days", "search_console_query_days", "search_console_reports",
   "competitor_setups", "competitor_reads", "competitor_pages", "competitor_reports",
-  "competitor_site_maps", "competitor_documents", "competitor_profiles", "competitor_changes"
+  "competitor_site_maps", "competitor_documents", "competitor_profiles", "competitor_changes",
+  "signup_verifications"
 ].forEach((name) => db.getCollection(name).drop())'
 ```
 

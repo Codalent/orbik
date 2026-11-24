@@ -17,9 +17,9 @@ function notFound() {
 }
 
 /**
- * Asking to join an install whose signup is closed, and an admin's answer.
+ * Asking to join an install, and an admin's answer.
  *
- * Somebody on the closed signup page leaves their address; it lands on the Admin page as one row
+ * Somebody on the Request access page (`/signup`) leaves their address; it lands on the Admin page as one row
  * per address (asking again updates it). Whoever asks is told the same thing whether or not the
  * address already has an account, so the form cannot be used to find out who is here. An admin
  * approves a request — which makes a one-time link, emailed to the address when this install sends
@@ -30,7 +30,7 @@ function notFound() {
  * @param {import("mongodb").Db} options.database
  * @param {object} options.userRepository
  * @param {{addresses: () => Promise<string[]>}} options.admins told about each new request by email
- * @param {{frontendOrigins: string[], signup: string}} options.config
+ * @param {{frontendOrigins: string[]}} options.config
  * @param {((message: object) => Promise<void>)|null} [options.sendEmail]
  * @param {{emit: Function}} [options.events] told `access.requested` and `account.created`
  * @param {Function} [options.logger]
@@ -88,13 +88,10 @@ export function createAccessRequestService({
 
   return {
     /**
-     * Records a request to join. Only while signup is closed: with it open there is nothing to ask.
-     * A dismissed request asked again is pending again; an approved one keeps its link.
+     * Records a request to join. A dismissed request asked again is pending again; an approved one
+     * keeps its link.
      */
     async request({ email }) {
-      if (config.signup === "open") {
-        throw new AppError({ status: 409, code: "SIGNUP_OPEN", message: "Signup is open here: create an account instead." });
-      }
       const address = canonicalizeEmail(email);
       const at = now();
       const before = await requests.findOneAndUpdate(

@@ -11,7 +11,7 @@ import { useAuth } from "@/lib/auth/AuthProvider";
 
 /**
  * The Admin section of Settings, at `/settings/admin`, listed only for the install's admins: access
- * requests from the closed signup page, and password reset links. It is about the install rather
+ * requests from the Request access page, and password reset links. It is about the install rather
  * than this workspace, so it is the same in every workspace; it used to be a page of its own,
  * opened from the account menu, and `/admin` still leads here.
  */

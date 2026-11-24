@@ -24,11 +24,9 @@ pnpm --dir backend run seed:user -- --email you@example.com
 
 Either way, once one account exists the setup code is gone.
 
-An install whose accounts all come by signup or invite, such as one open to the public, can turn
-setup off with `ORBIK_FIRST_RUN_SETUP=off`: the API prints no code, the sign-in page stays the
-sign-in page and `/setup` leads to it. With signup open as well, name the admins in
-`ORBIK_ADMIN_EMAILS`; otherwise whoever signed up first would administer the install, so the
-install refuses to start without them.
+An install whose first account is made another way, with `seed:user` for instance, can turn setup
+off with `ORBIK_FIRST_RUN_SETUP=off`: the API prints no code, the sign-in page stays the sign-in
+page and `/setup` leads to it.
 
 ## How other people join
 
@@ -36,32 +34,29 @@ install refuses to start without them.
 it creates the account if the address has none (see
 [Workspaces and members](workspaces-and-members.md#inviting-someone)).
 
-**By asking.** Signup is closed by default. The **Request access** form at `/signup` takes an
-email address and puts it under Settings → Admin for an admin to approve. The form answers the same
-whoever asks, so it never tells anyone whether an address already has an account.
+**By asking.** The **Request access** form at `/signup` takes an email address and puts it under
+Settings → Admin for an admin to approve. The form answers the same whoever asks, so it never tells
+anyone whether an address already has an account. Approving it gives the person a one-time link
+that makes their account.
 
-**By signing up.** With `ORBIK_SIGNUP=open`, anyone who can reach the sign-in page can create an
-account there. Leave it `closed` unless the install is only reachable by people you trust. With
-`ORBIK_SIGNUP_VERIFY_EMAIL=true` as well, signing up sends a link to the address instead, and the
-account is made when that link is opened and confirmed, so every account's address is known to
-reach its owner. That needs email to be set up (`SMTP_URL`). When the email cannot be sent to the
-address (the mail service refused it), the form says so and nothing is kept: check the address and
-sign up again.
+Orbik has no self-service signup: nobody gets an account without an invite, an admin's approval or
+someone with access to the server. An install upgraded from a release that had it, and still
+setting `ORBIK_SIGNUP=open` or `ORBIK_SIGNUP_VERIFY_EMAIL=true`, does not start until the setting is
+removed, so that it is not left believing anyone can sign up.
 
 Settings like these are listed in [Configuration](../self-hosting/configuration.md).
 
 ## Signing in with Google
 
-With `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` set, the sign-in page, and the signup page when
-signup is open, offer **Continue with Google**.
+With `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` set, the sign-in page offers **Continue with
+Google**.
 
 - **An address that already has an account** signs in to it, whichever way the account was made,
   as long as Google says it has verified the address. That links the Google account: from then
   on the account is found by it. The password, if the account has one, keeps working.
-- **An address with no account** gets one only when signup is open (`ORBIK_SIGNUP=open`). It is
-  made at once, without a confirmation email, since Google has confirmed the address already, and
-  it has no password: **Forgot password?** gives it one. With signup closed, the sign-in page says
-  there is no account, and the person asks for an invite or for access as before.
+- **An address with no account** does not get one: the sign-in page says there is no account, and
+  the person asks for an invite or for access. Once they have an account, by either, Google signs
+  them in to it.
 - An account linked to one Google account does not sign in with another that has the same address
   (an address moved between Google accounts). Sign in with the password, or with the first one.
 

@@ -13,7 +13,7 @@ import { canonicalizeEmail, createUserRepository } from "../repositories/userRep
 
 /**
  * Provisions one pre-provisioned user without placing a password in shell history.
- * Runs in every environment because signup is disabled: this is the only way to create
+ * Runs in every environment because Orbik has no self-service signup: this is the only way to create
  * the operational account in production. The target database and email are echoed before
  * the password prompt so an unintended target can be abandoned with Ctrl+C.
  */

@@ -49,7 +49,7 @@ set `ORBIK_BIND_ADDRESS` to an address of this server that it can reach.
 > Without `ORBIK_TRUSTED_PROXIES`, every request reaches the API as plain HTTP. On an HTTPS address
 > the session cookie is `Secure`, so it is never set: signing in seems to work and lands back on
 > the sign-in page, and the API's log says `session.request_not_https`. The sign-in, setup and
-> signup rate limits would also count everyone as the one proxy address.
+> access request rate limits would also count everyone as the one proxy address.
 
 ### nginx on the same server
 
