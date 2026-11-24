@@ -24,6 +24,12 @@ pnpm --dir backend run seed:user -- --email you@example.com
 
 Either way, once one account exists the setup code is gone.
 
+An install whose accounts all come by signup or invite, such as one open to the public, can turn
+setup off with `ORBIK_FIRST_RUN_SETUP=off`: the API prints no code, the sign-in page stays the
+sign-in page and `/setup` leads to it. With signup open as well, name the admins in
+`ORBIK_ADMIN_EMAILS`; otherwise whoever signed up first would administer the install, so the
+install refuses to start without them.
+
 ## How other people join
 
 **By invite.** The usual way in: someone who manages a workspace sends an invite link, and opening

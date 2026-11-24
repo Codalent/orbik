@@ -121,6 +121,17 @@ export async function prepareFirstRun(database) {
 }
 
 /**
+ * Deletes a setup code left in the database, for an install that has turned first-run setup off
+ * (`ORBIK_FIRST_RUN_SETUP=off`): one made before that keeps no way in once the route is gone, but
+ * it is not left lying in `system_state` either.
+ *
+ * @param {import("mongodb").Db} database
+ */
+export async function discardSetupCode(database) {
+  await database.collection(COLLECTIONS.systemState).deleteOne({ _id: SETUP_ID });
+}
+
+/**
  * The banner the API prints while the install has no account. Plain text, for a terminal.
  *
  * The address carries the code as `?key=`, so opening it fills the setup page in; the code is also

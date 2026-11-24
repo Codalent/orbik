@@ -5,6 +5,11 @@ What changed in each release of Orbik. Releases are tagged `vX.Y.Z`; upgrading i
 
 ## Unreleased
 
+- **Setup can be turned off.** `ORBIK_FIRST_RUN_SETUP=off` is for an install whose accounts all
+  come by signup or invite: the API prints no setup code, `POST /v1/setup` is not served, and the
+  sign-in page no longer sends anyone to `/setup` while the install has no account. With
+  `ORBIK_SIGNUP=open` it needs `ORBIK_ADMIN_EMAILS`, so the first person to sign up does not
+  become the install's admin. See [docs/guides/accounts-and-admin.md](docs/guides/accounts-and-admin.md#the-first-account).
 - **Sources.** A workspace reads more than its website. **Sources**, in the rail between Brand and
   Agents, lists everything Orbik reads, and **Add a source** takes another site of yours (a
   documentation subdomain, a second domain, the whole of it, one section or a few pages) or pages
