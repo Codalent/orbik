@@ -15,6 +15,9 @@ import { validateEmailOnly, validateNewPassword } from "../validators/authValida
  * - `GET /v1/auth/password-resets/:token`, `POST …/complete` — public: a reset link.
  * - `/v1/admin/…` — the install's admins: the access requests, and a reset link for someone.
  *
+ * With no install admin (`ORBIK_INSTALL_ADMIN=off`) neither asking for access nor `/v1/admin/…` is
+ * served: nobody would answer. The links of requests approved before stay usable.
+ *
  * Every public write is CSRF-protected as login is and limited per address; a limiter keyed on a
  * link carries a hash of it, never the token.
  */
@@ -35,16 +38,18 @@ export function createAccessRouter({ accessRequestService, passwordResetService,
   };
 
   // Asking for access: a few per address an hour, and the same answer whoever asks.
-  router.post(
-    "/v1/access-requests",
-    ensureCsrfToken, csrfProtection,
-    limit("access-request", 10, 3600), limit("access-request-address", 3, 3600, byAddress),
-    validateEmailOnly,
-    handle(async (req, res) => {
-      await accessRequestService.request(req.validated);
-      res.status(202).json({ status: "received" });
-    }),
-  );
+  if (admins.enabled) {
+    router.post(
+      "/v1/access-requests",
+      ensureCsrfToken, csrfProtection,
+      limit("access-request", 10, 3600), limit("access-request-address", 3, 3600, byAddress),
+      validateEmailOnly,
+      handle(async (req, res) => {
+        await accessRequestService.request(req.validated);
+        res.status(202).json({ status: "received" });
+      }),
+    );
+  }
   router.get("/v1/access-links/:token", limit("access-link-describe", 30, 300), handle(async (req, res) => {
     res.json(await accessRequestService.describeLink(req.params.token));
   }));
@@ -81,6 +86,7 @@ export function createAccessRouter({ accessRequestService, passwordResetService,
   );
 
   // The Admin page.
+  if (!admins.enabled) return router;
   const admin = [requireAuthentication, admins.requireInstallAdmin];
   router.get("/v1/admin/access-requests", ...admin, handle(async (req, res) => {
     res.json(await accessRequestService.list({ status: typeof req.query.status === "string" ? req.query.status : undefined }));

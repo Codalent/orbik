@@ -25,17 +25,33 @@ function useAuthKit() {
 }
 
 /**
+ * `/signup` on an install with no admin to ask (`ORBIK_INSTALL_ADMIN=off`) and no way of its own to
+ * make an account: people join by invite.
+ */
+function InviteOnlyNotice() {
+  return (
+    <AuthPanel title="Invite only" description="Accounts here are made by invite.">
+      <p className="text-sm text-orb-gray">
+        Ask someone who manages a workspace here to invite you. Their invite link makes your account.
+      </p>
+      <AuthPanelFoot><Link href="/login" className={AUTH_LINK}>Back to sign in</Link></AuthPanelFoot>
+    </AuthPanel>
+  );
+}
+
+/**
  * `/signup`. Orbik has no self-service signup: here a person asks the install's admins for access
- * (the Request access form). A deployment whose extension adds a way to make an account puts its
- * own page here instead (the `signupPage` slot), which is handed the app's API client and the
- * sign-in pages' pieces.
+ * (the Request access form), or, on an install with no admin, is told to ask for an invite. A
+ * deployment whose extension adds a way to make an account puts its own page here instead (the
+ * `signupPage` slot), which is handed the app's API client and the sign-in pages' pieces.
  */
 export function SignupPage() {
   const { signupPage } = useExtensionSlots();
+  const { edition } = useEdition();
   const ui = useAuthKit();
   const { status, page } = signupPage();
-  if (status === "loading") return <NeutralLoading inline />;
-  if (status === "missing") return <SignupDisabledForm />;
+  if (status === "loading" || !edition) return <NeutralLoading inline />;
+  if (status === "missing") return edition.accessRequests === false ? <InviteOnlyNotice /> : <SignupDisabledForm />;
   const { Component } = page;
   return <Component api={extensionApi} ui={ui} />;
 }

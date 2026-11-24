@@ -6,12 +6,15 @@ import { AppError } from "../errors/appError.js";
  *
  * `ORBIK_ADMIN_EMAILS` names them. Unset, the install's first account is its admin — the one the
  * setup page (or the first `seed:user`) made — so a self-hosted install has one without being told.
+ * With `ORBIK_INSTALL_ADMIN=off` (`enabled: false`) nobody is: the Admin routes answer 404 to
+ * everyone and no address is told about anything.
  *
  * @param {object} options
  * @param {import("mongodb").Collection} options.users
  * @param {string[]} [options.adminEmails] canonical addresses, from configuration
+ * @param {boolean} [options.enabled] false when the install has no admin at all
  */
-export function createInstallAdmins({ users, adminEmails = [] }) {
+export function createInstallAdmins({ users, adminEmails = [], enabled = true }) {
   async function firstAccountId() {
     const [first] = await users.find({}, { projection: { _id: 1 } }).sort({ _id: 1 }).limit(1).toArray();
     return first?._id ?? null;
@@ -19,7 +22,7 @@ export function createInstallAdmins({ users, adminEmails = [] }) {
 
   /** Whether this account (`{ _id, email }`) is one of the install's admins. */
   async function isAdmin(user) {
-    if (!user) return false;
+    if (!user || !enabled) return false;
     if (adminEmails.length) return adminEmails.includes(user.email);
     const first = await firstAccountId();
     return Boolean(first?.equals(user._id));
@@ -27,6 +30,7 @@ export function createInstallAdmins({ users, adminEmails = [] }) {
 
   /** The admins' addresses, for telling them about a new request. */
   async function addresses() {
+    if (!enabled) return [];
     if (adminEmails.length) return adminEmails;
     const [first] = await users.find({ status: "active" }, { projection: { email: 1 } }).sort({ _id: 1 }).limit(1).toArray();
     return first ? [first.email] : [];
@@ -48,5 +52,5 @@ export function createInstallAdmins({ users, adminEmails = [] }) {
       .catch(next);
   }
 
-  return { isAdmin, addresses, requireInstallAdmin };
+  return { enabled, isAdmin, addresses, requireInstallAdmin };
 }

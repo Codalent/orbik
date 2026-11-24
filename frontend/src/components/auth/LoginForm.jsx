@@ -84,7 +84,9 @@ export function LoginForm() {
         Need an account?{" "}
         {signupOpen
           ? <Link href="/signup" className={AUTH_LINK}>Create one</Link>
-          : <Link href="/signup" className={AUTH_LINK}>Request access</Link>}
+          : edition?.accessRequests === false
+            ? "Ask someone here to invite you."
+            : <Link href="/signup" className={AUTH_LINK}>Request access</Link>}
       </AuthPanelFoot>
     </AuthPanel>
   );

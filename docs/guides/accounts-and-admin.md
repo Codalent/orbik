@@ -92,6 +92,15 @@ When the install sends email, admins are also told about each new request.
 **Password reset link** makes a reset link for someone who can't get one by email: enter their
 email and choose **Make link**, then send it to them.
 
+### No install admin
+
+A deployment that is administered some other way can have no install admin at all, with
+`ORBIK_INSTALL_ADMIN=off`. Then no account is an admin, whichever was first: there is no Admin page,
+and nobody can ask for access, since nobody would answer. `/signup` tells a person to ask for an
+invite, and the sign-in page says the same. A forgotten password is reset by email, so the install
+must send email (`SMTP_URL`); the API does not start without it, or with `ORBIK_ADMIN_EMAILS` also
+set. The terminal's `reset:password` keeps working.
+
 ## Changing your password
 
 **Settings → Account**, in any workspace, changes your password (`/account/password` leads there

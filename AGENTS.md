@@ -197,7 +197,11 @@ shows under **Settings → Admin** (`/workspaces/:id/settings/admin`; `/admin` l
 the page itself for an admin with no workspace yet), where an admin approves it —
 a one-time `/join/<token>` link, seven days, emailed when SMTP is set and shown to the admin either
 way — or dismisses it. The install's admins are the addresses in `ORBIK_ADMIN_EMAILS`, or with it
-unset its first account; everyone else gets 404 from `/v1/admin/*`. **Forgot password** on the
+unset its first account; everyone else gets 404 from `/v1/admin/*`. `ORBIK_INSTALL_ADMIN=off`
+(for a deployment administered another way) makes nobody the install's admin: no `/v1/admin/*`, no
+`POST /v1/access-requests`, `GET /v1/edition` says `accessRequests: false` and `/signup` tells a
+person to ask for an invite; the API refuses it beside `ORBIK_ADMIN_EMAILS` or without SMTP, since a
+forgotten password then has no admin to ask. **Forgot password** on the
 sign-in page emails a one-time `/reset-password/<token>` link (an hour, `password_resets`, only the
 hash stored); using it sets the password, deletes every other session of the account and signs
 this browser in. Signed in, **Settings → Account** (`/workspaces/:id/settings/account`; `/account/password` leads
