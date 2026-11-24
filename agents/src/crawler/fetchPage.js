@@ -278,9 +278,11 @@ export function createFetchHandler({ createFetcherFor }) {
         runId: job.runId ?? null,
         title: extracted.title ?? null,
         extracted,
-        // Normalised as the crawler normalises, so a link in the text names the page it stored.
+        // Normalised as the crawler normalises, and read onto the site's host as the crawler
+        // reads them, so a link in the text names the page it stored.
         conversion: toMarkdown(response.body, {
           url: response.url, extracted, fetchedAt: new Date(), normalizeOptions: normalizeOptionsFor(config),
+          onSiteHost: scope.onSiteHost,
         }),
       });
     }
@@ -556,6 +558,11 @@ function writeSnapshot(snapshots, snapshot) {
  * keeps storage bounded by the size of the site instead of by the number of crawls, and the graph
  * always reflects the latest fetch of every page. The trade-off is that historical link diffs are
  * not available; adding them later means keeping edges per run and pruning old ones on a schedule.
+ *
+ * A relative link is resolved against where the page was served from, not where it was asked for.
+ * The two differ whenever the request was redirected, and a page that arrived from another host
+ * has links that belong to that host: resolved against the address asked for, they would be
+ * registered as pages of this site that do not exist.
  */
 export async function recordLinks({ collections, registry, job, siteId, config, scope, rules, record, extracted, discovery = false }) {
   const normalizeOptions = normalizeOptionsFor(config);
@@ -564,8 +571,14 @@ export async function recordLinks({ collections, registry, job, siteId, config, 
   const edges = [];
 
   for (const link of extracted.links) {
-    const normalized = tryNormalizeUrl(link.href, { base: record.url, ...normalizeOptions });
-    if (!normalized) continue;
+    // Resolved the way a browser resolves it: against the address the page was served from, after
+    // any redirect, or the one its `<base href>` names. Each link carries that base from
+    // extraction. The address the page was asked for is only the fallback, for a link recorded
+    // without one.
+    const asWritten = tryNormalizeUrl(link.href, { base: link.base ?? record.url, ...normalizeOptions });
+    if (!asWritten) continue;
+    // A link written with the site's other spelling leads to the page on this host.
+    const normalized = scope.onSiteHost(asWritten);
 
     const decision = scope.allows(normalized, depth ?? 0);
     // Another host, or — for a list of pages — a page of the host nobody listed: an edge, and

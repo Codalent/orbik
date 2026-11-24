@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 
-import { toObjectId } from "@orbik/core";
+import { aliasHostOf, aliasOf, isWwwPair, readOntoSiteHost, toObjectId } from "@orbik/core";
 
 import { AppError } from "../errors/appError.js";
 import { toWorkspaceSummary } from "../repositories/workspaceRepository.js";
@@ -9,6 +9,40 @@ import { createWorkspaceAccessCheck } from "./workspaceAccess.js";
 /** The hostname of an address, lower-cased: what decides whether two addresses are one site. */
 function hostOf(url) {
   return new URL(url).hostname.toLowerCase();
+}
+
+/**
+ * Whether an address is on the site a crawl covers: on the hostname its crawl starts from, or on
+ * that hostname's other spelling when the crawler saw it redirect there and moved the crawl
+ * (`redirectedFrom`, `aliasHostOf` in `@orbik/core`). `example.com` typed for a site crawled on
+ * `www.example.com` is then the same site, as it is to the crawler.
+ */
+function isOnCrawledSite(url, site) {
+  const host = hostOf(url);
+  return host === hostOf(site.seedUrl) || host === aliasHostOf(site);
+}
+
+/**
+ * An address as the crawl would start from it: itself, or the same address on the host the crawl
+ * covers when it was typed with the spelling that only redirects there. Read by the crawler's own
+ * rule (`readOntoSiteHost` in `@orbik/core`), so the crawl is not sent back to a name it has
+ * already been moved off.
+ */
+function onCrawledHost(url, site) {
+  const alias = aliasOf(site);
+  return readOntoSiteHost(url, { seedUrl: site.seedUrl, aliasHost: alias?.host, aliasProtocol: alias?.protocol });
+}
+
+/**
+ * Whether the crawl still starts where the workspace's website says, so that it follows the
+ * website to a new address. Either the two are the same address, or the website is the address
+ * the crawler moved the crawl from and the start address is still the one that move left
+ * (`redirectedFrom.to`). A start address a person chose on the Crawl page since is neither, and
+ * is kept.
+ */
+function seedFollowsWebsite(site, websiteUrl) {
+  if (site.seedUrl === websiteUrl) return true;
+  return Boolean(aliasHostOf(site)) && site.redirectedFrom.url === websiteUrl && site.redirectedFrom.to === site.seedUrl;
 }
 
 /**
@@ -128,7 +162,12 @@ export function createWorkspaceService({
      *
      * - **Same hostname** (`http:` to `https:`, another start path): the same site. The crawl's
      *   start address moves too when it was the old website, and is left alone when somebody chose
-     *   another one on the Crawl page. Everything crawled and the Library stay as they are.
+     *   another one on the Crawl page. Everything crawled and the Library stay as they are. The
+     *   hostname's other spelling counts as the same one when the crawler moved the crawl from it:
+     *   a website typed as `example.com` that redirects to `www.example.com` is crawled there, and
+     *   either name is still this site. The start address then counts as the old website when it
+     *   is what the crawler moved that website to, and a new website typed with the spelling that
+     *   redirects starts the crawl from the same address on the host that answers.
      * - **Another hostname**: another site, whose pages the crawl registry does not hold, and old
      *   pages left in it would still be fetched on every crawl. It needs `confirmSiteChange`, and
      *   is refused while a crawl runs. It then does what Clear crawled data does — every crawled
@@ -154,7 +193,7 @@ export function createWorkspaceService({
         if (!site) {
           crawl = { change: "not-set-up" };
         } else {
-          const newSite = hostOf(changes.websiteUrl) !== hostOf(site.seedUrl);
+          const newSite = !isOnCrawledSite(changes.websiteUrl, site);
           if (newSite && !confirmSiteChange) {
             throw new AppError({
               status: 409,
@@ -175,7 +214,7 @@ export function createWorkspaceService({
           // read its pages twice.
           const newHost = hostOf(changes.websiteUrl);
           const other = newSite
-            ? (await crawlRepository.listSources(workspace._id)).find((source) => source.primary === false && source.host === newHost)
+            ? (await crawlRepository.listSources(workspace._id)).find((source) => source.primary === false && (source.host === newHost || isWwwPair(source.host, newHost)))
             : null;
           if (other) {
             throw new AppError({
@@ -190,9 +229,17 @@ export function createWorkspaceService({
             await crawlRepository.moveSeed(site._id, { seedUrl: changes.websiteUrl, newSite: true, now: at });
             await crawlRepository.requestCrawlNow(site._id, at, userId);
             crawl = { change: "new-site", pagesCleared: pages, crawlRequested: true, seedUrl: changes.websiteUrl };
-          } else if (site.seedUrl === workspace.websiteUrl) {
-            await crawlRepository.moveSeed(site._id, { seedUrl: changes.websiteUrl, newSite: false, now: at });
-            crawl = { change: "seed-moved", seedUrl: changes.websiteUrl };
+          } else if (seedFollowsWebsite(site, workspace.websiteUrl)) {
+            const seedUrl = onCrawledHost(changes.websiteUrl, site);
+            await crawlRepository.moveSeed(site._id, {
+              seedUrl,
+              newSite: false,
+              now: at,
+              // Kept in step with the website, so the start address is still recognised as
+              // following it the next time the website changes.
+              typedUrl: seedUrl === changes.websiteUrl ? null : changes.websiteUrl,
+            });
+            crawl = { change: "seed-moved", seedUrl };
           } else {
             crawl = { change: "seed-kept", seedUrl: site.seedUrl };
           }

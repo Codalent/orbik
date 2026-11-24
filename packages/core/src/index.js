@@ -29,6 +29,7 @@ export { closeMongo, connectMongo, isMongoReady } from "./db/mongo.js";
 export { toObjectId } from "./db/objectId.js";
 export { escapeRegExp } from "./escapeRegExp.js";
 export { INVALID_URL, hashUrl, normalizeUrl, tryNormalizeUrl } from "./url/url.js";
+export { aliasHostOf, aliasOf, isWwwPair, readOntoSiteHost } from "./url/siteHost.js";
 export {
   AGENT_COLLECTIONS,
   COLLECTIONS,

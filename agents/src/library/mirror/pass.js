@@ -3,9 +3,11 @@ import {
   KNOWLEDGE_AGENT_SLUG,
   SOURCE_RELATION,
   WEBSITE_SOURCE,
+  aliasOf,
   describePageKind,
   describeSource,
   log,
+  readOntoSiteHost,
   sourcePurpose,
 } from "@orbik/core";
 import {
@@ -238,7 +240,9 @@ export async function mirrorWorkspace({
   // Decided over the whole site on every pass rather than page by page as each is copied, because
   // it is a ranking: whether the fortieth page is in depends on the thirty-nine ahead of it.
   // The order a person listed a list's pages in is the order they are written from.
-  const listedOrder = new Map(source.pageUrls.map((url, index) => [url, index]));
+  const twin = aliasOf(siteDocument);
+  const onHost = (url) => (twin ? readOntoSiteHost(url, { seedUrl: siteDocument.seedUrl, aliasHost: twin.host, aliasProtocol: twin.protocol }) : url);
+  const listedOrder = new Map(source.pageUrls.flatMap((url, index) => [[url, index], [onHost(url), index]]));
   const candidates = stored.map(({ page, registry: registryRow, included }) => ({
     order: listedOrder.get(page.url) ?? null,
     key: page.urlHash,

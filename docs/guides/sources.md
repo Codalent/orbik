@@ -35,7 +35,8 @@ how it is doing. Press a row for the source's own page.
   reads only the pages you list, and never follows links off them.
 
 Each host is read by one source. Your website and `docs.example.com` are two sources, and a link
-from one to the other is left to the source it belongs to rather than read twice.
+from one to the other is left to the source it belongs to rather than read twice. `example.com`
+and `www.example.com` count as the same host.
 
 ## Add a source
 

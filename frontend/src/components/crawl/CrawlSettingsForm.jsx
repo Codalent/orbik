@@ -10,6 +10,7 @@ import { CrawlSetupGuide } from "./CrawlSetupGuide";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { hostOf } from "@/lib/format";
 import { crawlSettingsSchema, crawlSetupSchema } from "@/lib/validation/crawl";
 
 /**
@@ -34,6 +35,7 @@ import { crawlSettingsSchema, crawlSetupSchema } from "@/lib/validation/crawl";
 export function CrawlSettingsForm({ site, defaultSeedUrl, onSave, onCancel, blockedReason = null }) {
   const isFirstSetup = !site;
   const savedSitemaps = site?.sitemapUrls ?? [];
+  const redirectedFromHost = site?.redirectedFrom?.host ?? null;
   const { register, handleSubmit, setError, formState: { errors, isSubmitting } } = useForm({
     resolver: zodResolver(isFirstSetup ? crawlSetupSchema : crawlSettingsSchema),
     defaultValues: {
@@ -81,7 +83,12 @@ export function CrawlSettingsForm({ site, defaultSeedUrl, onSave, onCancel, bloc
         />
         {errors.seedUrl
           ? <p id="crawl-seed-url-error" className="text-sm text-destructive">{errors.seedUrl.message}</p>
-          : <p id="crawl-seed-url-hint" className="text-sm text-orb-muted">Every crawl begins here and follows links and sitemaps outward. An address without https:// is read as one.</p>}
+          : (
+            <p id="crawl-seed-url-hint" className="text-sm text-orb-muted">
+              Every crawl begins here and follows links and sitemaps outward. An address without https:// is read as one.
+              {redirectedFromHost && ` ${redirectedFromHost} redirects to ${hostOf(site.seedUrl)}, so Orbik crawls the site there.`}
+            </p>
+          )}
       </div>
 
       <SitemapField

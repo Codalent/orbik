@@ -5,9 +5,11 @@ import {
   SOURCE_PURPOSES,
   SOURCE_RELATION,
   WEBSITE_SOURCE,
+  aliasHostOf,
   describeSource,
   hostOf,
   isUnderDomain,
+  isWwwPair,
   normalizeSection,
   ownDomainOf,
   sourcePurpose,
@@ -258,7 +260,7 @@ export function createSourceService({
       const target = new URL(url);
       const host = target.hostname.toLowerCase();
       const websiteHost = website ? hostOf(website.seedUrl) : hostOf(workspace.websiteUrl);
-      const taken = sites.find((site) => describeSource(site).host === host) ?? null;
+      const taken = sites.find((site) => sameSite(site, host)) ?? null;
       const known = describeKnownPage(target);
       const relation = websiteHost && isUnderDomain(host, websiteHost) ? SOURCE_RELATION.own : SOURCE_RELATION.elsewhere;
       const probe = known && !known.readable
@@ -304,7 +306,7 @@ export function createSourceService({
       }
       const target = new URL(source.url);
       const host = target.hostname.toLowerCase();
-      const taken = sites.find((site) => describeSource(site).host === host);
+      const taken = sites.find((site) => sameSite(site, host));
       if (taken) {
         const name = describeSource(taken).name;
         throw new AppError({
@@ -374,7 +376,10 @@ export function createSourceService({
         set.mode = changes.mode;
       }
       const onHost = (url, field) => {
-        if (hostOf(url) !== current.host) refuse(field, `Every address of this source is on ${current.host}. Another host is another source.`);
+        const host = hostOf(url);
+        if (host !== current.host && !isWwwPair(host, current.host)) {
+          refuse(field, `Every address of this source is on ${current.host}. Another host is another source.`);
+        }
       };
       if (mode === SOURCE_MODE.section) {
         const section = changes.section ?? current.section ?? normalizeSection(new URL(changes.seedUrl ?? site.seedUrl).pathname);
@@ -558,6 +563,15 @@ function toSourceSummary(site, { active, latest, firstRead, outstanding, library
     pages: { known, copied: library.copied, chosen: library.chosen },
     lastReadAt: latest?.finishedAt ? latest.finishedAt.toISOString() : null,
   };
+}
+
+/**
+ * Whether a source reads `host`: its own host, the spelling its seed was moved from, or — as the
+ * crawler would move it — the other of the `www.` pair.
+ */
+function sameSite(site, host) {
+  const own = describeSource(site).host;
+  return own === host || isWwwPair(own, host) || aliasHostOf(site) === host;
 }
 
 /** The one state a source is in, from its runs. */

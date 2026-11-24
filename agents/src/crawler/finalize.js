@@ -3,7 +3,7 @@ import { createEventOutbox, EVENT_TYPES } from "../runtime/eventOutbox.js";
 import { CRAWLER_AGENT, CRAWLER_JOBS, LIBRARY_JOBS, libraryJob } from "../jobs.js";
 import { createScope } from "./scope.js";
 import { derivePatterns } from "./routePattern.js";
-import { groupDuplicates } from "./duplicateGroup.js";
+import { DUPLICATE_REASONS, groupDuplicates } from "./duplicateGroup.js";
 import { RUN_STATUS } from "../runtime/runLedger.js";
 import { applyCrawlSchedule, getAgentCollections } from "@orbik/core";
 import { hashUrl } from "./url.js";
@@ -109,7 +109,7 @@ export function createFinalizeHandler() {
     // Grouping and route patterns are computed here for the same reason depth is: both need the
     // whole site at once. A duplicate cannot be recognised until the page it duplicates has been
     // fetched, and a URL is only an instance of `/blog/[slug]` once its siblings exist.
-    const shape = await describeSiteShape(collections, siteId);
+    const shape = await describeSiteShape(collections, siteId, scope);
     // Rows were only just given their route pattern, so whatever frequencies are already on record
     // are applied to them here. Without this, a pattern set to "daily" by hand would not reach a
     // page this crawl discovered under it.
@@ -209,19 +209,48 @@ export function createFinalizeHandler() {
  * per crawl over everything known, and written back onto the registry where every later read — the
  * route tree, the page list, the counts a person is shown — can use them without recomputing.
  *
+ * A site that moved to its `www.` twin (`./seedHost.js`) still holds the rows it crawled under the
+ * spelling it left. Each of those is the address that redirects to its twin on the site's host,
+ * and it is given its twin's group outright rather than a place in the election. The twin is the
+ * page: the one the crawl can still fetch, and the one the Library keeps a copy of. Put through the
+ * general rules, the old row — whose snapshot holds the very same text, under the shorter address
+ * — is as likely to be chosen to stand for the group as the page it only points at.
+ *
+ * Not before the twin has been read, though, and read means served: its latest fetch came back
+ * 2xx, or its Markdown is on record from one that did. Until then the old row is the only reading
+ * of the page there is, and folding it into an address nothing has been read from would have the
+ * Library drop its copy with nothing to put in its place: a crawl that moves a site and runs out
+ * of budget part-way, or is answered with an error for a page, would empty the Library of the
+ * pages it did not get. Such a row is left exactly as the last crawl described it, and is folded
+ * by the crawl that reads its twin. Two kinds of old row are not kept waiting. One with no
+ * Markdown of its own — it answered an error, or was not a page — has no copy to lose. And one
+ * whose twin the crawl may not read at all, because the host's own robots.txt forbids it or the
+ * scope excludes it: that row was read under rules that were never this site's.
+ *
+ * @param {object} collections the agent collections
+ * @param {import("mongodb").ObjectId} siteId the site
+ * @param {ReturnType<import("./scope.js").createScope>} scope the site's scope, for which
+ *   addresses are the old spelling of another
  * @returns {Promise<{duplicates: number, uniquePages: number, patterns: number}>}
  */
-async function describeSiteShape(collections, siteId) {
+async function describeSiteShape(collections, siteId, scope) {
   const rows = await collections.urls
     .find({ siteId })
-    .project({ urlHash: 1, url: 1, discoveredBy: 1 })
+    .project({ urlHash: 1, url: 1, discoveredBy: 1, eligible: 1 })
     .toArray();
   if (!rows.length) return { duplicates: 0, uniquePages: 0, patterns: 0 };
 
   const inbound = await inboundCounts(collections.links, siteId);
   const latest = await latestSnapshots(collections.snapshots, siteId);
+  const registered = new Set(rows.map((row) => row.urlHash));
+  // Rows under the spelling the site left, each with the row it stands for.
+  const twins = new Map();
+  for (const row of rows) {
+    const twinHash = twinOf(row.url, scope, registered);
+    if (twinHash) twins.set(row.urlHash, twinHash);
+  }
 
-  const pages = rows.map((row) => {
+  const pages = rows.filter((row) => !twins.has(row.urlHash)).map((row) => {
     const snapshot = latest.get(row.urlHash);
     return {
       urlHash: row.urlHash,
@@ -265,16 +294,72 @@ async function describeSiteShape(collections, siteId) {
     };
   });
 
+  // The old spelling's rows, each into the group its twin ended in. Only the grouping is written:
+  // the route and the path a row was given by the crawl that read it still describe it.
+  const readable = new Set(rows.filter((row) => row.eligible !== false).map((row) => row.urlHash));
+  const withMarkdown = await pagesWithMarkdown(collections.markdown, siteId, [...twins.keys(), ...twins.values()]);
+  const served = (urlHash) => {
+    const status = latest.get(urlHash)?.status;
+    return withMarkdown.has(urlHash) || (Number.isInteger(status) && status >= 200 && status < 300);
+  };
+  let folded = 0;
+  for (const [urlHash, twinHash] of twins) {
+    if (withMarkdown.has(urlHash) && readable.has(twinHash) && !served(twinHash)) continue;
+    const { groupKey } = grouped.get(twinHash);
+    operations.push({
+      updateOne: {
+        filter: { siteId, urlHash },
+        update: { $set: { groupKey, variantOf: groupKey, variantReason: DUPLICATE_REASONS.redirect } },
+      },
+    });
+    folded += 1;
+  }
+
   for (let offset = 0; offset < operations.length; offset += BATCH_SIZE) {
     await collections.urls.bulkWrite(operations.slice(offset, offset + BATCH_SIZE), { ordered: false });
   }
 
   const duplicates = [...grouped.values()].filter((entry) => entry.variantOf).length;
   return {
-    duplicates,
+    duplicates: duplicates + folded,
     uniquePages: pages.length - duplicates,
     patterns: new Set(patterns.values()).size,
   };
+}
+
+/**
+ * Which of some pages have Markdown on record: the ones the Library holds, or can hold, a copy of.
+ *
+ * @returns {Promise<Set<string>>} their URL hashes
+ */
+async function pagesWithMarkdown(markdown, siteId, hashes) {
+  const found = new Set();
+  const wanted = [...new Set(hashes)];
+  for (let offset = 0; offset < wanted.length; offset += BATCH_SIZE) {
+    const rows = await markdown
+      .find({ siteId, urlHash: { $in: wanted.slice(offset, offset + BATCH_SIZE) } })
+      .project({ urlHash: 1 })
+      .toArray();
+    for (const row of rows) found.add(row.urlHash);
+  }
+  return found;
+}
+
+/**
+ * The registry row an address under the site's old spelling stands for, as a hash, or null.
+ *
+ * Null for every address on the site's own host, and for an old one whose twin was never
+ * registered: that one is grouped by what its snapshot recorded, like any other row.
+ */
+function twinOf(url, scope, registered) {
+  let hostname;
+  try {
+    hostname = new URL(url).hostname;
+  } catch {
+    return null;
+  }
+  const twin = scope.onSiteHost({ href: url, hostname });
+  return twin.href !== url && registered.has(twin.hash) ? twin.hash : null;
 }
 
 /** Counts internal links pointing at each URL, which is what decides a group's representative. */

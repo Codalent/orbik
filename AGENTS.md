@@ -154,7 +154,9 @@ only an extension sets (below); core has no limit.
   address with no account sets a password and the account is created.
 - `PATCH /v1/workspaces/:id` — `name` and/or `websiteUrl`; admin and up. A website on the same
   hostname moves the crawl's start address (unless one was chosen on the Crawl page) and keeps
-  everything; another hostname is another site: refused with `409 SITE_CHANGE_UNCONFIRMED` until
+  everything, and so does one on the `www.` twin the crawler moved the crawl from (`redirectedFrom`
+  on the crawl site, docs/architecture/crawler.md § "The host a site lives on"); another hostname
+  is another site: refused with `409 SITE_CHANGE_UNCONFIRMED` until
   sent with `confirmSiteChange: true`, refused while a crawl runs, and then clears the crawled pages
   as Clear crawled data does, drops the old host's sitemaps and requests a crawl of the new site.
   The Library and the brand are left as they are.

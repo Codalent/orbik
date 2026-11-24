@@ -37,6 +37,15 @@ What changed in each release of Orbik. Releases are tagged `vX.Y.Z`; upgrading i
 - **Workspaces and crawling.** A website address typed without `https://` (`example.com`) is taken
   to be HTTPS rather than refused, in the new-workspace form and the crawler's start address and
   sitemaps.
+- **Crawling a site typed without (or with) `www.`.** When the start address only redirects to the
+  same name with or without `www.`, the crawl moves to the host that answers: pages are found and
+  fetched at their real addresses, sitemap entries and absolute links on that host are followed,
+  and its robots.txt is the one obeyed. Before, such a site was read through a redirect per page
+  and mostly not found. Relative links are now resolved against the address a page was served
+  from, or its `<base href>`, rather than the address asked for. A site already crawled under the
+  name that redirects is fetched again at its real addresses by its next crawl, which spends crawl
+  budget where one is set and changes the pages the knowledge base is chosen from; the old
+  addresses stay listed as duplicates. See [docs/guides/crawling.md](docs/guides/crawling.md#when-your-address-redirects-to-www).
 - **Agents and Ask.** A model that calls a tool it was not given (`json`, to hand over its answer,
   is the usual one) is told so and goes on to answer, instead of the run failing with
   `INVALID_AGENT_EVENT` after its work was done. Seen with Ask on its first question.

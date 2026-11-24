@@ -1,4 +1,4 @@
-import { WEBSITE_SOURCE, describeSource, effectiveIntervalHours, patternIntervalHours } from "@orbik/core";
+import { WEBSITE_SOURCE, describeSource, effectiveIntervalHours, isWwwPair, patternIntervalHours } from "@orbik/core";
 import { BUDGET_STATE } from "@orbik/crawl-budget";
 
 import { AppError } from "../errors/appError.js";
@@ -35,12 +35,21 @@ export function createCrawlService({ workspaceRepository, crawlRepository, crawl
    * being crawled. A sitemap on another hostname lists another site's pages, and following it
    * would both fold a second site's URLs into this workspace's totals and let operator input aim
    * the crawler's first outbound requests at a host of its choosing.
+   *
+   * The start address's `www.` twin is not another hostname for this purpose. The crawler moves
+   * the start address between the two when one only redirects to the other, so a sitemap may be
+   * named under either spelling, before or after that move; `parseSiteConfig` in the agents
+   * applies the same rule to what is stored.
    */
   function requireSitemapsOnSeedHost(seedUrl, sitemapUrls) {
     if (!sitemapUrls?.length) return;
     const host = new URL(seedUrl).hostname;
-    const foreign = sitemapUrls.filter((url) => new URL(url).hostname !== host);
+    const foreign = sitemapUrls.filter((url) => {
+      const named = new URL(url).hostname;
+      return named !== host && !isWwwPair(named, host);
+    });
     if (!foreign.length) return;
+    const twin = host.startsWith("www.") ? host.slice(4) : `www.${host}`;
     throw new AppError({
       status: 400,
       code: "VALIDATION_FAILED",
@@ -48,7 +57,7 @@ export function createCrawlService({ workspaceRepository, crawlRepository, crawl
       fields: foreign.map((url) => ({
         field: "sitemapUrls",
         code: "INVALID",
-        message: `${url} is not on ${host}. A sitemap on another hostname describes another site.`,
+        message: `${url} is not on ${host} or ${twin}. A sitemap on another hostname describes another site.`,
       })),
     });
   }

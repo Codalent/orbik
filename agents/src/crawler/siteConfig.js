@@ -1,4 +1,12 @@
-import { SOURCE_LIMITS, SOURCE_MODE, describeSource, sectionPatterns } from "@orbik/core";
+import {
+  SOURCE_LIMITS,
+  SOURCE_MODE,
+  aliasOf,
+  describeSource,
+  isWwwPair,
+  readOntoSiteHost,
+  sectionPatterns,
+} from "@orbik/core";
 
 import { AgentError } from "../runtime/errors.js";
 import { normalizeUrl } from "./url.js";
@@ -65,7 +73,12 @@ export function parseSiteConfig(document) {
       errors.push(`pageUrls must list from 1 to ${SOURCE_LIMITS.pages} pages.`);
     } else {
       try {
-        pageUrls = described.pageUrls.map((url) => normalizeUrl(url).href);
+        // Listed with the spelling that redirects, when the seed has since moved to its twin: each
+        // page is the same page on the host that answers.
+        const twin = seedUrl ? aliasOf({ seedUrl, redirectedFrom: source.redirectedFrom }) : null;
+        pageUrls = described.pageUrls.map((url) => normalizeUrl(
+          twin ? readOntoSiteHost(url, { seedUrl, aliasHost: twin.host, aliasProtocol: twin.protocol }) : url,
+        ).href);
       } catch {
         errors.push("pageUrls entries must be absolute http(s) URLs.");
       }
@@ -132,7 +145,9 @@ export function parseSiteConfig(document) {
   // Sitemaps named by the operator, on top of whatever robots.txt declares. Each becomes an
   // outbound request before a single page is fetched, so the host is pinned to the seed's: a
   // sitemap elsewhere lists another site's pages, and a stored document is not proof that anything
-  // checked where it points.
+  // checked where it points. The seed's `www.` twin is allowed, because the seed moves between the
+  // two when one redirects to the other (`./seedHost.js`) and a sitemap named before the move must
+  // not stop every crawl after it.
   const sitemapUrls = source.sitemapUrls ?? [];
   if (!Array.isArray(sitemapUrls) || sitemapUrls.length > 20) {
     errors.push("sitemapUrls must be an array of at most 20 URLs.");
@@ -142,7 +157,9 @@ export function parseSiteConfig(document) {
       let parsed = null;
       try { parsed = new URL(normalizeUrl(candidate).href); } catch { parsed = null; }
       if (!parsed) errors.push("sitemapUrls entries must be absolute http(s) URLs.");
-      else if (parsed.hostname !== seedHost) errors.push(`sitemapUrls must all be on ${seedHost}.`);
+      else if (parsed.hostname !== seedHost && !isWwwPair(parsed.hostname, seedHost)) {
+        errors.push(`sitemapUrls must all be on ${seedHost}.`);
+      }
     }
   }
 
@@ -161,8 +178,14 @@ export function parseSiteConfig(document) {
     });
   }
 
+  // The other spelling of the seed's hostname, when discovery saw it redirect here: an address on
+  // it is read as the same address on the seed's host (`createScope().onSiteHost`).
+  const alias = aliasOf({ seedUrl, redirectedFrom: source.redirectedFrom });
+
   return Object.freeze({
     seedUrl,
+    aliasHost: alias?.host ?? null,
+    aliasProtocol: alias?.protocol ?? null,
     sitemapUrls: Array.isArray(sitemapUrls) ? sitemapUrls.map((url) => normalizeUrl(url).href) : [],
     mode,
     primary: described.primary,

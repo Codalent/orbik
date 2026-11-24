@@ -181,9 +181,11 @@ const turndown = createTurndown();
  * @param {object} [options.normalizeOptions] the site's URL normalisation policy (`stripParams`,
  *   `keepTrackingParams`, `sortQuery`), so a link in the text names a page as the crawler stored it;
  *   without one the defaults apply, which remove the common tracking parameters
+ * @param {(url: object) => object} [options.onSiteHost] the crawl scope's reading of an address
+ *   written with the site's other spelling (`createScope().onSiteHost`), for the same reason
  * @returns {{markdown: string, hash: string, bytes: number, truncated: boolean, words: number}}
  */
-export function toMarkdown(html, { url, extracted = null, fetchedAt = new Date(), normalizeOptions = {} }) {
+export function toMarkdown(html, { url, extracted = null, fetchedAt = new Date(), normalizeOptions = {}, onSiteHost = (address) => address }) {
   const $ = cheerio.load(html ?? "");
   // Judged before anything is removed, because the rule reads what each one sits inside.
   $("header, footer").filter((_index, element) => isPageLevel($, element, PAGE_LANDMARKS[element.tagName])).remove();
@@ -191,7 +193,7 @@ export function toMarkdown(html, { url, extracted = null, fetchedAt = new Date()
 
   const root = contentRootOf($);
   dropLeadingMenus($, root);
-  rewriteAddresses($, root, { base: url, normalizeOptions });
+  rewriteAddresses($, root, { base: url, normalizeOptions, onSiteHost });
   flattenBlocks($, root.find("a[href], td, th").toArray());
   settleHeadings(root);
   unfoldDisclosures($, root);
@@ -329,10 +331,10 @@ function linkMeasure() {
  * - **`title` attributes** go from links and images: on 2,202 pages of one site they were
  *   the word `"null"`, and where they are real they repeat the text beside them.
  */
-function rewriteAddresses($, root, { base, normalizeOptions }) {
+function rewriteAddresses($, root, { base, normalizeOptions, onSiteHost }) {
   root.find("a[title], img[title]").removeAttr("title");
   root.find("a[href]").each((_index, element) => {
-    const target = linkTarget($(element).attr("href"), base, normalizeOptions);
+    const target = linkTarget($(element).attr("href"), base, normalizeOptions, onSiteHost);
     if (target) $(element).attr("href", target);
   });
   root.find("img").each((_index, element) => {
@@ -349,7 +351,7 @@ function rewriteAddresses($, root, { base, normalizeOptions }) {
 }
 
 /** Where a link leads, absolute and normalised, or null to leave it as written. */
-function linkTarget(value, base, normalizeOptions) {
+function linkTarget(value, base, normalizeOptions, onSiteHost) {
   const href = String(value ?? "").trim();
   if (!href || /^(?:#|mailto:|tel:|javascript:|data:)/i.test(href)) return null;
   let absolute;
@@ -360,7 +362,7 @@ function linkTarget(value, base, normalizeOptions) {
     return null;
   }
   const normalized = /^https?:$/.test(absolute.protocol) ? tryNormalizeUrl(absolute.href, normalizeOptions) : null;
-  return normalized ? `${normalized.href}${absolute.hash}` : absolute.href;
+  return normalized ? `${onSiteHost(normalized).href}${absolute.hash}` : absolute.href;
 }
 
 /** What an image is worth saying about, as alt text, or "" when nothing is. */

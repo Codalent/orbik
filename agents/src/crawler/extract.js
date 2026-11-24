@@ -86,7 +86,7 @@ export function extractPage(html, options = {}) {
   }
 
   const text = readableText($);
-  const links = extractLinks($, options.url);
+  const links = extractLinks($, documentBase($, options.url));
 
   return {
     title,
@@ -157,7 +157,13 @@ export function parseXRobotsTag(header) {
   return [...directives];
 }
 
-/** Collects anchor and `link` references with the attributes that decide how they count. */
+/**
+ * Collects anchor and `link` references with the attributes that decide how they count.
+ *
+ * Each carries the address its `href` is relative to — the page's own, or the one its
+ * `<base href>` declares — because that is known here and nowhere later: whoever resolves the
+ * link has the `href` as written and nothing else of the document.
+ */
 function extractLinks($, base) {
   const links = [];
   $("a[href]").each((_index, element) => {

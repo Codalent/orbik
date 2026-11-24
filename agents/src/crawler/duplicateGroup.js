@@ -9,7 +9,7 @@
 const MIN_WORDS_FOR_TEXT_MATCH = 20;
 
 /** How a URL came to be treated as a variant, kept so a grouping can be explained rather than guessed at. */
-const DUPLICATE_REASONS = Object.freeze({
+export const DUPLICATE_REASONS = Object.freeze({
   redirect: "REDIRECTS_TO",
   canonical: "CANONICAL_TO",
   identicalText: "IDENTICAL_TEXT",
