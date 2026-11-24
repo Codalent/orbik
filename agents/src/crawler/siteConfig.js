@@ -1,4 +1,12 @@
-import { aliasOf, isWwwPair } from "@orbik/core";
+import {
+  SOURCE_LIMITS,
+  SOURCE_MODE,
+  aliasOf,
+  describeSource,
+  isWwwPair,
+  readOntoSiteHost,
+  sectionPatterns,
+} from "@orbik/core";
 
 import { AgentError } from "../runtime/errors.js";
 import { normalizeUrl } from "./url.js";
@@ -54,7 +62,38 @@ export function parseSiteConfig(document) {
     errors.push("seedUrl must be an absolute http(s) URL.");
   }
 
-  const maxDepth = source.maxDepth ?? SITE_DEFAULTS.maxDepth;
+  // What the site is as a source: the whole host, one section of it, or a list of pages. A
+  // section is an inclusion rule the scope already knows how to apply; a list of pages is a scope
+  // of its own (`createScope`), whose only links worth following are a listing's own next pages.
+  const described = describeSource(source);
+  const mode = described.mode;
+  let pageUrls = [];
+  if (mode === SOURCE_MODE.pages) {
+    if (!Array.isArray(described.pageUrls) || !described.pageUrls.length || described.pageUrls.length > SOURCE_LIMITS.pages) {
+      errors.push(`pageUrls must list from 1 to ${SOURCE_LIMITS.pages} pages.`);
+    } else {
+      try {
+        // Listed with the spelling that redirects, when the seed has since moved to its twin: each
+        // page is the same page on the host that answers.
+        const twin = seedUrl ? aliasOf({ seedUrl, redirectedFrom: source.redirectedFrom }) : null;
+        pageUrls = described.pageUrls.map((url) => normalizeUrl(
+          twin ? readOntoSiteHost(url, { seedUrl, aliasHost: twin.host, aliasProtocol: twin.protocol }) : url,
+        ).href);
+      } catch {
+        errors.push("pageUrls entries must be absolute http(s) URLs.");
+      }
+      if (seedUrl && pageUrls.some((url) => new URL(url).hostname !== new URL(seedUrl).hostname)) {
+        errors.push("pageUrls must all be on the seed's host.");
+      }
+    }
+  }
+  if (mode === SOURCE_MODE.section && !described.section) {
+    errors.push("A section source needs a section.");
+  }
+
+  // A page list goes as deep as its listings page, and no deeper: depth there is the next-page
+  // chain, not the site's link structure.
+  const maxDepth = mode === SOURCE_MODE.pages ? SOURCE_LIMITS.pagination : (source.maxDepth ?? SITE_DEFAULTS.maxDepth);
   if (!Number.isInteger(maxDepth) || maxDepth < 0 || maxDepth > 50) {
     errors.push("maxDepth must be an integer from 0 through 50.");
   }
@@ -148,7 +187,11 @@ export function parseSiteConfig(document) {
     aliasHost: alias?.host ?? null,
     aliasProtocol: alias?.protocol ?? null,
     sitemapUrls: Array.isArray(sitemapUrls) ? sitemapUrls.map((url) => normalizeUrl(url).href) : [],
-    includePatterns: source.includePatterns ?? [],
+    mode,
+    primary: described.primary,
+    pageUrls,
+    followPagination: described.followPagination,
+    includePatterns: mode === SOURCE_MODE.section ? sectionPatterns(described.section) : (source.includePatterns ?? []),
     excludePatterns: source.excludePatterns ?? [],
     maxDepth,
     respectRobots,
@@ -163,30 +206,9 @@ export function parseSiteConfig(document) {
   });
 }
 
-/** The name the crawler goes by, as a site's logs and firewall rules see it. */
-export const CRAWLER_PRODUCT_NAME = "OrbikBot";
-
-/**
- * The page the User-Agent names when the install's operator names none of their own
- * (`ORBIK_CRAWLER_CONTACT_URL`): what OrbikBot is and how to block it. It is docs/orbikbot.md as
- * the docs site publishes it. Release 0.1.0 named that file on GitHub instead, so the file keeps
- * its path for as long as those crawlers are about.
- */
-export const DEFAULT_CRAWLER_CONTACT_URL = "https://orbik.io/docs/orbikbot";
-
-/**
- * Builds the product token sent on every request for a site.
- *
- * The contact URL is not decoration: it is how a site owner who sees unexpected traffic finds out
- * who is crawling and asks them to stop, and it is what distinguishes a crawler acting in good
- * faith from one that hides. Each install is run by someone else, so an operator should point it
- * at a page of their own; the agents' config checks the value at start.
- *
- * @param {string} [contactUrl] page describing the crawler and how to contact its operator
- */
-export function crawlerUserAgent(contactUrl = process.env.ORBIK_CRAWLER_CONTACT_URL?.trim() || DEFAULT_CRAWLER_CONTACT_URL) {
-  return `Mozilla/5.0 (compatible; ${CRAWLER_PRODUCT_NAME}/1.0; +${contactUrl})`;
-}
+// The crawler's name and User-Agent live in `@orbik/core`, so the API's check of an address a
+// person is about to add as a source introduces itself the way the crawler will.
+export { CRAWLER_PRODUCT_NAME, DEFAULT_CRAWLER_CONTACT_URL, crawlerUserAgent } from "@orbik/core";
 
 /** Product token matched against robots.txt `User-agent` groups. */
 export const CRAWLER_PRODUCT_TOKEN = "orbikbot";

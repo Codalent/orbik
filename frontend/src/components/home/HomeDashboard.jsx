@@ -77,7 +77,7 @@ export function HomeDashboard({ workspaceId }) {
     if (configured) await requestCrawl(workspaceId);
     else await saveCrawlSite(workspaceId, {});
     await Promise.all([read.mutate(), crawl.refresh()]).catch(() => {});
-    router.push(`/workspaces/${workspaceId}/agents/crawler`);
+    router.push(`/workspaces/${workspaceId}/sources/website/pages`);
   }
 
   const refresh = () => { read.mutate().catch(() => {}); };

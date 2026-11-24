@@ -1,4 +1,4 @@
-import { escapeRegExp, readOntoSiteHost } from "@orbik/core";
+import { SOURCE_MODE, escapeRegExp, paginationBase, paginationOf, readOntoSiteHost } from "@orbik/core";
 
 import { AgentError } from "../runtime/errors.js";
 import { hashUrl, normalizeUrl } from "./url.js";
@@ -8,8 +8,15 @@ const SCOPE_REASONS = Object.freeze({
   outOfScopeHost: "OUT_OF_SCOPE_HOST",
   excludedPath: "EXCLUDED_PATH",
   notIncluded: "NOT_INCLUDED",
+  notListed: "NOT_LISTED",
   maxDepth: "MAX_DEPTH",
 });
+
+/**
+ * Reasons that keep an address out of a site's registry altogether: it is not one of this site's
+ * pages, and recording it would count somebody else's pages as this site's.
+ */
+export const FOREIGN_REASONS = Object.freeze(new Set([SCOPE_REASONS.outOfScopeHost, SCOPE_REASONS.notListed]));
 
 const MAX_PATTERNS = 100;
 const MAX_PATTERN_LENGTH = 500;
@@ -26,9 +33,15 @@ const MAX_PATTERN_LENGTH = 500;
  * a pathological pattern.
  *
  * A crawl covers exactly one hostname. A subdomain is a different site — different content,
- * different owner in many organisations, and a different set of findings — so it belongs to its
- * own workspace rather than being folded into this one's totals. That also keeps a crawl's page
- * count honest: `blog.example.com` cannot silently double the size of a crawl of `example.com`.
+ * different owner in many organisations, and a different set of findings — so it is a source of
+ * its own rather than being folded into this one's totals. That also keeps a crawl's page count
+ * honest: `blog.example.com` cannot silently double the size of a crawl of `example.com`.
+ *
+ * A source of listed pages (`mode: "pages"`) is narrower still: only the pages listed, and — when
+ * `followPagination` is on — the next pages of a listing among them, recognised from the address
+ * alone (`paginationOf`): `?page=2` beside a listed page, or `/page/2` under it. That is decided
+ * here rather than from the link that led to a page, so the test gives the same answer when the
+ * page is discovered and again when it is about to be fetched.
  *
  * One hostname, which may have two spellings. When the address a person typed redirects to its
  * `www.` twin (or the reverse), discovery moves the seed to the host that answers and records the
@@ -65,6 +78,22 @@ export function createScope(config) {
   const includePatterns = compilePatterns(config.includePatterns, "includePatterns", errors);
   const excludePatterns = compilePatterns(config.excludePatterns, "excludePatterns", errors);
 
+  const listOnly = config.mode === SOURCE_MODE.pages;
+  const listed = [];
+  if (listOnly) {
+    for (const href of config.pageUrls ?? []) {
+      try {
+        listed.push(normalizeUrl(href));
+      } catch {
+        errors.push("pageUrls entries must be absolute http(s) URLs.");
+      }
+    }
+    if (!listed.length) errors.push("A list of pages needs at least one page.");
+  }
+  const listedHashes = new Set(listed.map((url) => url.hash));
+  // A listed page may itself be a later page of its listing; either way the listing is the key.
+  const listings = new Set(listed.map((url) => paginationOf(url)?.base ?? paginationBase(url)));
+
   if (errors.length) {
     throw new AgentError({
       code: "INVALID_SCOPE",
@@ -81,6 +110,17 @@ export function createScope(config) {
 
   return {
     seed,
+
+    /** The pages a list-of-pages source names, normalized; empty for a site or a section. */
+    listed,
+
+    /**
+     * Whether a page is where the crawl starts: the seed, or a page on the list. A refusal there
+     * means the site refuses the crawler, not that one page is closed.
+     */
+    isStart(hash) {
+      return hash === seed.hash || listedHashes.has(hash);
+    },
 
     /**
      * Reads an address written with the site's other spelling as the same address on its host.
@@ -138,12 +178,30 @@ export function createScope(config) {
       if (excludePatterns.some((pattern) => pattern.test(target))) {
         return { allowed: false, reason: SCOPE_REASONS.excludedPath };
       }
+      if (listOnly) {
+        // A normalized URL carries the crawler's key in `hash`; a plain `URL` (what the fetch step
+        // passes) carries its fragment there, so it is normalized first.
+        const key = /^[0-9a-f]{64}$/.test(url.hash ?? "") ? url.hash : keyOf(url.href);
+        if (listedHashes.has(key)) return { allowed: true };
+        const page = config.followPagination ? paginationOf(url) : null;
+        if (page && listings.has(page.base)) return { allowed: true };
+        return { allowed: false, reason: SCOPE_REASONS.notListed };
+      }
       if (includePatterns.length && !includePatterns.some((pattern) => pattern.test(target))) {
         return { allowed: false, reason: SCOPE_REASONS.notIncluded };
       }
       return { allowed: true };
     },
   };
+}
+
+/** The crawler's key for an address, or null when it cannot be normalized. */
+function keyOf(href) {
+  try {
+    return normalizeUrl(href).hash;
+  } catch {
+    return null;
+  }
 }
 
 /**

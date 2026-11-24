@@ -22,6 +22,7 @@ import { useAuth } from "@/lib/auth/AuthProvider";
 import { useShortcut } from "@/lib/keyboard";
 import { ProtectedRoute } from "@/lib/auth/ProtectedRoute";
 import { AppSidebar } from "./AppSidebar";
+import { SourcesSidebar } from "@/components/sources/SourcesSidebar";
 import { ThemeSwitch } from "./ThemeSwitch";
 import { UserMenu } from "./UserMenu";
 import { WorkspaceSwitcher } from "./WorkspaceSwitcher";
@@ -87,8 +88,16 @@ function WorkspaceChrome({ children }) {
   // The overview of every agent: where the rail's Agents item leads, and the first row of the
   // agents' sidebar.
   const agentsHref = selectedWorkspaceId ? `/workspaces/${selectedWorkspaceId}/agents` : null;
+  // Everything the workspace reads: drawn as working while the same activity read has one of its
+  // sources being read, or about to be.
+  const sourcesLink = selectedWorkspaceId
+    ? {
+      href: `/workspaces/${selectedWorkspaceId}/sources`,
+      working: Boolean(activity?.crawls?.some((crawl) => crawl.workspaceId === selectedWorkspaceId)),
+    }
+    : null;
   // Ask is in neither the rail nor the header: the dot in the window's corner opens it (`AskLauncher`).
-  const rail = buildRail({ leading: homeLink, knowledge, agents, links: extensionLinks, footer: settingsLink, agentsHref, path: pathname });
+  const rail = buildRail({ leading: homeLink, knowledge, agents, links: extensionLinks, footer: settingsLink, agentsHref, sources: sourcesLink, path: pathname });
 
   // The workspace the panel answers for is the one in the address, which is the page on screen;
   // the selected one stands in on the rare page under the shell that has none.
@@ -96,7 +105,8 @@ function WorkspaceChrome({ children }) {
   // What the page on screen is called, as the rail or the sidebar names it, so the panel can tell
   // the agent where the person is.
   const overviewLink = agentsHref ? [{ name: "Agents", href: agentsHref }] : [];
-  const pageName = pageNameFor(pathname, [...homeLink, ...knowledge, ...overviewLink, ...agents, ...extensionLinks, ...settingsLink], panelWorkspaceId);
+  const sourcesRow = sourcesLink ? [{ name: "Sources", href: sourcesLink.href }] : [];
+  const pageName = pageNameFor(pathname, [...homeLink, ...knowledge, ...sourcesRow, ...overviewLink, ...agents, ...extensionLinks, ...settingsLink], panelWorkspaceId);
   // On the Library the header carries the way into its quick switcher, which the page opens when
   // asked; the shell holds none of its state.
   const onLibrary = /^\/workspaces\/[^/]+\/library\/?$/.test(pathname ?? "");
@@ -191,6 +201,7 @@ function WorkspaceChrome({ children }) {
                   second thing beside it. `overflow-hidden` keeps both inside the rounded corners. */}
               <div className="flex min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-orb-line bg-orb-space md:min-h-0 md:flex-row">
                 {rail.agentsOpen && <AppSidebar agents={agents} currentPath={pathname} overviewHref={agentsHref} />}
+                {rail.sourcesOpen && <SourcesSidebar workspaceId={selectedWorkspaceId} currentPath={pathname} />}
                 {/* `min-h-0` is what lets this shrink below its content's height: a flex child
                     defaults to `min-height: auto`, which would grow the row and push the sidebar's
                     foot off screen instead of scrolling here. `relative` keeps anything absolutely

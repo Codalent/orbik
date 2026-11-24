@@ -10,8 +10,8 @@
  * Library".
  *
  * `/workspaces/:id` itself opens Home, by the owner's decision (2026-10-29): it is the address a
- * person types or bookmarks for "the workspace". The Crawler's page, which used to be there, is
- * at `workspaceCrawlerPath` among the other agents.
+ * person types or bookmarks for "the workspace". The crawl page, which used to be there, is the
+ * website's pages under Sources (`workspaceCrawlerPath`).
  *
  * @param {string} workspaceId
  * @returns {string}
@@ -30,7 +30,15 @@ export function workspaceLibraryPath(workspaceId) {
   return `/workspaces/${workspaceId}/library`;
 }
 
-/** The Crawler's page, where every link that means "the crawl of your site" goes. */
+/**
+ * The website's pages under Sources — the crawl's tree, figures, frequencies and logs — where every
+ * link that means "the crawl of your site" goes. It used to be the Crawler's page among the agents.
+ */
 export function workspaceCrawlerPath(workspaceId) {
-  return `/workspaces/${workspaceId}/agents/crawler`;
+  return `/workspaces/${workspaceId}/sources/website/pages`;
+}
+
+/** The website's page under Sources: what it is, how it is read, and its settings. */
+export function workspaceWebsitePath(workspaceId) {
+  return `/workspaces/${workspaceId}/sources/website`;
 }

@@ -40,11 +40,22 @@ import {
 /** The folder every source layer sits under. Reserved: agents other than its writer stay out. */
 export const SOURCE_ROOT_PATH = "/sources";
 
-/** The crawl's own branch of it. One site per workspace today, so no host segment. */
+/**
+ * The website's branch of it. Every other source of the workspace — a documentation subdomain, a
+ * review profile — has a branch of its own beside it, named by the source's `folder`
+ * ({@link sourceFolderPath}); there is no host segment, because each host belongs to one source.
+ */
 export const SOURCE_WEBSITE_PATH = "/sources/website";
 
-/** The reserved, code-managed folders of the source layer. */
-const SOURCE_RESERVED_FOLDERS = Object.freeze([SOURCE_ROOT_PATH, SOURCE_WEBSITE_PATH]);
+/**
+ * The branch one source's pages are copied into.
+ *
+ * @param {string} folder the source's folder, a slug (`website`, `docs`, `clutch`)
+ * @returns {string} `/sources/<folder>`
+ */
+export function sourceFolderPath(folder) {
+  return `${SOURCE_ROOT_PATH}${LIBRARY_PATH_SEPARATOR}${folder}`;
+}
 
 /**
  * Who the source layer belongs to, as a Library author.
@@ -126,9 +137,14 @@ export function isSourceLayerPath(path) {
   return isWithinLibraryPath(path, SOURCE_ROOT_PATH);
 }
 
-/** Whether a path is one of the source layer's own reserved folders. */
+/**
+ * Whether a path is one of the source layer's own reserved folders: `/sources` itself, or the
+ * branch of one source directly under it. Code makes and removes them as sources come and go;
+ * nobody moves them.
+ */
 export function isReservedSourceFolder(path) {
-  return SOURCE_RESERVED_FOLDERS.includes(path);
+  if (path === SOURCE_ROOT_PATH) return true;
+  return isWithinLibraryPath(path, SOURCE_ROOT_PATH) && libraryDepth(path) === libraryDepth(SOURCE_ROOT_PATH) + 1;
 }
 
 /**
@@ -170,6 +186,10 @@ export function sourcePagePath(url, { taken = null, folders = null, root = SOURC
   const raw = pathname.split(LIBRARY_PATH_SEPARATOR).filter(Boolean);
   const segments = raw.map((segment, index) => slugifySegment(segment) || digestSegment(segment, index));
   if (!segments.length) segments.push(SOURCE_HOME_SEGMENT);
+  // A later page of a listing told apart by its query — reviews at `?page=2` — is the listing's
+  // path with the page number on it, rather than a collision suffix nobody could read.
+  const paged = pageNumberOf(url);
+  if (paged !== null) segments[segments.length - 1] = slugifySegment(`${segments.at(-1)}-page-${paged}`) || segments.at(-1);
 
   // What the mirror may spend: the depth ceiling, less the branch it hangs off.
   const allowance = Math.max(1, LIBRARY_LIMITS.depth - libraryDepth(root));
@@ -252,6 +272,23 @@ export function sourceMirrorVerdict(page) {
 /** A skip verdict with the message a person reads beside it. */
 function skip(reason) {
   return { store: false, reason, message: SOURCE_SKIP_MESSAGES[reason] ?? null };
+}
+
+/** Query parameters a listing pages with, holding a number: `?page=2`, `?p=3`. */
+const PAGE_PARAMS = new Set(["page", "p", "pg", "paged", "pagenum", "page_num"]);
+
+/** The page number an address carries in its query, or null. */
+function pageNumberOf(url) {
+  let params;
+  try {
+    params = new URL(url).searchParams;
+  } catch {
+    return null;
+  }
+  const keys = [...params.keys()].filter((key) => PAGE_PARAMS.has(key.toLowerCase()));
+  if (keys.length !== 1) return null;
+  const value = params.get(keys[0]);
+  return /^\d{1,5}$/.test(value ?? "") ? Number(value) : null;
 }
 
 /**

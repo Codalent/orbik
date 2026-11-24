@@ -89,6 +89,9 @@ export function libraryJob(type, { workspaceId, siteId = null, pass = 0, idempot
     workspaceId,
     siteId: siteId ?? null,
     priority: 7,
-    idempotencyKey: idempotencyKey ?? `${KEY_PREFIX[type]}:${workspaceId.toHexString()}:${pass}`,
+    // A mirror pass is one source's; indexing is the whole workspace's.
+    idempotencyKey: idempotencyKey ?? (type === LIBRARY_JOBS.mirror && siteId
+      ? `${KEY_PREFIX[type]}:${workspaceId.toHexString()}:${siteId.toHexString()}:${pass}`
+      : `${KEY_PREFIX[type]}:${workspaceId.toHexString()}:${pass}`),
   };
 }

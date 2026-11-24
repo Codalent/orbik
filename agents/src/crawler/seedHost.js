@@ -94,21 +94,30 @@ export async function findSeedHost({ fetcher, config, rules, signal }) {
  * @param {() => Date} [options.now] clock
  * @returns {Promise<object|null>} the site as it now stands, or null when it had changed meanwhile
  */
-export function moveSeedHost({ sites, document, moved, runId, now = () => new Date() }) {
+export async function moveSeedHost({ sites, document, moved, runId, now = () => new Date() }) {
   const at = now();
-  return sites.findOneAndUpdate(
-    { _id: document._id, seedUrl: document.seedUrl },
-    {
-      $set: {
-        seedUrl: moved.seedUrl,
+  try {
+    return await sites.findOneAndUpdate(
+      { _id: document._id, seedUrl: document.seedUrl },
+      {
+        $set: {
+          seedUrl: moved.seedUrl,
+          // The host a source is known by follows its seed: each host is read by one source.
+          host: new URL(moved.seedUrl).hostname.toLowerCase(),
         // `to` is the seed as this move left it, which is how the API tells a seed that still
         // follows the website from one a person has since chosen for themselves.
-        redirectedFrom: { url: moved.from.url, host: moved.from.host, to: moved.seedUrl, at, runId: runId ?? null },
-        updatedAt: at,
+          redirectedFrom: { url: moved.from.url, host: moved.from.host, to: moved.seedUrl, at, runId: runId ?? null },
+          updatedAt: at,
+        },
       },
-    },
-    { returnDocument: "after" },
-  );
+      { returnDocument: "after" },
+    );
+  } catch (error) {
+    // Another source of the workspace already reads the twin (a unique index on its sources'
+    // hosts): this one stays where it is rather than reading that source's pages again.
+    if (error?.code === 11000) return null;
+    throw error;
+  }
 }
 
 /**

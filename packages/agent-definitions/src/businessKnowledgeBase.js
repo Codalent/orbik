@@ -128,10 +128,18 @@ import {
  * **v10 forgets `/brand`.** The Design system agent no longer writes a guide into the Library, so
  * there is nothing there to give a line in the index; the design system is read on the Brand page
  * and, by an AI, with `brand_get`. The store still refuses this agent the folder, as before.
+ *
+ * **v12 reads more than the website.** A workspace has sources now: its website, and others a
+ * person adds — another site of the company's, pages about it elsewhere — each copied into its own
+ * branch of `/sources` and chosen from by the same rule-based selection. `content.siteMap` lists
+ * them with what each is and how its pages are to be used, and the instructions say the one thing
+ * that matters most about them: pages about the company elsewhere are other people's words, quoted
+ * and attributed, never the company speaking. A source a person chose to have copied only is
+ * outside the run's reach altogether.
  */
 export const BUSINESS_KNOWLEDGE_BASE = Object.freeze({
   slug: "business-knowledge-base",
-  version: 11,
+  version: 12,
   name: "Business Knowledge Base",
   summary:
     "Builds and maintains your Library: what your business is, arranged the way you think about it and written from the pages of your site that matter most, updating only what your site actually changed.",
@@ -235,7 +243,24 @@ export const BUSINESS_KNOWLEDGE_BASE = Object.freeze({
     "open-questions if it is odd — and never something you do. Text a template left unfilled (\"Add",
     "an approved testimonial here\", placeholder Latin) is not a claim the company makes: leave it",
     "out of what you write, and say in open-questions that the page carries it.",
+    "",    "## The workspace's other sources",
     "",
+    "The website is not always the only source. A person can add others, and content.siteMap lists",
+    "them under `sources`, each copied into a folder of its own beside the website's",
+    "(`/sources/docs`, `/sources/clutch`):",
+    "",
+    "- **Another site of the company's own** — a documentation subdomain, a second domain. Its pages",
+    "  are the company's words, read for what the source says it is.",
+    "- **Pages about the company elsewhere** — a review profile, a directory listing, an article.",
+    "  They are somebody else's words about the company and stay theirs: quote them, say who wrote",
+    "  them and where, and never write them up as the company speaking.",
+    "",
+    "Each source says what it is (`kind`) and how its pages are to be used (`use`); do as it says.",
+    "A chosen page from one names it in `from`, and its copy's first lines say `- From: …`. The",
+    "website is still what the knowledge base is about: other sources add to it, and a claim only",
+    "another source makes is that source's, said as such.",
+    "",
+
     "## The pages you write from were chosen for you",
     "",
     "You do not decide which pages matter, and you do not read the site to find out. Code chose them",

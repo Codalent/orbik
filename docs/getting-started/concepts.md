@@ -38,14 +38,23 @@ See [Workspaces and members](../guides/workspaces-and-members.md).
 The crawler reads your site page by page, starting from its home page and sitemaps, and renders
 each page as Markdown. It identifies itself as [OrbikBot](../orbikbot.md), obeys `robots.txt` and
 paces its requests to your server. A page is fetched once when it is found; how often each page is
-fetched again is yours to choose on the **Crawler** page. See
+fetched again is yours to choose on its crawl page under **Sources**. See
 [Crawling your site](../guides/crawling.md).
+
+## Sources
+
+Everything Orbik reads for a workspace: its website first, and any other site of yours (a
+documentation subdomain, a second domain) or page about you elsewhere (a review profile, an
+article) that you add. Each source is read on its own schedule, copied into a folder of its own
+under `/sources`, and says what it is, which tells the knowledge base how to use it — a review is
+quoted as the reviewer's words, never written up as the company speaking. See
+[Sources](../guides/sources.md).
 
 ## The Library
 
 A tree of Markdown files, in two layers:
 
-- **The source layer**, under `/sources/website`: a word-for-word copy of every crawled page,
+- **The source layer**, under `/sources`: a word-for-word copy of every crawled page of every source,
   written by code when a crawl finishes. No model reads a page to store it, and nothing else may
   write there.
 - **The knowledge base** above it: files a model writes about your company, from the pages code
@@ -85,7 +94,7 @@ your site; every link in it is a page the crawler fetched. You copy it to your s
 ## Agents and runs
 
 An **agent** is one job Orbik does for a workspace. Those listed under **Agents** are the
-**Crawler**, the **Knowledge base** agent (which writes the Library, and is switched on and off from
+**Knowledge base** agent (which writes the Library, and is switched on and off from
 its own page under **Agents** or from the Library), **llms.txt** and **Design system**. A **run** is one time an agent works.
 **Run now** runs an agent once; **Set to work** puts it on its schedule, and **Pause** takes it off
 again. An agent's page and its card on the Agents overview say the same thing: *Set to work*, *Not

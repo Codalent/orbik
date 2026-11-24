@@ -1,5 +1,5 @@
 import { findAgentDefinition } from "@orbik/agent-definitions";
-import { AGENT_COLLECTIONS, log } from "@orbik/core";
+import { AGENT_COLLECTIONS, log, websiteFilter } from "@orbik/core";
 import { RUN_STATUS } from "@orbik/protocol";
 
 import { AI_AGENT } from "../jobs.js";
@@ -195,7 +195,8 @@ export function createOutboxScheduler({
         // One bad workspace must not stop the pass: the next one reconsiders every agent, so a
         // failure delays that workspace's agent rather than every workspace's.
         try {
-          const site = await sites.findOne({ workspaceId: schedule.workspaceId }, { projection: { _id: 1 } });
+          // The agents read the workspace's website; its other sources do not start them.
+          const site = await sites.findOne(websiteFilter(schedule.workspaceId), { projection: { _id: 1 } });
           if (!site) {
             skipped.push({ ...context, reason: "NEVER_CRAWLED" });
             continue;

@@ -23,18 +23,10 @@ const LIVE_MS = 5000;
 const IDLE_MS = 30_000;
 
 /**
- * The Crawler's one line. It is not in the agent catalog — it is the crawl itself, not a
- * definition a run follows — so the overview words it here.
- */
-const CRAWLER_SUMMARY = "Fetches every page of your site on a schedule and keeps each one as Markdown: what every other agent, and the Library, read.";
-
-/**
  * What a card says in place of a last run while its agent is not set up: what it is waiting for.
  * The state itself is the registry's; this only words what that state means for each agent.
  */
-const UNCONFIGURED_HINT = Object.freeze({
-  crawler: "Set up the crawl of your site to start",
-});
+const UNCONFIGURED_HINT = Object.freeze({});
 const DEFAULT_HINT = "Starts once your site has been crawled";
 
 /**
@@ -57,7 +49,7 @@ const NOT_WORKING = Object.freeze({
  * The agents are the sidebar's (`buildAgentRows`), built from the same read the shell makes for
  * it — the crawl — from the same cache, so a card's state and the sidebar row beside it are one
  * answer. The rest is one read for every agent (`GET …/agents`: newest run, schedule) and the agent
- * catalog for each line of what it does. The Crawler's last and next crawl come from the crawl
+ * catalog for each line of what it does. Whether the site has been crawled comes from the crawl
  * overview, which is where crawls are recorded.
  *
  * Cards are grouped by what somebody should do about them: agents whose last run failed first,
@@ -185,10 +177,10 @@ function CrawlFirst({ workspaceId, crawling, canEdit }) {
         </p>
       </div>
       <Link
-        href={`/workspaces/${workspaceId}/agents/crawler`}
+        href={`/workspaces/${workspaceId}/sources/website/pages`}
         className="inline-flex shrink-0 items-center gap-1 text-sm font-medium text-orb-lime underline-offset-4 hover:underline"
       >
-        {crawling || !canEdit ? "Open the Crawler" : "Set up the crawl"} <ArrowRight aria-hidden="true" className="size-3.5" />
+        {crawling || !canEdit ? "Open the website's crawl" : "Set up the crawl"} <ArrowRight aria-hidden="true" className="size-3.5" />
       </Link>
     </Panel>
   );
@@ -210,28 +202,10 @@ function OverviewSkeleton() {
 
 /**
  * A sidebar row with what the overview adds to it: the catalog's line of what it does, its newest
- * run, its next run and, for the Crawler, its pages.
+ * run and its next run.
  */
 function withFigures(row, { crawl, catalog, overview, overviewFailed }) {
   const hint = UNCONFIGURED_HINT[row.id] ?? DEFAULT_HINT;
-  if (row.id === "crawler") {
-    const active = crawl?.activeRun ?? null;
-    const latest = active ?? crawl?.latestRun ?? null;
-    return {
-      ...row,
-      summary: CRAWLER_SUMMARY,
-      hint,
-      run: crawl?.queued && !active ? { status: "queued" } : latest,
-      runningWord: "Crawling",
-      runNoun: "crawl",
-      nextWord: "Next crawl",
-      next: !active && crawl?.site?.enabled !== false ? crawl?.site?.nextCrawlAt ?? null : null,
-      facts: crawl?.site && crawl.urls ? plural(crawl.urls.pages ?? crawl.urls.total ?? 0, "page") : null,
-      scheduled: Boolean(crawl?.site && crawl.site.enabled !== false),
-      // The crawler's own page says "Paused" for a site whose schedule is off; its card agrees.
-      restWords: { on: "Idle", off: "Paused" },
-    };
-  }
   const item = overview?.items?.find((entry) => entry.agentSlug === row.id) ?? null;
   const schedule = item?.schedule ?? null;
   return {

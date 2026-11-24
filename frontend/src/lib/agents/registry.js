@@ -1,4 +1,4 @@
-import { BookOpenText, Bot, FileCode2, Palette, Waypoints } from "lucide-react";
+import { BookOpenText, Bot, FileCode2, Palette } from "lucide-react";
 
 import { DESIGN_SYSTEM_AGENT_SLUG } from "@/lib/brand/brand";
 import { LLMS_TXT_AGENT_SLUG } from "@/lib/knowledge/knowledge";
@@ -21,6 +21,9 @@ export const AGENT_STATUS = Object.freeze({
 /**
  * Every agent whose *status* is worth watching, in the order they appear in the sidebar.
  *
+ * The crawler is not among them: what it reads is under Sources, one rail item for everything the
+ * workspace reads, and each source says there how its crawl is doing.
+ *
  * One entry per agent that actually exists. An agent joins this list when it ships, so the sidebar
  * never points at something that is not there — a navigation item is a promise that pressing it
  * takes you somewhere.
@@ -38,20 +41,6 @@ export const AGENT_STATUS = Object.freeze({
  * ones would misdescribe it.
  */
 const AGENTS = Object.freeze([
-  {
-    id: "crawler",
-    name: "Crawler",
-    // Nodes joined by a path: the link graph the crawler walks outward from its seed.
-    icon: Waypoints,
-    href: (workspaceId) => `/workspaces/${workspaceId}/agents/crawler`,
-    describe(crawl) {
-      if (!crawl) return { status: AGENT_STATUS.unknown };
-      if (!crawl.site) return { status: AGENT_STATUS.unconfigured };
-      if (crawl.activeRun || crawl.queued) return { status: AGENT_STATUS.working };
-      if (crawl.latestRun?.status === "failed") return { status: AGENT_STATUS.failed };
-      return { status: AGENT_STATUS.idle };
-    },
-  },
   {
     id: LIBRARY_AGENT_SLUG,
     name: "Knowledge base",

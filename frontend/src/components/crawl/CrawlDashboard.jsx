@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import Link from "next/link";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { Waypoints } from "lucide-react";
 
@@ -20,7 +21,7 @@ import { CrawlTopBar } from "./CrawlTopBar";
 import { CrawlTree } from "./CrawlTree";
 import { PageDetailSheet } from "./PageDetailSheet";
 import { ranOutOfPages } from "./runPresentation";
-import { clearCrawlData, requestCrawl, saveCrawlSite } from "@/lib/api/crawl";
+import { clearCrawlData, crawlScope, requestCrawl, saveCrawlSite } from "@/lib/api/crawl";
 import { useRevalidateWorkspace } from "@/lib/api/cache";
 import { BUDGET_REFUSALS, crawlBlockedReason, isUnlimited } from "@/lib/crawl/budget";
 import { useCrawlOverview } from "@/lib/crawl/useCrawlOverview";
@@ -39,14 +40,24 @@ function stageOf(overview) {
 }
 
 /**
- * The workspace's crawl view: configure it, run it, and read what it found.
+ * One source's pages, as its crawl knows them: configure the website's crawl, run it, and read
+ * what it found. Every source has this page under Sources (`…/sources/:sourceId/pages`); the
+ * website's is the crawl page it always was.
  *
  * Crawl status is read through the same hook the sidebar uses. A crawl is asynchronous and can
  * take minutes, so that status is polled while one is running — but the read is cached by its
  * path, so the two can never disagree and an open tab makes one request rather than two.
+ *
+ * @param {object} props
+ * @param {string} props.workspaceId
+ * @param {string} [props.sourceId] a source's id, or `website` (the default)
  */
-export function CrawlDashboard({ workspaceId }) {
-  const status = useCrawlOverview(workspaceId);
+export function CrawlDashboard({ workspaceId, sourceId = "website" }) {
+  // Every crawl read below goes to this source's routes; the workspace itself is still what roles,
+  // budgets and the cache are about.
+  const scope = useMemo(() => crawlScope(workspaceId, sourceId), [workspaceId, sourceId]);
+  const isWebsite = typeof scope === "string";
+  const status = useCrawlOverview(scope);
   const overview = status.crawl;
   const revalidateWorkspace = useRevalidateWorkspace(workspaceId);
   // Crawling, its settings and frequencies are a member's; clearing everything crawled is an
@@ -127,7 +138,7 @@ export function CrawlDashboard({ workspaceId }) {
   // runs while a crawl is in progress, and once more whenever the panel is opened on a finished
   // one; an idle page with the panel shut makes no request at all.
   const activity = useCrawlActivity({
-    workspaceId,
+    workspaceId: scope,
     enabled: Boolean(hasSite && !editing && (live || logsOpen)),
     live,
   });
@@ -180,7 +191,7 @@ export function CrawlDashboard({ workspaceId }) {
     setError(null);
     setNotice(null);
     try {
-      const result = await requestCrawl(workspaceId, { fresh });
+      const result = await requestCrawl(scope, { fresh });
       const latest = await refreshOverview();
       if (!mounted.current) return;
       setNotice(result.alreadyRunning
@@ -203,7 +214,7 @@ export function CrawlDashboard({ workspaceId }) {
     setError(null);
     setNotice(null);
     try {
-      const result = await clearCrawlData(workspaceId);
+      const result = await clearCrawlData(scope);
       await refreshWorkspace();
       const latest = await refreshOverview();
       if (!mounted.current) return;
@@ -232,6 +243,15 @@ export function CrawlDashboard({ workspaceId }) {
       );
     }
 
+    if (!hasSite && !isWebsite) {
+      return (
+        <div className="p-6">
+          <Alert variant="destructive" role="alert"><AlertDescription>This source is not in this workspace any more.</AlertDescription></Alert>
+          <Link href={`/workspaces/${workspaceId}/sources`} className="mt-3 inline-block text-sm text-orb-cyan hover:underline">All sources</Link>
+        </div>
+      );
+    }
+
     if (!hasSite && !canCrawl) {
       return (
         <div className="mx-auto w-full max-w-2xl space-y-6 p-6 md:p-8">
@@ -245,7 +265,8 @@ export function CrawlDashboard({ workspaceId }) {
       );
     }
 
-    if (!hasSite || (editing && canCrawl)) {
+    // Another source's settings are on its own page; only the website is set up here.
+    if (isWebsite && (!hasSite || (editing && canCrawl))) {
       return (
         <div className="mx-auto w-full max-w-2xl space-y-6 p-6 md:p-8">
           <PageHeader
@@ -289,7 +310,9 @@ export function CrawlDashboard({ workspaceId }) {
           onFreshCrawl={canCrawl ? () => crawlNow({ fresh: true }) : undefined}
           onSetFrequencies={canCrawl ? () => { setNotice(null); setFrequenciesOpen(true); } : undefined}
           onClearData={canClear ? clearData : undefined}
-          onEditSettings={canCrawl ? () => { setNotice(null); setEditing(true); } : undefined}
+          onEditSettings={canCrawl && isWebsite ? () => { setNotice(null); setEditing(true); } : undefined}
+          source={overview.source}
+          sourceHref={`/workspaces/${workspaceId}/sources/${isWebsite ? "website" : sourceId}`}
           onOpenLogs={() => setLogsOpen(true)}
           busy={busy}
         />
@@ -309,7 +332,7 @@ export function CrawlDashboard({ workspaceId }) {
 
         {/* The step after the first crawl, said here as well as on Home, once a crawl has
             finished and while nothing else is going on. */}
-        {!live && !queued && overview.latestRun?.status === "succeeded" && <CrawlNextStep workspaceId={workspaceId} />}
+        {isWebsite && !live && !queued && overview.latestRun?.status === "succeeded" && <CrawlNextStep workspaceId={workspaceId} />}
 
         {/*
           The log is on the page only while a crawl is running, which is the one time it is
@@ -330,7 +353,7 @@ export function CrawlDashboard({ workspaceId }) {
         {finding ? (
           <CrawlFindings
             key={`${finding}:${treeKey}`}
-            workspaceId={workspaceId}
+            workspaceId={scope}
             kind={finding}
             selectedHash={selectedHash}
             onSelect={setSelectedHash}
@@ -339,7 +362,7 @@ export function CrawlDashboard({ workspaceId }) {
         ) : (
           <CrawlTree
             key={treeKey}
-            workspaceId={workspaceId}
+            workspaceId={scope}
             selectedHash={selectedHash}
             onSelect={setSelectedHash}
             liveVersion={liveVersion}
@@ -349,12 +372,12 @@ export function CrawlDashboard({ workspaceId }) {
         <CrawlFrequencySheet
           open={frequenciesOpen && canCrawl}
           onClose={() => setFrequenciesOpen(false)}
-          workspaceId={workspaceId}
+          workspaceId={scope}
           onApplied={refreshOverview}
         />
 
         <CrawlLogsSheet
-          workspaceId={workspaceId}
+          workspaceId={scope}
           open={logsOpen}
           onClose={() => setLogsOpen(false)}
           activity={activity}
@@ -363,7 +386,7 @@ export function CrawlDashboard({ workspaceId }) {
         />
 
         <PageDetailSheet
-          workspaceId={workspaceId}
+          workspaceId={scope}
           canCrawl={canCrawl}
           urlHash={selectedHash}
           onClose={() => setSelectedHash(null)}

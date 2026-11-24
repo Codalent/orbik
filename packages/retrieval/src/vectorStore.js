@@ -45,6 +45,7 @@ const INDEXED_PAYLOAD_FIELDS = Object.freeze({
   workspaceId: "keyword",
   sourceKind: "keyword",
   sourceKey: "keyword",
+  siteId: "keyword",
   path: "keyword",
   model: "keyword",
 });
@@ -164,6 +165,31 @@ export function createVectorStore({ url, collection, dimensions, apiKey = null, 
     },
 
     /**
+     * Removes every point of some sources of one workspace, by key: what removing one of its
+     * crawled sources asks of the index. In batches, so a large source is several bounded filters
+     * rather than one with thousands of values.
+     */
+    async deleteSources({ workspaceId, sourceKind, sourceKeys }) {
+      const existence = await attempt("check the collection", () => qdrant.collectionExists(collection));
+      if (!existence?.exists) return { deleted: true, existed: false };
+      for (let offset = 0; offset < sourceKeys.length; offset += 500) {
+        const keys = sourceKeys.slice(offset, offset + 500);
+        await attempt("delete sources", () =>
+          qdrant.delete(collection, {
+            wait: true,
+            filter: {
+              must: [
+                { key: "workspaceId", match: { value: workspaceId } },
+                { key: "sourceKind", match: { value: sourceKind } },
+                { key: "sourceKey", match: { any: keys } },
+              ],
+            },
+          }));
+      }
+      return { deleted: true, existed: true };
+    },
+
+    /**
      * Removes every point of one workspace: what deleting the workspace asks of the index.
      *
      * By filter, like {@link deleteSource}, so it needs no list of what was written. A collection
@@ -193,15 +219,19 @@ export function createVectorStore({ url, collection, dimensions, apiKey = null, 
      * @param {string} options.workspaceId hexadecimal workspace identifier
      * @param {string[]} [options.kinds] restrict to these source kinds
      * @param {string} [options.pathPrefix] restrict Library results to one branch
+     * @param {string[]} [options.excludeSiteIds] sources whose pages are left out
      * @param {number} [options.limit] how many passages to return
      */
-    async search({ vector, workspaceId, kinds = [], pathPrefix = null, limit = 8 }) {
+    async search({ vector, workspaceId, kinds = [], pathPrefix = null, excludeSiteIds = [], limit = 8 }) {
       const must = [{ key: "workspaceId", match: { value: workspaceId } }];
       if (kinds.length) must.push({ key: "sourceKind", match: { any: [...kinds] } });
       // A path prefix is expressed as a text match on the stored path rather than as a range,
       // because Qdrant's keyword index matches whole values: the candidates it returns are then
       // narrowed exactly by the caller, which holds the same paths in MongoDB.
       const filter = { must };
+      // A point indexed before it carried its source has none, and is the website's — which is
+      // never left out — so a missing value matches nothing here and is kept.
+      if (excludeSiteIds.length) filter.must_not = [{ key: "siteId", match: { any: [...excludeSiteIds] } }];
 
       const response = await attempt("search", () =>
         qdrant.query(collection, {

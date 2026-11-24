@@ -90,9 +90,10 @@ export function createLibraryScheduler({ database, queue, ledger, config, logger
     return row?.[field] ?? null;
   }
 
-  /** The most recent moment any of this site's pages was rendered. */
-  function latestPageChange(siteId) {
-    return siteId ? latest(markdown, { siteId }, "updatedAt") : null;
+  /** The most recent moment any page of these sources was rendered. */
+  function latestPageChange(siteIds) {
+    const ids = [siteIds].flat().filter(Boolean);
+    return ids.length ? latest(markdown, { siteId: { $in: ids } }, "updatedAt") : null;
   }
 
   // ----------------------------------------------------------------------------------------------
@@ -111,9 +112,9 @@ export function createLibraryScheduler({ database, queue, ledger, config, logger
    * workspace every minute to look for deletions that almost never happen would be the wrong
    * trade.
    */
-  async function embedPosition(workspaceId, siteId) {
+  async function embedPosition(workspaceId, siteIds) {
     const [page, file, indexedAt, failed] = await Promise.all([
-      latestPageChange(siteId),
+      latestPageChange(siteIds),
       // The source layer's copy of a page that is still on the site is not indexed — the page
       // is — so its being written is not a reason to index. Counting it would make the question
       // true for good after every mirror pass: nothing the index does ever catches up with a
@@ -172,6 +173,8 @@ export function createLibraryScheduler({ database, queue, ledger, config, logger
    * layer daily, and the knowledge base is not rewritten for a post it was never written from.
    */
   async function sourcePosition(workspaceId, siteId) {
+    // One source's rows and passes: each source is mirrored into a branch of its own.
+    const mine = { workspaceId, siteId };
     const [changedAt, writtenAt, mirroredAt, movedAt, failed, requested, sweptAt] = await Promise.all([
       latestPageChange(siteId),
       // The knowledge base's own files. Which pages they cite is part of the choice — a page
@@ -179,15 +182,15 @@ export function createLibraryScheduler({ database, queue, ledger, config, logger
       // again. It is how a page a run reached through search, and cited, is on the ledger as
       // chosen a minute later rather than at the next crawl.
       latest(nodes, { workspaceId, kind: LIBRARY_NODE_KINDS.file, path: { $not: new RegExp(`^${SOURCE_ROOT_PATH}(/|$)`) } }, "updatedAt"),
-      latest(sourceState, { workspaceId, mirroredAt: { $exists: true } }, "mirroredAt"),
-      latest(sourceState, { workspaceId, movedAt: { $exists: true } }, "movedAt"),
-      sourceState.countDocuments({ workspaceId, error: { $exists: true } }, { limit: 1 }),
+      latest(sourceState, { ...mine, mirroredAt: { $exists: true } }, "mirroredAt"),
+      latest(sourceState, { ...mine, movedAt: { $exists: true } }, "movedAt"),
+      sourceState.countDocuments({ ...mine, error: { $exists: true } }, { limit: 1 }),
       // Asked for and not yet chosen. The pass that honours it marks the page chosen; one that
       // cannot — the page is a duplicate — withdraws the request, so neither stays outstanding.
-      sourceState.countDocuments({ workspaceId, include: true, chosen: { $ne: true } }, { limit: 1 }),
+      sourceState.countDocuments({ ...mine, include: true, chosen: { $ne: true } }, { limit: 1 }),
       latest(
         jobs,
-        { agent: LIBRARY_AGENT, status: JOB_STATUS.succeeded, type: LIBRARY_JOBS.mirror, workspaceId },
+        { agent: LIBRARY_AGENT, status: JOB_STATUS.succeeded, type: LIBRARY_JOBS.mirror, ...mine },
         "createdAt",
       ),
     ]);
@@ -220,14 +223,15 @@ export function createLibraryScheduler({ database, queue, ledger, config, logger
    * continuation the same way, so from the first fetch to the last copy there is no moment at
    * which neither is in flight.
    */
-  async function upstreamBusy(workspaceId, siteId) {
+  async function upstreamBusy(workspaceId, siteIds) {
+    const ids = [siteIds].flat().filter(Boolean);
     const [mirroring, crawling] = await Promise.all([
       jobs.countDocuments(
-        { agent: LIBRARY_AGENT, status: { $in: IN_FLIGHT }, type: LIBRARY_JOBS.mirror, workspaceId },
+        { agent: LIBRARY_AGENT, status: { $in: IN_FLIGHT }, type: LIBRARY_JOBS.mirror, workspaceId, ...(ids.length === 1 ? { siteId: ids[0] } : {}) },
         { limit: 1 },
       ),
-      siteId
-        ? jobs.countDocuments({ agent: CRAWLER_AGENT, status: { $in: IN_FLIGHT }, siteId }, { limit: 1 })
+      ids.length
+        ? jobs.countDocuments({ agent: CRAWLER_AGENT, status: { $in: IN_FLIGHT }, siteId: { $in: ids } }, { limit: 1 })
         : 0,
     ]);
     if (crawling) return "CRAWL_IN_FLIGHT";
@@ -302,7 +306,7 @@ export function createLibraryScheduler({ database, queue, ledger, config, logger
    *
    * @returns {Promise<{runId?: object, reason?: string}>} the run it started, or why it did not
    */
-  async function considerWrite({ workspaceId, siteId, position }) {
+  async function considerWrite({ workspaceId, siteId, siteIds, position }) {
     const schedule = await schedules.findOne({ workspaceId, agentSlug: KNOWLEDGE_AGENT_SLUG });
     if (!schedule?.enabled) return { reason: "NOT_WORKING" };
     if (!config.synthesisEnabled) return { reason: "PROVIDER_NOT_CONFIGURED" };
@@ -311,7 +315,8 @@ export function createLibraryScheduler({ database, queue, ledger, config, logger
     // without it, and then writing again a minute later with it.
     if (position.requested) return { reason: "PAGE_REQUESTED" };
 
-    const busy = await upstreamBusy(workspaceId, siteId);
+    // Every source the knowledge base reads has to be quiet, not only the website.
+    const busy = await upstreamBusy(workspaceId, siteIds);
     if (busy) return { reason: busy };
 
     // The top level is the person's. Until they have chosen it — or chosen it again, after asking
@@ -422,17 +427,24 @@ export function createLibraryScheduler({ database, queue, ledger, config, logger
       const rows = await workspaces.find({}, { projection: { _id: 1 } }).limit(MAX_WORKSPACES_PER_PASS).toArray();
       for (const workspace of rows) {
         const workspaceId = workspace._id;
-        const site = await sites.findOne({ workspaceId }, { projection: { _id: 1 } });
-        const siteId = site?._id ?? null;
+        // Every source of the workspace, the website first. The knowledge base's run is about the
+        // website; each source is mirrored into its own branch by a pass of its own.
+        const siteRows = await sites
+          .find({ workspaceId }, { projection: { _id: 1, primary: 1 } })
+          .toArray();
+        siteRows.sort((left, right) => Number(right.primary !== false) - Number(left.primary !== false));
+        const siteIds = siteRows.map((row) => row._id);
+        const siteId = siteIds[0] ?? null;
         const id = workspaceId.toHexString();
 
         /** Queues one stage's first pass, recording whether it was new work. */
-        const enqueue = async (stage, context) => {
-          // The key is the workspace, without a timestamp: while a pass for it is in flight the
-          // next tick finds the same key and adds nothing, which is exactly what should happen to
-          // a workspace being edited or crawled while it is being worked on.
+        const enqueue = async (stage, context, forSite = siteId) => {
+          // The key is the workspace (and, for a mirror pass, the source), without a timestamp:
+          // while a pass for it is in flight the next tick finds the same key and adds nothing,
+          // which is exactly what should happen to a workspace being edited or crawled while it is
+          // being worked on.
           const { created } = await queue.enqueue({
-            ...libraryJob(stage, { workspaceId, siteId }),
+            ...libraryJob(stage, { workspaceId, siteId: forSite }),
             maxAttempts: config.maxAttempts,
           });
           if (!created) {
@@ -444,7 +456,7 @@ export function createLibraryScheduler({ database, queue, ledger, config, logger
         };
 
         if (considerEmbed) {
-          const position = await embedPosition(workspaceId, siteId);
+          const position = await embedPosition(workspaceId, siteIds);
           if (!position.stale) skipped.push({ workspaceId, stage: LIBRARY_JOBS.embed, reason: "UP_TO_DATE" });
           else {
             await enqueue(LIBRARY_JOBS.embed, {
@@ -460,13 +472,20 @@ export function createLibraryScheduler({ database, queue, ledger, config, logger
           skipped.push({ workspaceId, stage: LIBRARY_JOBS.mirror, reason: "NEVER_CRAWLED" });
           continue;
         }
-        const position = await sourcePosition(workspaceId, siteId);
+        const positions = [];
+        for (const sourceId of siteIds) positions.push({ siteId: sourceId, position: await sourcePosition(workspaceId, sourceId) });
+        // What the write run is asked about is the knowledge base's sources taken together: the
+        // newest move among them, and a request outstanding on any.
+        const position = {
+          movedAt: positions.reduce((moment, entry) => newest(moment, entry.position.movedAt), null),
+          requested: positions.some((entry) => entry.position.requested),
+        };
 
         // Writing is decided before mirroring is queued, on what was in flight when this pass
         // arrived. A workspace with a page that fails every time has a mirror pass queued on every
         // tick, and a decision taken after that enqueue would find one in flight forever.
         try {
-          const outcome = await considerWrite({ workspaceId, siteId, position });
+          const outcome = await considerWrite({ workspaceId, siteId, siteIds, position });
           // What it decided is kept for the Library page; failing to keep it decides nothing.
           await recordWriteCheck(workspaceId, outcome).catch((error) => {
             logger("warn", "library_scheduler.write_check_failed", { workspaceId: id, message: error.message });
@@ -487,21 +506,24 @@ export function createLibraryScheduler({ database, queue, ledger, config, logger
           logger("error", "library_scheduler.run_failed", { workspaceId: id, message: error.message });
         }
 
-        // Not while the site is being crawled — the crawl hands the site over when it finishes,
-        // with its duplicates folded — and not beside a pass that is already queued or running,
-        // whatever key it was queued under: two passes at once each place pages the other has
-        // placed. The key alone only ever kept out a second pass with the same number.
-        const busy = position.stale ? await upstreamBusy(workspaceId, siteId) : null;
-        if (!position.stale) skipped.push({ workspaceId, stage: LIBRARY_JOBS.mirror, reason: "UP_TO_DATE" });
-        else if (busy) skipped.push({ workspaceId, stage: LIBRARY_JOBS.mirror, reason: busy });
-        else {
-          await enqueue(LIBRARY_JOBS.mirror, {
-            changedAt: iso(position.changedAt),
-            mirroredAt: iso(position.mirroredAt),
-            sweptAt: iso(position.sweptAt),
-            afterFailure: position.failed,
-            requested: position.requested,
-          });
+        // Not while the source is being crawled — the crawl hands it over when it finishes, with
+        // its duplicates folded — and not beside a pass of the same source that is already queued
+        // or running, whatever key it was queued under: two passes at once each place pages the
+        // other has placed. The key alone only ever kept out a second pass with the same number.
+        for (const { siteId: sourceId, position: mirror } of positions) {
+          const busy = mirror.stale ? await upstreamBusy(workspaceId, sourceId) : null;
+          if (!mirror.stale) skipped.push({ workspaceId, stage: LIBRARY_JOBS.mirror, reason: "UP_TO_DATE" });
+          else if (busy) skipped.push({ workspaceId, stage: LIBRARY_JOBS.mirror, reason: busy });
+          else {
+            await enqueue(LIBRARY_JOBS.mirror, {
+              siteId: sourceId.toHexString(),
+              changedAt: iso(mirror.changedAt),
+              mirroredAt: iso(mirror.mirroredAt),
+              sweptAt: iso(mirror.sweptAt),
+              afterFailure: mirror.failed,
+              requested: mirror.requested,
+            }, sourceId);
+          }
         }
       }
       return { queued, started, skipped };

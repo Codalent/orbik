@@ -4,7 +4,7 @@ export function createCrawlController(crawlService) {
     /** Returns the workspace's crawl configuration and current status. */
     async overview(req, res, next) {
       try {
-        res.json(await crawlService.getOverview({ userId: req.auth.userId, workspaceId: req.validated.workspaceId }));
+        res.json(await crawlService.getOverview({ userId: req.auth.userId, workspaceId: req.validated.workspaceId, sourceId: req.validated.sourceId }));
       } catch (error) { next(error); }
     },
 
@@ -23,15 +23,22 @@ export function createCrawlController(crawlService) {
     /** Asks for a crawl, reporting 200 when one was already in progress and 202 when queued. */
     async requestCrawl(req, res, next) {
       try {
-        const result = await crawlService.requestCrawl({ userId: req.auth.userId, workspaceId: req.validated.workspaceId, fresh: req.validated.fresh });
+        const result = await crawlService.requestCrawl({ userId: req.auth.userId, workspaceId: req.validated.workspaceId, sourceId: req.validated.sourceId, fresh: req.validated.fresh });
         res.status(result.alreadyRunning ? 200 : 202).json(result);
+      } catch (error) { next(error); }
+    },
+
+    /** Stops the source's crawl that is running, or takes back one that has not started. */
+    async stopCrawl(req, res, next) {
+      try {
+        res.json(await crawlService.stopCrawl({ userId: req.auth.userId, workspaceId: req.validated.workspaceId, sourceId: req.validated.sourceId }));
       } catch (error) { next(error); }
     },
 
     /** Deletes everything crawled for the workspace, keeping its crawl settings. */
     async clearData(req, res, next) {
       try {
-        res.json(await crawlService.clearData({ userId: req.auth.userId, workspaceId: req.validated.workspaceId }));
+        res.json(await crawlService.clearData({ userId: req.auth.userId, workspaceId: req.validated.workspaceId, sourceId: req.validated.sourceId }));
       } catch (error) { next(error); }
     },
 
@@ -39,7 +46,7 @@ export function createCrawlController(crawlService) {
     async listRuns(req, res, next) {
       try {
         res.json(await crawlService.listRuns({
-          userId: req.auth.userId, workspaceId: req.validated.workspaceId, limit: req.validated.limit,
+          userId: req.auth.userId, workspaceId: req.validated.workspaceId, sourceId: req.validated.sourceId, limit: req.validated.limit,
         }));
       } catch (error) { next(error); }
     },
@@ -50,6 +57,7 @@ export function createCrawlController(crawlService) {
         res.json(await crawlService.getActivity({
           userId: req.auth.userId,
           workspaceId: req.validated.workspaceId,
+          sourceId: req.validated.sourceId,
           before: req.validated.before,
           limit: req.validated.limit,
         }));
@@ -62,6 +70,7 @@ export function createCrawlController(crawlService) {
         res.json(await crawlService.getTree({
           userId: req.auth.userId,
           workspaceId: req.validated.workspaceId,
+          sourceId: req.validated.sourceId,
           path: req.validated.path,
           limit: req.validated.limit,
           skip: req.validated.skip,
@@ -75,6 +84,7 @@ export function createCrawlController(crawlService) {
         res.json(await crawlService.getFindings({
           userId: req.auth.userId,
           workspaceId: req.validated.workspaceId,
+          sourceId: req.validated.sourceId,
           kind: req.validated.kind,
           limit: req.validated.limit,
           skip: req.validated.skip,
@@ -88,6 +98,7 @@ export function createCrawlController(crawlService) {
         res.json(await crawlService.getPage({
           userId: req.auth.userId,
           workspaceId: req.validated.workspaceId,
+          sourceId: req.validated.sourceId,
           urlHash: req.validated.urlHash,
         }));
       } catch (error) { next(error); }
@@ -96,7 +107,7 @@ export function createCrawlController(crawlService) {
     /** Reports how often each route pattern is crawled, and where each decision came from. */
     async schedule(req, res, next) {
       try {
-        res.json(await crawlService.getSchedule({ userId: req.auth.userId, workspaceId: req.validated.workspaceId }));
+        res.json(await crawlService.getSchedule({ userId: req.auth.userId, workspaceId: req.validated.workspaceId, sourceId: req.validated.sourceId }));
       } catch (error) { next(error); }
     },
 
@@ -106,6 +117,7 @@ export function createCrawlController(crawlService) {
         res.json(await crawlService.setPageSchedule({
           userId: req.auth.userId,
           workspaceId: req.validated.workspaceId,
+          sourceId: req.validated.sourceId,
           urlHash: req.validated.urlHash,
           override: req.validated.override,
         }));
@@ -118,6 +130,7 @@ export function createCrawlController(crawlService) {
         res.json(await crawlService.listMarkdown({
           userId: req.auth.userId,
           workspaceId: req.validated.workspaceId,
+          sourceId: req.validated.sourceId,
           limit: req.validated.limit,
           skip: req.validated.skip,
         }));
@@ -130,6 +143,7 @@ export function createCrawlController(crawlService) {
         const result = await crawlService.getPageMarkdown({
           userId: req.auth.userId,
           workspaceId: req.validated.workspaceId,
+          sourceId: req.validated.sourceId,
           urlHash: req.validated.urlHash,
         });
         res.type("text/markdown; charset=utf-8");
@@ -144,6 +158,7 @@ export function createCrawlController(crawlService) {
         res.json(await crawlService.setFrequencies({
           userId: req.auth.userId,
           workspaceId: req.validated.workspaceId,
+          sourceId: req.validated.sourceId,
           targets: req.validated.targets,
           intervalHours: req.validated.intervalHours,
         }));
@@ -156,6 +171,7 @@ export function createCrawlController(crawlService) {
         res.status(202).json(await crawlService.requestRecrawl({
           userId: req.auth.userId,
           workspaceId: req.validated.workspaceId,
+          sourceId: req.validated.sourceId,
           target: req.validated.target,
         }));
       } catch (error) { next(error); }

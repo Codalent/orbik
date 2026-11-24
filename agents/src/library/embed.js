@@ -3,7 +3,7 @@ import { MAX_SOURCES_PER_PASS } from "@orbik/retrieval";
 
 import { LIBRARY_JOBS, libraryJob } from "../jobs.js";
 import { requireObjectId } from "../runtime/errors.js";
-import { findSite } from "./scope.js";
+import { findSite, listSites } from "./scope.js";
 
 /**
  * The Library agent's second stage: keeps a workspace's retrieval index in step with its documents.
@@ -52,10 +52,12 @@ export function createEmbedHandler({ retrieval, reason = null, logger = log }) {
     const siteId = job.payload?.siteId
       ? requireObjectId(job.payload.siteId, "siteId", "An index job")
       : await findSite(database, workspaceId);
+    // Every source's pages are the workspace's to search, whichever crawl handed this pass over.
+    const siteIds = (await listSites(database, workspaceId)).map((site) => site._id);
 
     const counters = await retrieval.indexWorkspace({
       workspaceId,
-      siteId,
+      siteIds,
       limit: MAX_SOURCES_PER_PASS,
       heartbeat,
       signal,

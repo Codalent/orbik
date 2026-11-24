@@ -11,13 +11,18 @@
  * 1. A per-URL override (`crawlOverride` on the registry row) wins outright.
  * 2. A per-pattern override the operator saved on the site wins over the AI.
  * 3. The AI's decision for the pattern.
- * 4. Otherwise: never. A URL nobody has decided about is fetched once when it is discovered and
+ * 4. The source's own frequency for its pages (`pageIntervalHours`, chosen under "How often" on
+ *    the source's page). A source added by a person starts weekly, because adding it was the
+ *    choice; the website starts with none.
+ * 5. Otherwise: never. A URL nobody has decided about is fetched once when it is discovered and
  *    then left alone until a person asks for it — either by choosing a frequency or by triggering a
  *    crawl by hand. Falling back to some default interval instead would spend crawl budget on a
  *    schedule nobody chose.
  *
  * `null` means "never" everywhere in this module: on an override, on a pattern, and as a result.
  */
+
+import { describeSource } from "./sources.js";
 
 /** The site-level cadence when nothing narrower has been chosen, in hours. */
 const DEFAULT_CRAWL_INTERVAL_HOURS = 168;
@@ -30,11 +35,30 @@ const DEFAULT_CRAWL_INTERVAL_HOURS = 168;
  * @returns {number|null} hours between crawls, or null for never
  */
 export function patternIntervalHours(site, pattern) {
-  if (!pattern) return null;
+  return patternDecision(site, pattern) ?? null;
+}
+
+/**
+ * The interval somebody chose for a pattern — null for never — or undefined when nobody did, so
+ * the source's own frequency can stand in for "nobody chose" without also overruling "never".
+ */
+function patternDecision(site, pattern) {
+  if (!pattern) return undefined;
   const override = (site.crawlScheduleOverrides ?? []).find((row) => row.pattern === pattern);
   if (override) return override.intervalHours ?? null;
   const planned = (site.crawlSchedule?.patterns ?? []).find((row) => row.pattern === pattern);
-  return planned?.intervalHours ?? null;
+  if (planned) return planned.intervalHours ?? null;
+  return undefined;
+}
+
+/**
+ * How often a source reads a page nobody chose a frequency for, or null for only when asked.
+ *
+ * @param {object} site the crawl site document
+ * @returns {number|null}
+ */
+export function sourcePageIntervalHours(site) {
+  return describeSource(site).pageIntervalHours ?? null;
 }
 
 /**
@@ -46,7 +70,8 @@ export function patternIntervalHours(site, pattern) {
  */
 export function effectiveIntervalHours(site, row) {
   if (row?.crawlOverride) return row.crawlOverride.intervalHours ?? null;
-  return patternIntervalHours(site, row?.routePattern);
+  const decided = patternDecision(site, row?.routePattern);
+  return decided === undefined ? sourcePageIntervalHours(site) : decided;
 }
 
 /**
@@ -74,6 +99,8 @@ async function discoveryIntervalHours({ urls, site }) {
     { $group: { _id: null, min: { $min: "$crawlOverride.intervalHours" } } },
   ]).toArray();
   if (pinned) intervals.push(pinned.min);
+  const fallback = sourcePageIntervalHours(site);
+  if (fallback !== null) intervals.push(fallback);
 
   return Math.min(site.crawlIntervalHours ?? DEFAULT_CRAWL_INTERVAL_HOURS, ...intervals);
 }
@@ -106,10 +133,11 @@ export async function applyCrawlSchedule({ sites, urls, site }) {
       { $set: { crawlIntervalHours: patternIntervalHours(site, pattern) } },
     );
   }
-  // Everything nobody has decided about, including rows whose pattern the AI has not seen yet.
+  // Everything nobody has decided about, including rows whose pattern the AI has not seen yet:
+  // the source's own frequency, or never.
   await urls.updateMany(
     { siteId: site._id, routePattern: { $nin: [...chosen] }, crawlOverride: { $exists: false } },
-    { $set: { crawlIntervalHours: null } },
+    { $set: { crawlIntervalHours: sourcePageIntervalHours(site) } },
   );
 
   const interval = await discoveryIntervalHours({ urls, site });

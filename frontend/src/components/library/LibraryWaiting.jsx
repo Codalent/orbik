@@ -56,7 +56,7 @@ export function WaitAction({ wait, className, size = "sm" }) {
   if (wait.action === "crawl") {
     return (
       <div className={className}>
-        <Link href={`/workspaces/${library.workspaceId}/agents/crawler`} className={buttonVariants({ size })}>
+        <Link href={`/workspaces/${library.workspaceId}/sources/website/pages`} className={buttonVariants({ size })}>
           Crawl your site
         </Link>
       </div>

@@ -1,4 +1,4 @@
-import { aliasHostOf, applyCrawlSchedule, toObjectId } from "@orbik/core";
+import { WEBSITE_SOURCE, aliasHostOf, applyCrawlSchedule, hostOf, toObjectId, websiteFilter } from "@orbik/core";
 
 /** Crawl configuration fields the API is allowed to expose or accept. */
 const SITE_PROJECTION = Object.freeze({
@@ -16,8 +16,25 @@ const SITE_PROJECTION = Object.freeze({
   crawlRequestedAt: 1,
   crawlRequestedBy: 1,
   frequenciesSetAt: 1,
+  discoveryIntervalHours: 1,
   createdAt: 1,
   updatedAt: 1,
+  // What the site is as a source (`describeSource` in `@orbik/core` reads them).
+  primary: 1,
+  relation: 1,
+  mode: 1,
+  name: 1,
+  folder: 1,
+  purpose: 1,
+  knowledgeUse: 1,
+  section: 1,
+  pageUrls: 1,
+  followPagination: 1,
+  excludePatterns: 1,
+  pageIntervalHours: 1,
+  host: 1,
+  addedBy: 1,
+  suggestionsDismissed: 1,
 });
 
 /**
@@ -143,9 +160,99 @@ export function createCrawlRepository(collections) {
   }
 
   return {
-    /** Finds the crawl configuration for one workspace, or null when none exists yet. */
+    /**
+     * Finds the workspace's website — the crawl the rest of Orbik is built on — or null when none
+     * is set up yet. Its other sources are found with {@link listSources} and {@link findSource}.
+     */
     findSiteByWorkspace(workspaceId) {
-      return sites.findOne({ workspaceId: toObjectId(workspaceId) }, { projection: SITE_PROJECTION });
+      return sites.findOne(websiteFilter(toObjectId(workspaceId)), { projection: SITE_PROJECTION });
+    },
+
+    /**
+     * One source of a workspace, by id, or its website by the word `website`; null when the
+     * workspace has no such source. Always within the workspace: an id from another workspace
+     * finds nothing.
+     */
+    findSource(workspaceId, sourceId) {
+      if (!sourceId || sourceId === WEBSITE_SOURCE) return this.findSiteByWorkspace(workspaceId);
+      return sites.findOne({ _id: toObjectId(sourceId), workspaceId: toObjectId(workspaceId) }, { projection: SITE_PROJECTION });
+    },
+
+    /** Every source of a workspace, the website first and the rest in the order they were added. */
+    async listSources(workspaceId) {
+      const rows = await sites.find({ workspaceId: toObjectId(workspaceId) }, { projection: SITE_PROJECTION }).sort({ createdAt: 1, _id: 1 }).toArray();
+      return rows.sort((left, right) => Number(right.primary !== false) - Number(left.primary !== false));
+    },
+
+    /** The ids of every source of a workspace, the website first: what a scope that reads them all carries. */
+    async listSourceIds(workspaceId) {
+      return (await this.listSources(workspaceId)).map((site) => site._id);
+    },
+
+    /**
+     * Adds a source other than the website.
+     *
+     * Due at once, as a website's first setup is: adding a source is asking for it to be read.
+     * The unique indexes on the workspace's folders and hosts are what refuse a second source of
+     * the same host, or a folder already taken, when two are added at the same moment.
+     */
+    async insertSource({ workspaceId, document, now, startedBy }) {
+      const result = await sites.insertOne({
+        ...document,
+        workspaceId: toObjectId(workspaceId),
+        primary: false,
+        enabled: true,
+        nextCrawlAt: now,
+        crawlRequestedAt: now,
+        crawlRequestedBy: startedBy ? toObjectId(startedBy) : null,
+        addedBy: startedBy ? toObjectId(startedBy) : null,
+        createdAt: now,
+        updatedAt: now,
+      });
+      return sites.findOne({ _id: result.insertedId }, { projection: SITE_PROJECTION });
+    },
+
+    /**
+     * Changes a source's settings. A change of how often its pages are read is applied to them at
+     * once, and can only bring the next visit forward.
+     */
+    async updateSource({ siteId, set = {}, unset = [], now }) {
+      const update = { $set: { ...set, updatedAt: now } };
+      if (unset.length) update.$unset = Object.fromEntries(unset.map((field) => [field, ""]));
+      await sites.updateOne({ _id: toObjectId(siteId) }, update);
+      const saved = await sites.findOne({ _id: toObjectId(siteId) }, { projection: SITE_PROJECTION });
+      if ("pageIntervalHours" in set) await rescheduleSite(saved, now);
+      return sites.findOne({ _id: toObjectId(siteId) }, { projection: SITE_PROJECTION });
+    },
+
+    /** Forgets a source once its crawl data is gone (`clearSiteData` first). */
+    async deleteSource(siteId) {
+      await sites.deleteOne({ _id: toObjectId(siteId), primary: false });
+    },
+
+    /** Records that a suggested source was dismissed, so it is not suggested again. */
+    async dismissSuggestion({ siteId, url, by, now }) {
+      await sites.updateOne(
+        { _id: toObjectId(siteId) },
+        { $push: { suggestionsDismissed: { $each: [{ url, by: by ? toObjectId(by) : null, at: now }], $slice: -200 } } },
+      );
+    },
+
+    /**
+     * The website's links to other hosts, by address, with how many of its pages make each one.
+     * What "Found on your website" is read from: a profile or a review page the site links to is
+     * a page about the company elsewhere that a person may want read.
+     */
+    outboundLinkTargets(siteId, { limit = 300 } = {}) {
+      return links.aggregate([
+        { $match: { siteId: toObjectId(siteId), internal: false } },
+        { $group: { _id: { to: "$toUrl", from: "$fromUrlHash" } } },
+        // A few of the pages making each link, to say where on the site it is.
+        { $group: { _id: "$_id.to", pages: { $sum: 1 }, from: { $push: "$_id.from" } } },
+        { $set: { from: { $slice: ["$from", 50] } } },
+        { $sort: { pages: -1, _id: 1 } },
+        { $limit: limit },
+      ]).toArray();
     },
 
     /**
@@ -156,15 +263,25 @@ export function createCrawlRepository(collections) {
      * permanently just-about-to-crawl.
      */
     async upsertSite({ workspaceId, seedUrl, settings, now, startedBy = null }) {
-      const filter = { workspaceId: toObjectId(workspaceId) };
+      const existing = await this.findSiteByWorkspace(workspaceId);
+      // The website, found by id once it exists, and made as the workspace's one primary source
+      // the first time: the unique index on primary sources is what keeps a second from being
+      // made by two first setups at once.
+      const filter = existing ? { _id: existing._id } : { workspaceId: toObjectId(workspaceId), primary: true };
       await sites.updateOne(
         filter,
         {
-          $set: { seedUrl, ...settings, updatedAt: now },
+          $set: { seedUrl, host: hostOf(seedUrl), ...settings, updatedAt: now },
           // Setting a site up is also asking for its first crawl: it is due at once, and the mark
           // is what lets the page say "queued" for the minute before the scheduler starts it.
           $setOnInsert: {
             workspaceId: toObjectId(workspaceId),
+            relation: "own",
+            mode: "site",
+            name: "Website",
+            folder: WEBSITE_SOURCE,
+            purpose: "product",
+            knowledgeUse: "use",
             nextCrawlAt: now,
             crawlRequestedAt: now,
             crawlRequestedBy: startedBy ? toObjectId(startedBy) : null,
@@ -371,6 +488,7 @@ export function createCrawlRepository(collections) {
         {
           $set: {
             seedUrl,
+            host: hostOf(seedUrl),
             updatedAt: now,
             ...(newSite ? { sitemapUrls: [] } : {}),
             ...(!newSite && typedUrl ? { "redirectedFrom.url": typedUrl, "redirectedFrom.to": seedUrl } : {}),
@@ -379,6 +497,33 @@ export function createCrawlRepository(collections) {
         },
       );
       return sites.findOne({ _id: toObjectId(siteId) }, { projection: SITE_PROJECTION });
+    },
+
+    /**
+     * Asks a running crawl to stop. The crawler's jobs check it before each request and read
+     * nothing more; finalize closes the run as cancelled.
+     */
+    async requestStop(runId, now) {
+      await runs.updateOne(
+        { _id: toObjectId(runId), status: "running", cancelRequestedAt: { $in: [null] } },
+        { $set: { cancelRequestedAt: now, updatedAt: now } },
+      );
+    },
+
+    /**
+     * Takes back a crawl that was asked for and has not started: the site is visited again on its
+     * own cadence, from its last visit. Answers whether there was one to take back.
+     */
+    async withdrawRequest(siteId) {
+      const site = await sites.findOne({ _id: toObjectId(siteId) }, { projection: { crawlRequestedAt: 1, lastScheduledAt: 1, discoveryIntervalHours: 1, crawlIntervalHours: 1 } });
+      if (!site?.crawlRequestedAt) return false;
+      const hours = site.discoveryIntervalHours ?? site.crawlIntervalHours ?? 168;
+      const from = site.lastScheduledAt ?? new Date();
+      await sites.updateOne(
+        { _id: site._id },
+        { $set: { nextCrawlAt: new Date(from.getTime() + hours * 3_600_000) }, $unset: { crawlRequestedAt: "", crawlRequestedBy: "" } },
+      );
+      return true;
     },
 
     /** The crawl configurations of several workspaces at once, for the activity monitor. */
@@ -557,7 +702,8 @@ export function createCrawlRepository(collections) {
     },
 
     /** How many pages have Markdown, which is what the knowledge agents read. */
-    countMarkdown({ siteId }) {
+    countMarkdown({ siteId, siteIds = null }) {
+      if (siteIds) return markdown.countDocuments({ siteId: { $in: siteIds.map((id) => toObjectId(id)) } });
       return markdown.countDocuments({ siteId: toObjectId(siteId) });
     },
 

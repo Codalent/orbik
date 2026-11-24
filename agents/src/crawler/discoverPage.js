@@ -9,7 +9,7 @@ import { parseSiteConfig } from "./siteConfig.js";
 import { createUrlRegistry } from "./urlRegistry.js";
 import { loadRobotsForSite } from "./robotsStore.js";
 import { awaitedJobs, recrawlPriority } from "./priority.js";
-import { detectSiteBlock, isRunBlocked, recordBlocked, recordNotBlocked } from "./siteBlock.js";
+import { detectSiteBlock, isRunBlocked, isRunStopped, recordBlocked, recordNotBlocked } from "./siteBlock.js";
 import { canRetry, isRunRateLimited, rateLimitedError, recordServed, recordThrottled, THROTTLE_STATUSES } from "./throttle.js";
 
 /**
@@ -38,6 +38,7 @@ export function createDiscoverPageHandler({ createFetcherFor }) {
     // explores nothing more either.
     if (await isRunRateLimited(collections.runs, job.runId)) return { counters: { pagesSkippedRateLimited: 1 } };
     if (await isRunBlocked(collections.runs, job.runId)) return {};
+    if (await isRunStopped(collections.runs, job.runId)) return {};
     const config = parseSiteConfig(site);
     const scope = createScope(config);
     const fetcher = createFetcherFor(config);
@@ -55,7 +56,7 @@ export function createDiscoverPageHandler({ createFetcherFor }) {
     // Checked before anything is read from the response: a bot-protection page has no links, and
     // a home page that turns the crawler away ends the crawl here, before any budget is spent.
     const block = detectSiteBlock(response);
-    const seed = record.urlHash === scope.seed.hash;
+    const seed = scope.isStart(record.urlHash);
     if (block && (block.kind === "challenge" || seed)) {
       await recordBlocked({ runs: collections.runs, runId: job.runId, block, url: record.url, seed });
       return {};

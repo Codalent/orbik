@@ -1,5 +1,8 @@
 import { toObjectId } from "@orbik/core";
 import { LIBRARY_SOURCE_KINDS, SOURCE_FIXED_SKIPS } from "@orbik/library";
+
+/** The selection reason of a page whose source is copied only (`chooseSourcePages`). */
+const COPY_ONLY_REASON = "copy-only";
 import { recordPersonVerdict } from "@orbik/tools";
 
 /**
@@ -66,15 +69,15 @@ export function createKnowledgeRepository(collections, database) {
         knowledgeSources.find(filter).sort({ sourceKind: 1, url: 1, sourceKey: 1 }).skip(skip).limit(limit).toArray(),
         knowledgeSources.countDocuments(filter),
       ]);
-      // Which of these a person could not pull in by asking: a duplicate URL, a page with no text.
-      // Read from the source layer's own rows, so the answer is its rule and not a guess from the
-      // wording of a reason.
+      // Which of these a person could not pull in by asking: a duplicate URL, a page with no text,
+      // a page of a source they chose to have copied only. Read from the source layer's own rows,
+      // so the answer is its rule and not a guess from the wording of a reason.
       const fixed = items.length
         ? await sourceNotes
           .find({
             workspaceId: filter.workspaceId,
             sourceKey: { $in: items.map((item) => item.sourceKey).filter(Boolean) },
-            skipped: { $in: [...SOURCE_FIXED_SKIPS] },
+            $or: [{ skipped: { $in: [...SOURCE_FIXED_SKIPS] } }, { chosenReason: COPY_ONLY_REASON }],
           })
           .project({ sourceKey: 1 })
           .toArray()
@@ -100,6 +103,10 @@ export function createKnowledgeRepository(collections, database) {
       const owner = toObjectId(workspaceId);
       const row = await knowledgeSources.findOne({ workspaceId: owner, agentSlug, sourceKind: "page", sourceKey });
       if (!row) return null;
+      // A page of a source copied only is not written from, whoever asks: the source's own setting
+      // is where that is changed.
+      const state = await sourceNotes.findOne({ workspaceId: owner, sourceKey }, { projection: { chosenReason: 1 } });
+      if (state?.chosenReason === COPY_ONLY_REASON) return { refused: COPY_ONLY_REASON };
 
       await sourceNotes.updateOne(
         { workspaceId: owner, sourceKey },

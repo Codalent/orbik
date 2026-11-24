@@ -25,6 +25,17 @@ export function requireSite(scope) {
 }
 
 /**
+ * Every source the run reads pages of: the website first, then the workspace's other sources it
+ * may read (`scope.siteIds`). A run with no list reads the website alone.
+ *
+ * @returns {Array<unknown>} site ids, as the scope holds them
+ */
+export function requireSites(scope) {
+  const siteId = requireSite(scope);
+  return Array.isArray(scope.siteIds) && scope.siteIds.length ? scope.siteIds : [siteId];
+}
+
+/**
  * The agent the run is executing, which is the namespace its source bookkeeping lives in.
  *
  * Per agent rather than per workspace because two agents reading the same site disagree about

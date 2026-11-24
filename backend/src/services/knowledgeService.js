@@ -75,6 +75,13 @@ export function createKnowledgeService({ workspaceRepository, knowledgeRepositor
           message: "That page is not one this agent has a verdict on.",
         });
       }
+      if (included.refused) {
+        throw new AppError({
+          status: 409,
+          code: "SOURCE_COPY_ONLY",
+          message: "This page's source is copied only, so the knowledge base is not written from it. Change that on the source's page under Sources.",
+        });
+      }
       return {
         source: included,
         // Said plainly because the action is asynchronous and the button that triggered it is not:

@@ -3,15 +3,15 @@ import { AgentError, requireObjectId } from "../runtime/errors.js";
 import { computeIndexability } from "./indexability.js";
 import { createCrawlBudget } from "@orbik/crawl-budget";
 import { createEventOutbox, EVENT_TYPES } from "../runtime/eventOutbox.js";
-import { createScope } from "./scope.js";
+import { FOREIGN_REASONS, createScope } from "./scope.js";
 import { createUrlRegistry, DISCOVERY_SOURCES, URL_STATE } from "./urlRegistry.js";
 import { extractPage, parseXRobotsTag } from "./extract.js";
 import { toMarkdown } from "./markdown.js";
-import { describePageKind, getAgentCollections } from "@orbik/core";
+import { SOURCE_RESERVE_SHARE, describePageKind, getAgentCollections } from "@orbik/core";
 import { loadRobotsForSite } from "./robotsStore.js";
 import { parseSiteConfig } from "./siteConfig.js";
 import { recrawlPriority } from "./priority.js";
-import { detectSiteBlock, isRunBlocked, recordBlocked, recordNotBlocked } from "./siteBlock.js";
+import { detectSiteBlock, isRunBlocked, isRunStopped, recordBlocked, recordNotBlocked } from "./siteBlock.js";
 import {
   canRetry,
   isRunRateLimited,
@@ -81,6 +81,10 @@ export function createFetchHandler({ createFetcherFor }) {
     if (await isRunBlocked(collections.runs, job.runId)) {
       return { counters: await countSkipOnce(collections.urls, job, record, "pagesSkippedBlocked"), enqueue: [] };
     }
+    // And for a crawl a person stopped.
+    if (await isRunStopped(collections.runs, job.runId)) {
+      return { counters: await countSkipOnce(collections.urls, job, record, "pagesSkippedStopped"), enqueue: [] };
+    }
 
     const scope = createScope(config);
     const fetcher = createFetcherFor(config);
@@ -110,7 +114,9 @@ export function createFetchHandler({ createFetcherFor }) {
     if (held > 0) throw rateLimitedError({ url: record.url, retryAfterMs: held });
 
     const budget = createCrawlBudget({ database });
-    const charge = await budget.consume({ workspaceId, pages: 1 });
+    // A source other than the website leaves the last share of the month to the website, which
+    // everything else in Orbik is built on.
+    const charge = await budget.consume({ workspaceId, pages: 1, reserveShare: config.primary ? 0 : SOURCE_RESERVE_SHARE });
     if (!charge.ok) {
       // Not an error: an exhausted allowance is a state the account is legitimately in, and
       // failing the job would dead-letter thousands of pages and report the month's limit as a
@@ -160,7 +166,7 @@ export function createFetchHandler({ createFetcherFor }) {
     // which the Library would otherwise take for the page's new content. The charge goes back
     // because nothing was served, and the URL stays unfetched for the next crawl.
     const block = detectSiteBlock(response);
-    const seed = urlHash === scope.seed.hash;
+    const seed = scope.isStart(urlHash);
     if (block && (block.kind === "challenge" || seed)) {
       await budget.refund({ workspaceId, pages: 1, period: charge.period });
       const streak = await recordBlocked({ runs: collections.runs, runId: job.runId, block, url: record.url, seed });
@@ -575,7 +581,9 @@ export async function recordLinks({ collections, registry, job, siteId, config, 
     const normalized = scope.onSiteHost(asWritten);
 
     const decision = scope.allows(normalized, depth ?? 0);
-    const internal = decision.reason !== "OUT_OF_SCOPE_HOST";
+    // Another host, or — for a list of pages — a page of the host nobody listed: an edge, and
+    // nothing more.
+    const internal = !FOREIGN_REASONS.has(decision.reason);
     edges.push({
       siteId,
       fromUrlHash: record.urlHash,

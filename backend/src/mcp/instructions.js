@@ -21,7 +21,10 @@ const COVERAGE_LINES = Object.freeze([
   "covers what it cites rather than every one the site has. For a count or a complete list, search",
   `with content_search or list the copies under ${SOURCE_WEBSITE_PATH} with library_tree (\`compact\`, then`,
   "`nextOffset` for the rest); each copy carries its page's `url` and the day it was `published`,",
-  "and library_read takes a `url` to open one.",
+  "and library_read takes a `url` to open one. Other sources the company added — its documentation,",
+  `reviews of it elsewhere — sit in folders of their own beside it, under ${SOURCE_ROOT_PATH}; a copy`,
+  "from one says so in its first lines (`- From: …`), and a page about the company elsewhere is",
+  "somebody else's words about it.",
 ]);
 
 /**
@@ -134,7 +137,8 @@ export function buildInstructions({ workspaces, roaming, mayWrite = false }) {
     `This is the Orbik knowledge base for ${workspace.name}${site}. It holds the Library — a tree of`,
     "Markdown files written from the company's own website, with a front page (the overview) and a",
     "map of what to read for which job (the index) — a copy of every crawled page under",
-    `${SOURCE_WEBSITE_PATH}, word for word as Markdown, and the site's llms.txt.`,
+    `${SOURCE_WEBSITE_PATH} (and of any other source the company added, beside it), word for word as`,
+    "Markdown, and the site's llms.txt.",
     "",
     "Start with the index the tree root names: library_tree returns `indexPath` and `overviewPath`,",
     "then library_read that path — unless you already know where to look. Both live in the first",
@@ -195,8 +199,8 @@ function buildRoamingInstructions(workspaces, closing) {
     "",
     "Each workspace holds the Library — a tree of Markdown files written from the company's own",
     "website, with a front page (the overview) and a map of what to read for which job (the index) —",
-    `a copy of every crawled page under ${SOURCE_WEBSITE_PATH}, word for word as Markdown, and the`,
-    "site's llms.txt.",
+    `a copy of every crawled page under ${SOURCE_WEBSITE_PATH} (and of any other source the company`,
+    "added, beside it), word for word as Markdown, and the site's llms.txt.",
     "",
     "Start with the index the tree root names, in the workspace you need: library_tree returns",
     "`indexPath` and `overviewPath`, then library_read that path — unless you already know where to",

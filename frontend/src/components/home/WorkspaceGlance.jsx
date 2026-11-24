@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Activity, ArrowRight, BookMarked, Bot, CircleAlert, CircleCheck, Globe } from "lucide-react";
+import { Activity, ArrowRight, BookMarked, Bot, CircleAlert, CircleCheck, Globe, SatelliteDish } from "lucide-react";
 
 import { buildAgentRows } from "@/lib/agents/registry";
 import { humanize } from "@/lib/aiCalls/describe";
@@ -56,7 +56,7 @@ export function WorkspaceGlance({ home, myEmail }) {
 
       <div className="grid min-w-0 grid-cols-2 gap-3 lg:grid-cols-4">
         <StatTile
-          href={`/workspaces/${id}/agents/crawler`}
+          href={`/workspaces/${id}/sources/website/pages`}
           icon={Globe}
           label="Pages crawled"
           value={website.configured ? website.pages.toLocaleString() : "—"}
@@ -256,7 +256,7 @@ function WebsiteCard({ id, website }) {
   const cycle = !website.crawling && lastAt && website.nextCrawlAt ? progressBetween(lastAt, website.nextCrawlAt) : null;
 
   return (
-    <Card icon={Globe} title="Website" href={`/workspaces/${id}/agents/crawler`} action="Crawler">
+    <Card icon={Globe} title="Website" href={`/workspaces/${id}/sources/website`} action="Sources">
       {website.configured ? (
         <div className="space-y-4">
           <div>
@@ -452,5 +452,7 @@ function newest(moments) {
 function agentDirectory(workspaceId, extensionAgents) {
   const rows = new Map(buildAgentRows(workspaceId, null, extensionAgents).map((row) => [row.id, { name: row.name, icon: row.icon, href: row.href }]));
   rows.set("business-knowledge-base", { name: "Library", icon: BookMarked, href: `/workspaces/${workspaceId}/library` });
+  // A crawl is a source being read: it is named and linked as Sources.
+  rows.set("crawler", { name: "Sources", icon: SatelliteDish, href: `/workspaces/${workspaceId}/sources` });
   return rows;
 }

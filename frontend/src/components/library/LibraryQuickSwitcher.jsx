@@ -353,7 +353,9 @@ function activePathOf(layout) {
 function whereOf(library, path, node) {
   if (isSourcePath(path)) {
     const url = node?.url;
-    const parts = ["Sources", "Website", ...path.split("/").slice(3, -1)];
+    // The source's own branch: the website's, or another source's beside it (`/sources/docs`).
+    const branch = path.split("/")[2] ?? "";
+    const parts = ["Sources", branch === "website" ? "Website" : branch.charAt(0).toUpperCase() + branch.slice(1), ...path.split("/").slice(3, -1)];
     return `${parts.join(" / ")}${url ? ` · ${hostAndPath(url)}` : ""}${node?.published ? ` · published ${node.published}` : ""}`;
   }
   const crumbs = library.crumbsFor(path).slice(1).map((crumb) => crumb.label);

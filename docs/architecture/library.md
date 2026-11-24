@@ -115,11 +115,11 @@ Three top-level folders are fixed in path and title, carry no number, and are sh
 chosen folders by a fixed rank (`compareLibrarySiblings`), because they are not judgement at all:
 
 - **`/sources`** — the source layer. Every agent but the mirror is refused a write inside it.
-- **`/sources/website`** — the crawl's branch of it. One site per workspace today, so there is no
-  host segment; the path is built so `/sources/website/<host>/…` can be switched on if a workspace
-  ever crawls two domains. A Notion connector would fill `/sources/notion/…` beside it, which is
-  the whole reason the origin is in the path rather than `/website` and `/notion` sitting at the
-  root among the subject folders.
+- **`/sources/website`** — the website's branch of it, and beside it one branch per other source of
+  the workspace (`/sources/docs`, `/sources/clutch`; see [Several sources](#several-sources)). Each
+  host is read by one source, so there is no host segment. A Notion connector would fill
+  `/sources/notion/…` the same way, which is the whole reason the origin is in the path rather than
+  `/website` and `/notion` sitting at the root among the subject folders.
 - **`/brand`** — reserved and, since v3 of the Design system agent, empty. It held a copy of the
   design system (`/brand/design-system`); the Brand page and `brand_get` are where the system is
   read now, and the worker removed the copies at its first start after the change
@@ -195,8 +195,8 @@ rules about paths, depth, size, locks and provenance, because there is one imple
   renamed, noting what was renamed. See
   [Renames, and the links that follow them](#renames-and-the-links-that-follow-them).
 - **The source layer has one writer.** Every agent but the mirror is refused a write anywhere
-  under `/sources` (`RESERVED_PATH`), and `/sources` and `/sources/website` cannot be moved or
-  deleted at all. A mirror of the site is only worth citing if the agent citing it cannot quietly
+  under `/sources` (`RESERVED_PATH`), and `/sources` and every source's branch directly under it
+  cannot be moved or deleted at all; a branch goes only when its source is removed. A mirror of the site is only worth citing if the agent citing it cannot quietly
   rewrite the page. A *person* may write inside a source file — annotating what the site says is
   the most useful thing anybody can do to one — and their blocks are protected like any other.
   The mirror is plain code, so it cannot be told to put a paragraph back: it passes each new copy
@@ -355,7 +355,7 @@ knowledge base is started, and another for every post that later changes.
 So the model call went, and two decisions took its place:
 
 ```
-crawl_page_markdown  →  sources.mirror  →  /sources/website/<url path>
+crawl_page_markdown  →  sources.mirror  →  /sources/<source folder>/<url path>
      one page            no model call        the page, copied
                               │
                               └→  chosen by rule  →  the pages the write run reads
@@ -371,8 +371,10 @@ as one with a key does.
 
 **Where a source file lives is dictated, never chosen.** `https://example.com/services/ai/chatbots`
 becomes `/sources/website/services/ai/chatbots`, slugified segment by segment, with the folders
-generated and their summaries counting the pages beneath them. `packages/library/src/sourceLayer.js`
-holds the conventions.
+generated and their summaries counting the pages beneath them; another source's pages go under its
+own branch (`sourceFolderPath`). A later page of a listing told apart only by its query —
+`?page=2` — takes the listing's path with the page number on it (`…/reviews-page-2`) rather than a
+collision suffix. `packages/library/src/sourceLayer.js` holds the conventions.
 
 Three things the mirror has to survive, and all three are decided by rule:
 
@@ -534,6 +536,40 @@ the *agent* wrote — `library.write` recording a page it cited, with the hash i
 left exactly as it is while the page is still chosen: restating "chosen" over it would erase the
 one fact the row is there to keep.
 
+### Several sources
+
+A workspace's sources besides its website (docs/guides/sources.md, and
+[architecture/crawler.md](crawler.md#sources)) are mirrored the same way, each by a pass of its own:
+`mirrorWorkspace` reads one site's pages and that source's state rows only (`{workspaceId,
+siteId}`), sweeps and counts only its branch, and names the branch's folder after the source. A
+website pass therefore never mistakes a documentation subdomain's pages for pages that left the
+website. Which of a source's pages the knowledge base is written from is `chooseSourcePages`:
+
+- **The website** keeps the rule above and the knowledge base's ceiling of 80.
+- **A site or section of the workspace's own** is ranked by the same rule over its own link
+  structure, within a ceiling of its own (`SOURCE_SYNTHESIS_PAGE_CEILING`, 40), so adding a
+  documentation site cannot push the company's own pages out.
+- **A list of pages** is written from in full, in the order listed, up to the same ceiling
+  (`on-list`): a person named every page, and the address rules that set pagination aside do not
+  apply to page two of a listing of reviews.
+- **A source copied only** (`knowledgeUse: "copy"`) has every page `copy-only`: stored, indexed
+  and searchable by Ask and outside AIs, never chosen, and refused by Include (`409
+  SOURCE_COPY_ONLY`).
+
+Each copy from a source other than the website carries one more line under `- Source:` —
+`- From: Clutch reviews (a page about the company elsewhere; testimonials & reviews)` — kept on the
+state row as `origin`, so renaming a source or changing what it is re-copies its pages without
+telling the write run anything moved. The website's copies carry none. What a source is reaches the
+write run three ways: that line, `content.siteMap`'s `sources` (each with what it is and the rule
+for using it, `SOURCE_PURPOSES` in `@orbik/core`) and `from` on each chosen page, and the knowledge
+base agent's instructions (v12), whose one rule about them is that pages about the company
+elsewhere are other people's words, quoted and attributed.
+
+Removing a source (`DELETE /v1/workspaces/:id/sources/:sourceId`) deletes its branch, its pages'
+state and ledger rows and its queued Library jobs, and its pages' index points (or leaves those to
+the next index pass, which forgets every row no source still has, when Qdrant is down). The
+knowledge base's own files keep the pages they cite.
+
 ### Listings
 
 The same pass that ranks the pages also records, on each page's state row, which site-wide pages
@@ -591,6 +627,13 @@ write per page read. A job that is retried builds a new registry and starts the 
 
 Read tools may be granted to any agent — a future sales or ads agent reads the same Library the
 knowledge agent writes. Write tools only to definitions that declare them.
+
+A run's scope names its website (`siteId`) and every source it may read pages of (`siteIds`, the
+website first): `content.readPages`, `content.siteMap`, `library.read` by `url` and the resolution
+of a citation read across all of them, so a page of the documentation site is opened and cited as
+a page of the website is. The knowledge base agent's `siteIds` leave out the sources copied only;
+Ask's and an outside AI's cover every source. The tools about the website's structure
+(`content.listRoutes`, `content.listPages`, the crawl tools, llms.txt's) keep to `siteId`.
 
 | Tool | What it does |
 | --- | --- |
@@ -757,6 +800,12 @@ Search is the layer under both of the newest things here: the chat, and the know
 ability to know more of a site than it can afford to read. It is one index over two kinds of
 document — every page the crawler rendered, and every Library file that is not a copy of one —
 cut into passages, embedded, and held in Qdrant beside MongoDB.
+
+The pages are every source's: an index pass lists the rendered pages of all of the workspace's
+sources (`indexWorkspace({siteIds})`), so a page of one is never forgotten as gone from another,
+and each page's points carry its `siteId`. The knowledge base agent's searches leave out the
+sources copied only (`excludeSiteIds`, a `must_not` on that payload field); a point indexed before
+the field existed has none and is the website's, which is never left out.
 
 ```mermaid
 flowchart LR
@@ -969,7 +1018,7 @@ written from, and a person could start a run with nothing new for it to read.
 
 | Stage | What it is | What starts it |
 | --- | --- | --- |
-| 1 · Mirror | `sources.mirror`, a handler of the registered `library` agent. Copies each new or changed page into `/sources/website` and chooses the pages the knowledge base is written from. No model call | the crawler's finalize step; the Library scheduler, for a failed page, a page asked for by name, or a page nothing has looked at yet |
+| 1 · Mirror | `sources.mirror`, a handler of the registered `library` agent. Copies each new or changed page of one source into its branch of `/sources` and chooses the pages the knowledge base is written from. No model call | the crawler's finalize step; the Library scheduler, for a failed page, a page asked for by name, or a page nothing has looked at yet |
 | 2 · Embed | `index.embed`, the other handler of `library`. Chunks and embeds what changed among the pages and the Library's files | the crawler's finalize step; the Library scheduler, when a file or page was written since anything was last indexed |
 | Before 3 · Structure | `structure.revise`, a handler of `library`: one structured model call making a change a person asked for in words to the top-level folders they are choosing | the structure dispatcher, within a couple of seconds of the request (`POST /library/structure/revise`) |
 | 3 · Write | a run of the `business-knowledge-base` definition, executed by `ai`. Reads the chosen pages and rewrites the subject tree inside the top-level folders the person chose | the Library scheduler, once stage 1 is quiet, a structure is chosen, and a chosen page has moved — or the structure was chosen — since the last run |
@@ -1475,9 +1524,11 @@ answers:
   anybody asked for a page by name. It was five minutes while a pass made model calls. "Or the last pass
   looked" matters: a duplicate that changes is not stored, a pass that reads it copies nothing,
   and without that clause the question would stay true for good. This is considered on every
-  deployment, with or without a model key. Nothing is queued while the site is being crawled — the
-  crawl hands the site over when it finishes — or while any pass of the workspace is queued or
-  running, whatever key it was queued under.
+  deployment, with or without a model key. Asked of each source of the workspace, which is
+  mirrored by passes of its own (keyed by workspace and source); the write run is asked about them
+  together — the newest move among them, and every source quiet. Nothing is queued while the source
+  is being crawled — the crawl hands it over when it finishes — or while a pass of the same source
+  is queued or running, whatever key it was queued under.
 
 **One mirror pass at a time per workspace, and none during a crawl.** A pass places every page
 from its own reading of which paths are taken and which URLs are duplicates, so two passes at once

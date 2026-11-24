@@ -143,6 +143,20 @@ export async function isRunBlocked(runs, runId) {
 }
 
 /**
+ * Whether a person stopped this crawl: **Stop crawl** on a source's page sets `cancelRequestedAt`
+ * on the run. The pages left are not requested, the run drains, and finalize closes it as
+ * cancelled; what was read so far stays read.
+ *
+ * @param {import("mongodb").Collection} runs the `agent_runs` collection
+ * @param {import("mongodb").ObjectId|null|undefined} runId run the job belongs to
+ */
+export async function isRunStopped(runs, runId) {
+  if (!runId) return false;
+  const run = await runs.findOne({ _id: runId }, { projection: { cancelRequestedAt: 1 } });
+  return Boolean(run?.cancelRequestedAt);
+}
+
+/**
  * Records one blocked response against its run and decides whether the run should stop.
  *
  * The home page is decisive on its own: a public site that will not serve its front door to the
@@ -221,7 +235,15 @@ export function blockedRunError(block, unfetched) {
   const what = REFUSAL_STATUSES.has(block?.status) || block?.kind !== "challenge"
     ? `${by} refused the request`
     : `${by} answered with a browser check instead of the page`;
-  const where = block?.seed ? "the home page" : `${BLOCK_ABORT_AFTER} pages in a row`;
+  // The seed is the home page of a site; for a list of pages it is the first page listed.
+  const start = (() => {
+    try {
+      return new URL(block?.lastUrl).pathname === "/" ? "the home page" : "the first page it asked for";
+    } catch {
+      return "the home page";
+    }
+  })();
+  const where = block?.seed ? start : `${BLOCK_ABORT_AFTER} pages in a row`;
   const left = unfetched > 0 ? ` ${unfetched.toLocaleString("en-US")} page(s) were left unfetched.` : "";
   const allow = block?.service ? `${block.service}'s bot rules` : "its firewall or server rules";
   return {

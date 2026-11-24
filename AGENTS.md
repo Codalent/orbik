@@ -307,9 +307,13 @@ people* both edit, and the llms.txt file a person publishes. Both track what the
 accounted for by content hash, so a second run only reads what changed. An agent writing in the
 Library must keep every block a person wrote; the tools enforce it.
 
-The Library has two layers. Under `/sources/website` is a copy of every crawled page, word for
-word, written by code when a crawl finishes (`sources.mirror`): no model reads a page in order to
-store it, and nothing but that job may write there. The knowledge base above it is written by a
+The Library has two layers. Under `/sources` is a copy of every crawled page, word for word,
+written by code when a crawl finishes (`sources.mirror`): no model reads a page in order to store
+it, and nothing but that job may write there. The website's pages are under `/sources/website`, and
+each other source of the workspace — another site of its own, pages about it elsewhere, added under
+**Sources** in the web app — is a crawl site of its own with a branch beside it (`/sources/docs`);
+`describeSource` in `@orbik/core` says what a site document is as a source, and docs/architecture/crawler.md
+§ "Sources" and library.md § "Several sources" are the design. The knowledge base above it is written by a
 model from the pages *code* chose for it — by how many pages link to each, up to 80 — so what a
 site costs follows the size of its knowledge base and not its page count. To verify a change
 there, inspect `source_note_state` for what the mirror did with each page (`mirroredAt`, `chosen`

@@ -66,27 +66,35 @@ export function createRetrievalIndex({ database, store, embedder, logger = log }
    * — are left out by `indexExclusionOf`, the rule the source layer shares. A page that drops out
    * this way is removed from the index by the sweep below, like one the crawler stopped rendering.
    */
-  async function listSources({ workspaceId, siteId }) {
+  async function listSources({ workspaceId, siteIds }) {
     const [rendered, nodeRows, exclusions] = await Promise.all([
-      siteId
+      siteIds.length
         ? markdown
-          .find({ siteId })
-          .project({ urlHash: 1, url: 1, title: 1, heading: 1, hash: 1, updatedAt: 1 })
+          .find({ siteId: { $in: siteIds } })
+          .project({ siteId: 1, urlHash: 1, url: 1, title: 1, heading: 1, hash: 1, updatedAt: 1 })
           .toArray()
         : [],
       nodes
         .find({ workspaceId, kind: LIBRARY_NODE_KINDS.file })
         .project({ path: 1, title: 1, revision: 1, updatedAt: 1, authors: 1, removed: 1, hasUserContent: 1 })
         .toArray(),
-      siteId ? loadPageExclusions({ database, workspaceId, siteId }) : null,
+      // Each source's own: which of its pages are duplicates, noindex or empty.
+      Promise.all(siteIds.map((siteId) => loadPageExclusions({ database, workspaceId, siteId }))),
     ]);
-    const pages = exclusions ? rendered.filter((page) => !indexExclusionOf(page, exclusions)) : rendered;
+    const bySite = new Map(siteIds.map((siteId, index) => [siteId.toHexString(), exclusions[index]]));
+    const pages = rendered.filter((page) => {
+      const excluded = bySite.get(page.siteId?.toHexString?.() ?? "");
+      return !excluded || !indexExclusionOf(page, excluded);
+    });
     const files = nodeRows.filter((file) => !isLiveCopy(file) || file.hasUserContent === true);
 
     return [
       ...pages.map((page) => ({
         sourceKind: LIBRARY_SOURCE_KINDS.page,
         sourceKey: page.urlHash,
+        // Which source the page came from, so a search can leave out a source the knowledge base
+        // is not written from.
+        siteId: page.siteId ?? null,
         url: page.url ?? null,
         path: null,
         title: page.title ?? page.heading ?? null,
@@ -138,10 +146,11 @@ export function createRetrievalIndex({ database, store, embedder, logger = log }
   }
 
   /** Reads the text of one source, and the hash that says what it currently is. */
-  async function readSource(source, { workspaceId, siteId }) {
+  async function readSource(source, { workspaceId }) {
     if (source.sourceKind === LIBRARY_SOURCE_KINDS.page) {
+      // The page's own source, as listed: a page is read from the crawl it belongs to.
       const page = await markdown.findOne(
-        { siteId, urlHash: source.sourceKey },
+        { siteId: source.siteId, urlHash: source.sourceKey },
         { projection: { markdown: 1, url: 1, title: 1, heading: 1, hash: 1, updatedAt: 1 } },
       );
       if (!page) return null;
@@ -211,6 +220,7 @@ export function createRetrievalIndex({ database, store, embedder, logger = log }
         workspaceId: owner,
         sourceKind: source.sourceKind,
         sourceKey: source.sourceKey,
+        siteId: source.siteId ? source.siteId.toHexString() : null,
         url: source.url,
         path: source.path,
         title: source.title,
@@ -369,18 +379,21 @@ export function createRetrievalIndex({ database, store, embedder, logger = log }
      *
      * @param {object} options
      * @param {unknown} options.workspaceId owning workspace
-     * @param {unknown} [options.siteId] the crawl whose pages belong to it
+     * @param {unknown} [options.siteId] the crawl whose pages belong to it, when it has one source
+     * @param {unknown[]} [options.siteIds] every source whose pages belong to it
      * @param {number} [options.limit] sources this pass may index
      * @param {() => Promise<unknown>} [options.heartbeat] extends the caller's lease between batches
      * @param {AbortSignal} [options.signal] cancellation
      */
-    async indexWorkspace({ workspaceId, siteId = null, limit = MAX_SOURCES_PER_PASS, heartbeat, signal }) {
+    async indexWorkspace({ workspaceId, siteId = null, siteIds = null, limit = MAX_SOURCES_PER_PASS, heartbeat, signal }) {
       const owner = toObjectId(workspaceId);
-      const site = siteId ? toObjectId(siteId) : null;
+      // Every source of the workspace at once: a page of one is never mistaken for a page that has
+      // left another.
+      const sites = (siteIds ?? (siteId ? [siteId] : [])).map((id) => toObjectId(id));
 
       await this.ensureReady();
 
-      const sources = await listSources({ workspaceId: owner, siteId: site });
+      const sources = await listSources({ workspaceId: owner, siteIds: sites });
       const rows = await state.find({ workspaceId: owner }).toArray();
       const byKey = new Map(rows.map((row) => [keyOf(row), row]));
 
@@ -427,7 +440,7 @@ export function createRetrievalIndex({ database, store, embedder, logger = log }
       const flush = async () => {
         if (!bundle.length) return;
         const texts = bundle.flatMap((entry) => entry.part.map((chunk) => chunk.text));
-        const vectors = await embedder.embed(texts, { trace: { workspaceId: owner, siteId: site } });
+        const vectors = await embedder.embed(texts, { trace: { workspaceId: owner, siteId: sites[0] ?? null } });
         let at = 0;
         for (const entry of bundle) {
           const slice = vectors.slice(at, at + entry.part.length);
@@ -450,7 +463,7 @@ export function createRetrievalIndex({ database, store, embedder, logger = log }
         for (const source of batch) {
           signal?.throwIfAborted();
           const previous = byKey.get(keyOf(source)) ?? null;
-          const loaded = await readSource(source, { workspaceId: owner, siteId: site });
+          const loaded = await readSource(source, { workspaceId: owner });
           if (!loaded) {
             // Deleted between listing the sources and reading this one. The sweep above already
             // removes what is gone, and the next pass will see it missing too.
@@ -530,11 +543,13 @@ export function createRetrievalIndex({ database, store, embedder, logger = log }
      * @param {string} options.query the question, in words
      * @param {string[]} [options.kinds] restrict to `page`, `library` or `document`
      * @param {string} [options.path] restrict Library results to one branch
+     * @param {string[]} [options.excludeSiteIds] sources whose pages are left out: those the
+     *   knowledge base is not written from, when it is the knowledge base searching
      * @param {number} [options.limit] passages to return
      * @param {object} [options.trace] the run searching, for the call log: `runId`, `siteId`,
      *   `agentSlug`. The workspace is always this search's own.
      */
-    async search({ workspaceId, query, kinds = [], path = null, limit = 8, trace = {} }) {
+    async search({ workspaceId, query, kinds = [], path = null, excludeSiteIds = [], limit = 8, trace = {} }) {
       const owner = toObjectId(workspaceId);
       const [vector] = await embedder.embed([query.slice(0, MAX_QUERY_CHARACTERS)], {
         trace: { ...trace, workspaceId: owner },
@@ -544,6 +559,7 @@ export function createRetrievalIndex({ database, store, embedder, logger = log }
         workspaceId: owner.toHexString(),
         kinds,
         pathPrefix: path,
+        excludeSiteIds: excludeSiteIds.map((id) => String(id)),
         // Over-fetched because a path filter is applied to the points that come back: asking for
         // exactly `limit` and then discarding half of them would quietly return four results to a
         // caller that asked for eight.

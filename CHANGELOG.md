@@ -5,6 +5,16 @@ What changed in each release of Orbik. Releases are tagged `vX.Y.Z`; upgrading i
 
 ## Unreleased
 
+- **Sources.** A workspace reads more than its website. **Sources**, in the rail between Brand and
+  Agents, lists everything Orbik reads, and **Add a source** takes another site of yours (a
+  documentation subdomain, a second domain, the whole of it, one section or a few pages) or pages
+  about you elsewhere (a review profile, a directory listing, an article; only the pages listed,
+  and their own next pages). Each is read on its own schedule, copied into its own folder under
+  `/sources`, and says what it is — documentation, reviews, press — which the knowledge base reads
+  it for: a review is quoted as the reviewer's words. A source can be copied only, for search and
+  Ask, and never written into the knowledge base. **Found on your website** suggests the profiles
+  your site links to. The Crawler leaves Agents: its page is the website's pages under Sources, and
+  a running crawl can be stopped. See [docs/guides/sources.md](docs/guides/sources.md).
 - **Docs.** `docs/` is the documentation published at <https://orbik.io/docs>: getting started,
   guides, connecting your AI, self-hosting and a generated MCP tool reference, in the order
   `docs/nav.json` gives. The maintainers' design documents moved to `docs/architecture/`, and

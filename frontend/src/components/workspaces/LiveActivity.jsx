@@ -65,7 +65,7 @@ export function LiveActivity() {
           <p className="mt-2 text-xs text-orb-muted">Nothing running.</p>
         ) : (
           <ul className="mt-2 max-h-48 space-y-2 overflow-y-auto">
-            {activity.crawls.map((crawl) => <CrawlItem key={`crawl-${crawl.workspaceId}`} crawl={crawl} />)}
+            {activity.crawls.map((crawl) => <CrawlItem key={`crawl-${crawl.sourceId ?? crawl.workspaceId}`} crawl={crawl} />)}
             {library.map((entry) => <LibraryItem key={`library-${entry.workspaceId}`} entry={entry} />)}
             {activity.agents.map((run) => <AgentItem key={`agent-${run.runId}`} run={run} />)}
             {activity.aiCalls.map((call) => <CallItem key={`call-${call.id}`} call={call} />)}
@@ -124,16 +124,18 @@ function CrawlItem({ crawl }) {
   const share = total > 0 ? Math.min(1, crawl.fetched / total) : 0;
   const queued = crawl.phase === "queued";
   const starter = starterOf(crawl.startedBy);
+  // A workspace can be reading two of its sources at once: one that is not the website says which.
+  const name = [crawl.workspaceName ?? hostOf(crawl.seedUrl), crawl.primary === false ? crawl.sourceName : null].filter(Boolean).join(" · ");
   return (
     <li className="space-y-1">
       <div className="flex items-center gap-1.5 text-xs">
         <Waypoints aria-hidden="true" className={cn("size-3 shrink-0", queued ? "text-orb-orange" : "text-orb-cyan")} />
-        <span className="truncate text-orb-white">{crawl.workspaceName ?? hostOf(crawl.seedUrl)}</span>
+        <span className="truncate text-orb-white">{name}</span>
         <span className={cn("ml-auto shrink-0", queued ? "text-orb-orange" : "text-orb-muted")}>{describePhase(crawl.phase)}</span>
       </div>
       <div
         role="progressbar"
-        aria-label={`Crawl of ${crawl.workspaceName ?? hostOf(crawl.seedUrl)}`}
+        aria-label={`Crawl of ${name}`}
         aria-valuemin={0}
         aria-valuemax={total || undefined}
         aria-valuenow={queued ? undefined : crawl.fetched}

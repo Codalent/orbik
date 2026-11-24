@@ -1,6 +1,6 @@
 "use client";
 
-import { Bot } from "lucide-react";
+import { Bot, SatelliteDish } from "lucide-react";
 import Link from "next/link";
 
 import { AGENT_STATUS } from "@/lib/agents/registry";
@@ -8,8 +8,9 @@ import { cn } from "@/lib/utils";
 
 /**
  * The top level of the workspace's navigation, as the rail lists it: Home, then each thing the
- * workspace knows as a destination of its own, then Agents, then after a gap the pages that stand
- * outside both (an extension's), and at the far end, on its own, Settings.
+ * workspace knows as a destination of its own, then Sources — everything it reads — then Agents,
+ * then after a gap the pages that stand outside both (an extension's), and at the far end, on its
+ * own, Settings.
  *
  * Home leads because it is where somebody new to a workspace is sent and where its setup is
  * finished; once it is, the workspace opens on the Library instead, and Home stays here, one click
@@ -31,16 +32,23 @@ import { cn } from "@/lib/utils";
  * @param {Array<object>} [input.links] pages outside both: `{ id, name, icon, href }`
  * @param {Array<object>} [input.footer] pages pinned to the rail's far end (Settings), same shape
  * @param {string} [input.agentsHref] the Agents overview, where the Agents item leads
+ * @param {{href: string, working?: boolean}} [input.sources] Sources, after the knowledge rows:
+ *   everything the workspace reads, which has a sidebar of its own while one of its pages is open
  * @param {string} [input.path] route being viewed
- * @returns {{ items: Array<object>, agentsOpen: boolean }} the rail's items, and whether the
- *   route is the overview or one of the agents' pages
+ * @returns {{ items: Array<object>, agentsOpen: boolean, sourcesOpen: boolean }} the rail's
+ *   items, and whether the route is one of the agents' pages or one of the sources'
  */
-export function buildRail({ leading = [], knowledge, agents, links = [], footer = [], agentsHref, path }) {
+export function buildRail({ leading = [], knowledge, agents, links = [], footer = [], agentsHref, sources = null, path }) {
   const onKnowledge = knowledge.some((row) => row.href === path);
   const agentsOpen = !onKnowledge && ((agentsHref && path === agentsHref) || agents.some((row) => row.href === path));
+  // Every page under Sources — all of them, one, a source's pages — keeps it open.
+  const sourcesOpen = Boolean(sources && path && (path === sources.href || path.startsWith(`${sources.href}/`)));
 
   const items = knowledge.map((row) => ({ ...row, active: row.href === path }));
   if (items.length) items.unshift(...leading.map((link) => ({ ...link, active: link.href === path })));
+  if (items.length && sources) {
+    items.push({ id: "sources", name: "Sources", icon: SatelliteDish, href: sources.href, working: Boolean(sources.working), active: sourcesOpen });
+  }
   if (agents.length) {
     items.push({
       id: "agents",
@@ -58,7 +66,7 @@ export function buildRail({ leading = [], knowledge, agents, links = [], footer 
     // Settings is one item for all of its sections, each a route under it.
     footer.forEach((link, index) => items.push({ ...link, active: link.href === path || Boolean(path?.startsWith(`${link.href}/`)), last: index === 0 }));
   }
-  return { items, agentsOpen };
+  return { items, agentsOpen, sourcesOpen };
 }
 
 /**
