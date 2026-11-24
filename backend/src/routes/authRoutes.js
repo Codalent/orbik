@@ -64,6 +64,7 @@ export function createAuthRouter({ config, authService, setupService, csrfProtec
     durationSeconds: 900,
     keyFromRequest: (req) => req.ip,
   });
-  router.post("/v1/setup", ensureCsrfToken, csrfProtection, setupLimit, validateSetup, controller.setup);
+  // Only while first-run setup is on (ORBIK_FIRST_RUN_SETUP); off, the API's 404 answers.
+  if (setupService) router.post("/v1/setup", ensureCsrfToken, csrfProtection, setupLimit, validateSetup, controller.setup);
   return router;
 }

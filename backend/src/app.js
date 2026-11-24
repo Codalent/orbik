@@ -129,7 +129,11 @@ export function createApp({ config, database, readiness, extensions = createExte
       logger: log,
     })
     : null;
-  const setupService = createSetupService({ database, userRepository, events: extensions, origin: config.frontendOrigins[0] });
+  // First-run setup (the setup code and page); null with ORBIK_FIRST_RUN_SETUP=off, and then
+  // nothing is served at /v1/setup and the edition never asks for setup.
+  const setupService = config.firstRunSetup
+    ? createSetupService({ database, userRepository, events: extensions, origin: config.frontendOrigins[0] })
+    : null;
   // Getting in when signup is closed (an access request an admin approves), and back in without
   // the password (a reset link).
   const accessRequestService = createAccessRequestService({ database, userRepository, admins, config, sendEmail, events: extensions, logger: log });
@@ -341,7 +345,7 @@ export function createApp({ config, database, readiness, extensions = createExte
   app.use(createEditionRouter({
     extensions,
     config,
-    setupRequired: () => setupService.required(),
+    setupRequired: async () => (setupService ? setupService.required() : false),
     passwordReset: passwordResetService.selfService ? "email" : "admin",
     signInWith: googleSignIn ? ["google"] : [],
     aiAvailability: createAiAvailabilityReader({ database, searchConfigured: Boolean(retrieval) }),

@@ -70,6 +70,17 @@ export function parseEnvironment(source) {
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/u.test(address)) errors.push(`ORBIK_ADMIN_EMAILS has an address that is not one: ${address}`);
   }
 
+  // First-run setup: `on` (the default) prints a one-time setup code while the install has no
+  // account, and the web app sends people to the setup page to claim it. `off` is for an install
+  // whose accounts all come another way (signup, invites, `seed:user`): no code, no setup page.
+  // With signup open as well, the first account would otherwise be whoever signed up first, and
+  // with no admins named that account would administer the install; so that needs its admins named.
+  const firstRunSetup = (source.ORBIK_FIRST_RUN_SETUP ?? "on").trim().toLowerCase() || "on";
+  if (!["on", "off"].includes(firstRunSetup)) errors.push("ORBIK_FIRST_RUN_SETUP must be on or off.");
+  if (firstRunSetup === "off" && signup === "open" && !adminEmails.length) {
+    errors.push("ORBIK_FIRST_RUN_SETUP=off with ORBIK_SIGNUP=open needs ORBIK_ADMIN_EMAILS: otherwise whoever signs up first administers the install.");
+  }
+
   // Email, through any SMTP server: smtp://user:pass@host:587 or smtps://user:pass@host:465.
   // Optional. Without it nothing is emailed and nothing needs to be: an invite link is shown to
   // whoever made it, to send as they like. With it, an invite is also emailed to the address.
@@ -182,6 +193,7 @@ export function parseEnvironment(source) {
     signup,
     signupVerifyEmail,
     adminEmails,
+    firstRunSetup: firstRunSetup === "on",
     smtpUrl: smtpUrl || null,
     googleClientId: googleClientId || null,
     googleClientSecret: googleClientSecret || null,

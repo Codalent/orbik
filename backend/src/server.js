@@ -11,7 +11,7 @@ import { createApp } from "./app.js";
 import { parseEnvironment } from "./config/env.js";
 import { resolveSecrets } from "./config/secrets.js";
 import { ensureIndexes } from "./db/indexes.js";
-import { prepareFirstRun, setupBanner } from "./services/setupService.js";
+import { discardSetupCode, prepareFirstRun, setupBanner } from "./services/setupService.js";
 
 const parsed = parseEnvironment(process.env);
 const database = await connectMongo(parsed);
@@ -49,9 +49,15 @@ const server = app.listen(config.port, config.host, () => {
 });
 
 // A new install says how to claim it, in words, where its operator will look: this process's log.
-const setupCode = await prepareFirstRun(database);
-if (setupCode) {
-  console.log(setupBanner({ code: setupCode, url: `${config.frontendOrigins[0]}/setup` }));
+// With first-run setup off, no code is printed, and one left from before setup was turned off is
+// deleted.
+if (config.firstRunSetup) {
+  const setupCode = await prepareFirstRun(database);
+  if (setupCode) {
+    console.log(setupBanner({ code: setupCode, url: `${config.frontendOrigins[0]}/setup` }));
+  }
+} else {
+  await discardSetupCode(database);
 }
 
 /**
