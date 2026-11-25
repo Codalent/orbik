@@ -1,7 +1,7 @@
 # A domain with HTTPS
 
 Put the install on a domain of its own and the proxy gets and renews its certificate for you.
-Claude.ai, Claude Desktop and ChatGPT can only sign in to an install on HTTPS.
+Claude.ai, Claude Desktop, ChatGPT, Gemini and Grok can only sign in to an install on HTTPS.
 
 ## Setting it up
 
@@ -17,8 +17,9 @@ ORBIK_HTTPS_PORT=443
 
 Then run `docker compose up -d` again. The proxy (Caddy) gets and renews the certificate itself.
 
-HTTPS matters beyond privacy: Claude.ai, Claude Desktop and ChatGPT connect to Orbik from their own
-servers and sign in over OAuth only on HTTPS, so they need the install on a public HTTPS address.
+HTTPS matters beyond privacy: Claude.ai, Claude Desktop, ChatGPT, Gemini and Grok connect to Orbik
+from their own servers and sign in over OAuth only on HTTPS, so they need the install on a public
+HTTPS address.
 Sessions also use secure cookies when the address is HTTPS.
 
 A plain-HTTP address other than `localhost` works for the web app, but browsers treat it as

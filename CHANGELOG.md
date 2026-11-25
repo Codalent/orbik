@@ -5,6 +5,12 @@ What changed in each release of Orbik. Releases are tagged `vX.Y.Z`; upgrading i
 
 ## Unreleased
 
+- **Gemini and Grok, and chat apps first.** Home's **Connect Orbik MCP** opens on **Claude.ai,
+  ChatGPT, Gemini, Grok**, ahead of the coding agents, and its second step is a button for each
+  app, under the app's own mark, to the settings page where a custom connector is added; Settings →
+  Orbik MCP shows the same buttons. Gemini (a custom app) and Grok (a custom connector) sign in to
+  Orbik like Claude.ai and ChatGPT. See [Gemini](docs/connect-your-ai/gemini.md) and
+  [Grok](docs/connect-your-ai/grok.md).
 - **No self-service signup.** Orbik is for a person or an organization running it for its own
   people: accounts come from the setup page, invites, access requests an admin approves, and
   `seed:user`. `ORBIK_SIGNUP` and `ORBIK_SIGNUP_VERIFY_EMAIL` are gone, with the signup form, the
