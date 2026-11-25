@@ -113,7 +113,8 @@ What changed in each release of Orbik. Releases are tagged `vX.Y.Z`; upgrading i
 - **Agents.** **Agents → Knowledge base** is the agent's own page rather than a second copy of the
   Library: its switch, what it is waiting on, the folders it writes into, the source ledger, what
   its last run changed and its recent runs, with links into the Library. While any agent is
-  working, its row and the rail's **Agents** item are marked as working, whoever started it.
+  working, its row and the rail's **Agents** item are marked as working, whoever started it and
+  whatever page is open.
 - **Home.** The ask box appears once Ask can answer; before the first crawl has finished, Home no
   longer shows a box saying why it cannot. The workspace's rail is a little narrower.
 

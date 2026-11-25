@@ -12,7 +12,7 @@ import { AskPanelProvider, useAskPanel } from "@/lib/ask/askPanel";
 import { OrbikLogo } from "@/components/OrbikLogo";
 import { NeutralLoading } from "@/components/NeutralLoading";
 import { buildAgentRows } from "@/lib/agents/registry";
-import { LIVE_ACTIVITY_PATH } from "@/lib/api/activity";
+import { useLiveActivity } from "@/lib/api/activity";
 import { WORKSPACES_PATH, selectWorkspace } from "@/lib/api/workspaces";
 import { useCrawlOverview } from "@/lib/crawl/useCrawlOverview";
 import { extensionApi, useExtensionSlots } from "@/lib/extensions/slots";
@@ -65,10 +65,11 @@ function WorkspaceChrome({ children }) {
   // unavailable" rather than guessing that nothing is happening.
   const { crawl } = useCrawlOverview(selectedWorkspaceId);
 
-  // What the rail says about the Library being written comes from the same read the activity
-  // monitor at the sidebar's foot polls, from the same cache: this asks for nothing of its own and
-  // is re-rendered whenever that poll brings something new.
-  const { data: activity = null } = useSWR(LIVE_ACTIVITY_PATH);
+  // What the rail says is at work — the Library being written, a source being read, an agent
+  // running — comes from the read the activity monitor shows, from the same cache. The rail polls
+  // it itself: most pages have no sidebar, so no monitor, and an agent that started while one of
+  // them was open went without its dot until the person moved to Agents or Sources.
+  const { activity } = useLiveActivity();
   // What an installed extension adds: rail items, banners and agents. Empty in the open-source edition.
   const extensionSlots = useExtensionSlots();
 
