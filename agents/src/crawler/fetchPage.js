@@ -10,6 +10,7 @@ import { toMarkdown } from "./markdown.js";
 import { SOURCE_RESERVE_SHARE, describePageKind, getAgentCollections } from "@orbik/core";
 import { loadRobotsForSite } from "./robotsStore.js";
 import { parseSiteConfig } from "./siteConfig.js";
+import { siteIconJob } from "./siteIcon.js";
 import { recrawlPriority } from "./priority.js";
 import { detectSiteBlock, isRunBlocked, isRunStopped, recordBlocked, recordNotBlocked } from "./siteBlock.js";
 import {
@@ -233,7 +234,7 @@ export function createFetchHandler({ createFetcherFor }) {
       // unchanged one, and an incremental crawl of a stable site would fetch nothing but the seed.
       return {
         counters: { pagesNotModified: 1 },
-        enqueue: await queueStoredLinks({ collections, registry, job, siteId, urlHash }),
+        enqueue: [...iconFollowUp(config, scope, job, siteId, urlHash), ...await queueStoredLinks({ collections, registry, job, siteId, urlHash })],
       };
     }
 
@@ -360,7 +361,7 @@ export function createFetchHandler({ createFetcherFor }) {
         urlsDiscovered: discovered.newEligible,
         ...(changes.length ? { pagesChanged: 1 } : {}),
       },
-      enqueue: discovered.enqueue,
+      enqueue: [...iconFollowUp(config, scope, job, siteId, urlHash), ...discovered.enqueue],
     };
   };
 }
@@ -390,6 +391,15 @@ export async function queueStoredLinks({ collections, registry, job, siteId, url
   const build = discovery ? discoveryJob : fetchJob;
   return pending.map((row) =>
     build({ siteId, runId: job.runId, urlHash: row.urlHash, priority: recrawlPriority(row) }));
+}
+
+/**
+ * The job that reads the website's icon, when the page just answered is the website's home page:
+ * once per crawl, whether the page changed or not (`siteIcon.js` reads the icons the newest whole
+ * copy of the page named). Another source's home page is not the workspace's, and gets none.
+ */
+function iconFollowUp(config, scope, job, siteId, urlHash) {
+  return config.primary && urlHash === scope.seed.hash ? [siteIconJob({ siteId, runId: job.runId })] : [];
 }
 
 /** Whether a registry row's run stamp names the run a job belongs to. */

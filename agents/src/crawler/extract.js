@@ -26,6 +26,8 @@ const EXTRACT_LIMITS = Object.freeze({
   maxImageContainerText: 400,
   /** How many ancestors are tried for that container. */
   maxImageContainerLevels: 5,
+  /** The icons a page's `<link>` elements name that are kept; a page names a handful. */
+  maxIcons: 20,
 });
 
 /**
@@ -126,6 +128,10 @@ export function extractPage(html, options = {}) {
       type: propertyContent($, "og:type"),
       image: propertyContent($, "og:image"),
     },
+    // What the page names as its icon. Read on every page and used from the home page's snapshot
+    // for the workspace's icon (`siteIcon.js`), which reads it from there even on a crawl the home
+    // page answered with "not modified".
+    icons: pageIcons($, options.url),
     links,
     linkCount: links.length,
   };
@@ -400,6 +406,38 @@ function imageInventory($, pageUrl) {
   });
 
   return { version: IMAGE_INVENTORY_VERSION, items, beyondCap };
+}
+
+/**
+ * The icons a page names in its `<link>` elements: `icon` (with `shortcut icon`, its old
+ * spelling) and `apple-touch-icon`, each with the sizes, type and media it declares. Addresses are
+ * resolved as an image's are, against the page or its `<base href>`; one written inline (`data:`)
+ * or on another scheme is left out, and so is `mask-icon`, a one-colour outline meant to be tinted.
+ *
+ * @returns {Array<{rel: "icon"|"apple-touch-icon", url: string, sizes: string|null, type: string|null, media: string|null}>}
+ */
+function pageIcons($, pageUrl) {
+  const base = documentBase($, pageUrl);
+  const icons = [];
+  $("link[rel][href]").each((_index, element) => {
+    if (icons.length >= EXTRACT_LIMITS.maxIcons) return false;
+    const node = $(element);
+    const rel = (node.attr("rel") ?? "").toLowerCase().split(/\s+/);
+    const kind = rel.includes("apple-touch-icon") || rel.includes("apple-touch-icon-precomposed") ? "apple-touch-icon" : rel.includes("icon") ? "icon" : null;
+    const href = node.attr("href").trim();
+    if (!kind || !href || href.length > EXTRACT_LIMITS.maxImageUrlLength || /^data:/i.test(href)) return true;
+    let url;
+    try {
+      url = new URL(href, base ?? undefined);
+    } catch {
+      return true;
+    }
+    if (url.protocol !== "https:" && url.protocol !== "http:") return true;
+    const text = (name, max) => node.attr(name)?.trim().toLowerCase().slice(0, max) || null;
+    icons.push({ rel: kind, url: url.href, sizes: text("sizes", 100), type: text("type", 60), media: text("media", 120) });
+    return true;
+  });
+  return icons;
 }
 
 /** The address relative addresses are resolved against: the page's, unless it declares a base. */

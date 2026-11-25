@@ -188,6 +188,15 @@ export const AGENT_COLLECTIONS = Object.freeze({
    * through the chat — with the value before and after, so each can be shown and undone.
    */
   brandChanges: "brand_changes",
+  /**
+   * One document per workspace holding its icon: the one the crawler found on the website, the one
+   * a person uploaded, and which of them — or neither, the name's first letter — the workspace is
+   * shown with. `_id` is the workspace's identifier, and `workspaceId` repeats it so that deleting
+   * a workspace sweeps it with the rest. The pictures are small (`WORKSPACE_ICON_LIMITS` in
+   * `@orbik/assets`) and sit in the row itself; every reader but the route that serves an icon
+   * leaves the bytes out.
+   */
+  workspaceIcons: "workspace_icons",
   /** Per-workspace crawl configuration: seeds, scope, politeness, cadence, and robots policy. */
   sites: "crawl_sites",
   /** The durable URL registry: every URL ever discovered for a site, and how. */

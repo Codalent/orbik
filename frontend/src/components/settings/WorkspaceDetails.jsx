@@ -19,9 +19,12 @@ import { cn } from "@/lib/utils";
 import { workspaceHomePath } from "@/lib/workspaces/home";
 import { can, roleLabel, roleOf } from "@/lib/workspaces/roles";
 
+import { WorkspaceIconSetting } from "./WorkspaceIconSetting";
+
 /**
- * What the workspace is — its name, site, identifier, the reader's role, when it was made — and,
- * for admins and the owner, editing the name and website. Deleting it is `DeleteWorkspace` below,
+ * What the workspace is — its name, site, icon, identifier, the reader's role, when it was made —
+ * and, for admins and the owner, editing the name and website and choosing the icon
+ * (`WorkspaceIconSetting`, which saves on its own). Deleting it is `DeleteWorkspace` below,
  * which the settings page puts last, after every other section, so it is not the second thing on
  * the page.
  *
@@ -65,6 +68,9 @@ export function WorkspaceDetails({ workspace }) {
               ) : (
                 <span className="text-orb-muted">Not set</span>
               )}
+            </Fact>
+            <Fact label="Icon" hint="Beside the name on Home and in the workspace switcher.">
+              <WorkspaceIconSetting workspace={workspace} canEdit={canEdit} />
             </Fact>
             <Fact label="Workspace ID" hint="An AI connected to several workspaces names this one by it.">
               <span className="flex min-w-0 flex-wrap items-center gap-2">
@@ -178,7 +184,7 @@ function DetailsForm({ workspace, onDone, onCancel }) {
               <li>Every page crawled from the old site is removed: snapshots, links, page Markdown and crawl history.</li>
               <li>A crawl of {hostOf(siteChange.to)} starts within a minute and spends this month&apos;s crawl budget.</li>
               <li>The Library keeps what people and agents wrote; its copies of the old pages are replaced as the new pages are crawled.</li>
-              <li>The brand stays as it is.</li>
+              <li>The brand stays as it is. The icon read from the old site goes, and the new site&apos;s is read when it is crawled; an uploaded icon stays.</li>
             </ul>
             <div className="flex shrink-0 flex-wrap items-center justify-end gap-2 border-t border-orb-line py-3.5 pr-4 pl-6">
               <Button type="button" variant="ghost" onClick={() => setSiteChange(null)} disabled={pending}>Keep the current site</Button>

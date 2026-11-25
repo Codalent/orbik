@@ -4,6 +4,7 @@ import { createDiscoverHandler } from "./discover.js";
 import { createFetchHandler } from "./fetchPage.js";
 import { createFinalizeHandler } from "./finalize.js";
 import { crawlerUserAgent } from "./siteConfig.js";
+import { createSiteIconHandler } from "./siteIcon.js";
 import { CRAWLER_AGENT, CRAWLER_JOBS } from "../jobs.js";
 import { defineAgent } from "../runtime/registry.js";
 
@@ -14,7 +15,8 @@ import { defineAgent } from "../runtime/registry.js";
  * it found. They are separate handlers because they fail differently: discovery is a handful of
  * requests that establish the shape of a crawl, fetching is thousands that fill it in. A third
  * handler, `finalize`, runs once the crawl drains and computes what only the finished link graph
- * can answer: exact click depth, and which pages nothing links to.
+ * can answer: exact click depth, and which pages nothing links to. A small fourth, `icon`, reads
+ * the website's icon for its workspace once the home page has been fetched.
  *
  * @param {object} [options] collaborators
  * @param {(config: object) => {fetch: Function}} [options.createFetcherFor] builds a site's HTTP
@@ -39,6 +41,7 @@ export function createCrawlerAgent(options = {}) {
       [CRAWLER_JOBS.discoverPage]: createDiscoverPageHandler({ createFetcherFor }),
       [CRAWLER_JOBS.startFetch]: createStartFetchHandler(),
       [CRAWLER_JOBS.fetch]: createFetchHandler({ createFetcherFor }),
+      [CRAWLER_JOBS.icon]: createSiteIconHandler({ createFetcherFor }),
       [CRAWLER_JOBS.finalize]: createFinalizeHandler(),
     },
   });

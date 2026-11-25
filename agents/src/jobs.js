@@ -28,6 +28,8 @@ export const CRAWLER_JOBS = Object.freeze({
   discoverPage: "crawler.discover-page",
   startFetch: "crawler.start-fetch",
   fetch: "crawler.fetch",
+  // The website's icon, for its workspace: queued by the fetch of the home page.
+  icon: "crawler.icon",
   finalize: "crawler.finalize",
 });
 

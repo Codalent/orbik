@@ -71,13 +71,25 @@ export function roleOf(workspace) {
  * @returns {"owner"|"admin"|"member"|"read-only"|null}
  */
 export function useWorkspaceRole(workspaceId) {
+  return roleOf(useWorkspaceItem(workspaceId));
+}
+
+/**
+ * A workspace's item of the workspace list — the address's when none is named — or null while the
+ * list is loading or when the workspace is not in it. Read from the shell's cache as the role is
+ * (`useWorkspaceRole`), for what a page shows of the workspace beyond its own read: its icon.
+ *
+ * @param {string} [workspaceId]
+ * @returns {object|null} an item of `GET /v1/workspaces`
+ */
+export function useWorkspaceItem(workspaceId) {
   const params = useParams();
   const id = workspaceId ?? (typeof params?.workspaceId === "string" ? params.workspaceId : null);
   const { cache } = useSWRConfig();
   const loaded = cache.get(WORKSPACES_PATH)?.data !== undefined;
   const { data } = useSWR(WORKSPACES_PATH, { revalidateOnMount: !loaded, revalidateIfStale: false });
   if (!id) return null;
-  return roleOf(data?.items?.find((workspace) => workspace.id === id));
+  return data?.items?.find((workspace) => workspace.id === id) ?? null;
 }
 
 /**

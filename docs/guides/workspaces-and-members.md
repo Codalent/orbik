@@ -9,7 +9,7 @@ Choose **Create workspace** in the workspace switcher, give the workspace a name
 of its website, and choose **Create workspace**. You are its owner. The next step is to crawl the
 site (see [Crawling](crawling.md)).
 
-The workspace's settings are under **Settings**: **Workspace** for its name, website and ID,
+The workspace's settings are under **Settings**: **Workspace** for its name, website, icon and ID,
 **People** for who is in it, **Orbik MCP** for connecting your AI, and **AI calls** for every model
 call made on your account's behalf, across all your workspaces. Below them, under **You**, are
 **Account**, for your password, and for the install's admins **Admin** (see
@@ -25,13 +25,27 @@ Admins and the owner can rename the workspace and change its website on **Settin
 - **A different site** starts over, and you are asked first. Every page crawled from the old site
   is removed — snapshots, links, page Markdown and crawl history — and a crawl of the new site is
   requested. The Library keeps what people and agents wrote; its copies of the old site's pages are
-  replaced as the new pages are crawled. The brand stays as it is.
+  replaced as the new pages are crawled. The brand stays as it is. The icon read from the old site
+  goes, and the new site's is read when it is crawled; an uploaded icon stays.
 
 `www.example.com` and `example.com` are different hostnames, so moving between them counts as a
 different site, with one exception: when one of the two only redirects to the other, the crawl has
 already moved to the one that answers (see
 [Crawling your site](crawling.md#when-your-address-redirects-to-www)), and a website typed with
 either name is the same site. A website can't be changed while a crawl is running.
+
+## The workspace's icon
+
+A workspace is shown with an icon beside its name: on Home and in the workspace switcher. Admins
+and the owner choose it under **Icon** on **Settings → Workspace**:
+
+- **Website's icon**, the default. Each crawl reads the icon your website's home page names (or its
+  `/favicon.ico`), so it follows the site when the site changes it. A new workspace has it as soon
+  as its first crawl has read the home page.
+- **Uploaded**, a picture of your own: **Upload an icon…** takes a PNG, SVG, WebP, JPEG, GIF, AVIF
+  or ICO file of up to 512 KB, and uses it at once. A square picture works best. The website's
+  icon is still read at each crawl, so you can switch back to it.
+- **Letter**, the first letter of the workspace's name.
 
 ## Roles
 
@@ -42,7 +56,7 @@ either name is the same site. A website can't be changed while a crawl is runnin
 | Edit the Library, change the brand, crawl, run agents and set them to work | | ✓ | ✓ | ✓ |
 | Connect an AI that also writes to the Library | | ✓ | ✓ | ✓ |
 | Invite people, change roles, remove people | | | ✓ | ✓ |
-| Rename the workspace, change its website, clear its crawl data | | | ✓ | ✓ |
+| Rename the workspace, change its website or icon, clear its crawl data | | | ✓ | ✓ |
 | Delete the workspace | | | | ✓ |
 
 **People** in the settings lists the owner and every member with their role; everyone in the

@@ -4,14 +4,16 @@ import { ArrowUpRight, Search } from "lucide-react";
 
 import { OrbikMark } from "@/components/OrbikMark";
 import { Button } from "@/components/ui/button";
+import { WorkspaceIcon } from "@/components/workspaces/WorkspaceIcon";
 import { useAiAvailability } from "@/lib/ask/ai";
 import { useAskPanel, useAskShortcut } from "@/lib/ask/askPanel";
 import { STEP_STATE, plural } from "@/lib/home/home";
 import { cn } from "@/lib/utils";
+import { useWorkspaceItem } from "@/lib/workspaces/roles";
 
 /**
- * The head of Home: the workspace's mark, name and site, how it is doing in a word, and a way to
- * ask the knowledge base a question.
+ * The head of Home: the workspace's mark (its icon, or its initial), name and site, how it is
+ * doing in a word, and a way to ask the knowledge base a question.
  *
  * The status is worked out from the same Home read as everything under it, in order of what a
  * person would want to hear first: a failed run, then something moving, then that the site has
@@ -34,6 +36,8 @@ export function HomeHeader({ home, hidden, onShowSetup }) {
   const shortcut = useAskShortcut();
   const ai = useAiAvailability();
   const { name, websiteUrl } = home.workspace;
+  // The icon is the workspace list's, which Settings re-reads when it changes.
+  const listed = useWorkspaceItem(home.workspace.id);
   const host = hostOf(websiteUrl);
   const status = statusOf(home);
   const starters = [`What does ${name} offer?`, `Who is ${name} for?`, `What sets ${name} apart?`];
@@ -43,12 +47,11 @@ export function HomeHeader({ home, hidden, onShowSetup }) {
       <OrbitBackdrop />
 
       <div className="flex flex-wrap items-start gap-x-4 gap-y-3">
-        <span
-          aria-hidden="true"
-          className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-monogram font-display text-xl font-bold text-monogram-foreground shadow-[0_0_0_4px_color-mix(in_oklab,var(--color-monogram)_14%,transparent)]"
-        >
-          {initialOf(name)}
-        </span>
+        <WorkspaceIcon
+          workspace={{ ...home.workspace, icon: listed?.icon }}
+          className="size-12 rounded-xl font-display text-xl font-bold shadow-[0_0_0_4px_color-mix(in_oklab,var(--color-monogram)_14%,transparent)]"
+          letterClassName="bg-monogram text-monogram-foreground"
+        />
         <div className="min-w-0 flex-1">
           <h1 id="home-title" className="font-display text-title font-bold leading-tight tracking-[-0.02em] text-orb-white [overflow-wrap:anywhere]">
             {name}
@@ -176,11 +179,6 @@ function OrbitBackdrop() {
   );
 }
 
-/** The first letter or digit of a name, for the workspace's mark. */
-function initialOf(name) {
-  const match = String(name ?? "").match(/[\p{L}\p{N}]/u);
-  return match ? match[0].toUpperCase() : "·";
-}
 
 /** The hostname of an address without "www.", or null. */
 function hostOf(url) {

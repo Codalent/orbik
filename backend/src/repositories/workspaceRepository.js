@@ -1,3 +1,4 @@
+import { toIconSummary } from "@orbik/assets";
 import { toObjectId } from "@orbik/core";
 import { ObjectId } from "mongodb";
 
@@ -8,14 +9,22 @@ import { ObjectId } from "mongodb";
  */
 const ACCESSIBLE_PROJECTION = Object.freeze({ name: 1, websiteUrl: 1, createdAt: 1, ownerId: 1, limits: 1 });
 
-/** Converts a workspace persistence record to its public summary, with the caller's role when known. */
-export function toWorkspaceSummary(workspace) {
+/**
+ * Converts a workspace persistence record to its public summary, with the caller's role when known
+ * and its icon: what it is shown with, and the website's and the uploaded picture to choose from
+ * (`toIconSummary` in `@orbik/assets`; a workspace with no icon row has neither yet).
+ *
+ * @param {object} workspace the `workspaces` record
+ * @param {object|null} [icon] its `workspace_icons` row, without the pictures
+ */
+export function toWorkspaceSummary(workspace, icon = null) {
   return {
     id: workspace._id.toHexString(),
     name: workspace.name,
     websiteUrl: workspace.websiteUrl,
     createdAt: workspace.createdAt.toISOString(),
     ...(workspace.role ? { role: workspace.role } : {}),
+    icon: toIconSummary(icon),
   };
 }
 
