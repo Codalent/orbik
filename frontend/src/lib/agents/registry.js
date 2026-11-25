@@ -95,8 +95,8 @@ const AGENTS = Object.freeze([
  *
  * @param {string} workspaceId workspace the rows link into
  * @param {object|null} crawl crawl overview, or null when it could not be read
- * A row is drawn as working whenever the live activity read (`GET /v1/activity`, the one the
- * activity monitor at the sidebar's foot polls) has a run of that agent in this workspace, whatever
+ * A row is drawn as working whenever the live activity read (`GET /v1/activity`, polled by
+ * `useLiveActivity` on every page) has a run of that agent in this workspace, whatever
  * its own state says: an agent started by the crawl or the scheduler is working as much as one a
  * person started, and a still row beside a run in the activity monitor reads as two accounts of
  * one thing. The Knowledge base agent also counts its first stage, the copy into Sources.

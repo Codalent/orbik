@@ -1,14 +1,9 @@
 "use client";
 
 import { Activity, BookMarked, Bot, Sparkles, Waypoints } from "lucide-react";
-import useSWR from "swr";
-
-import { LIVE_ACTIVITY_PATH } from "@/lib/api/activity";
+import { useLiveActivity } from "@/lib/api/activity";
 import { hostOf, personFromEmail } from "@/lib/format";
 import { cn } from "@/lib/utils";
-
-/** How often the monitor asks while something is running, and while nothing is. */
-const POLL_MS = Object.freeze({ active: 3000, idle: 15000 });
 
 /**
  * The small window at the foot of the sidebar that shows what Orbik is doing right now.
@@ -23,21 +18,14 @@ const POLL_MS = Object.freeze({ active: 3000, idle: 15000 });
  * a finished crawl started names nobody.
  *
  * It asks the server rather than assembling a picture from what the page happens to know,
- * because the page only knows about its own workspace and only while it is open. Polling slows
- * to a crawl when nothing is live, so an idle sidebar costs a request every fifteen seconds; a
- * crawl being asked for, starting or ending has it ask at once (`useCrawlOverview`), so a short
- * crawl is not missed between two slow polls.
+ * because the page only knows about its own workspace and only while it is open. How often it
+ * asks is `useLiveActivity`'s: every few seconds while something is live, slowly otherwise.
  *
  * On a phone, where the sidebar sits above the page, the box is one line instead: the first thing
  * running and how many more, so the page's own head is not pushed down by a list.
  */
 export function LiveActivity() {
-  // The cadence is chosen from the latest answer, so the faster one starts on the read after
-  // something goes live rather than after one idle-length wait.
-  const { data: activity = null, error } = useSWR(LIVE_ACTIVITY_PATH, {
-    refreshInterval: (latest) => (latest?.active ? POLL_MS.active : POLL_MS.idle),
-  });
-  const failed = Boolean(error);
+  const { activity, failed } = useLiveActivity();
   const active = activity?.active === true;
 
   const library = activity?.library ?? [];
