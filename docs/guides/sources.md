@@ -90,9 +90,21 @@ The website is always written from.
 
 ## A source's page
 
-A source's page heads with its state and **Read now** (or **Stop crawl** while it is being read)
-and **Open in Library**. While a source is read, a bar shows the pages read, left out and waiting.
-Below are its settings, which apply from its next read:
+A source's page heads with its state, its address, when it was last and is next read, and **Crawl
+now** (**Stop crawl** while it is being read or waits to be). Under the head are three tabs.
+
+**Overview** says how the source is doing. While it is read, a bar shows the pages read, left out
+and waiting. Then come the crawl's figures, each in the colour of what it means and each finding a
+link to its pages, and the month's crawl budget; the latest pages read and the ones left out and
+why, or for a list of pages what the last read found on each; **The copy**, the source's folder in
+the Library, with **Open in Library**; and **Quoted in**, the knowledge base's files that cite its
+pages.
+
+**Pages** is every page the source's crawl keeps: the tree, the pages behind each finding, the crawl
+logs, and each page's Markdown with what the crawl recorded about it. For the website, that is the
+crawl page described in [Crawling your site](crawling.md#the-crawl-page).
+
+**Settings** is everything that can be set about the source, applied from its next read:
 
 - **How much of it**, for a site of yours other than the website: **The whole site**, **One
   section** (only addresses under a path such as `/guides/`) or **Only these pages**.
@@ -101,16 +113,15 @@ Below are its settings, which apply from its next read:
   **Sitemaps** lists those `robots.txt` names and takes more.
 - **Pages Orbik reads**, for a list of pages: the pages you listed and the next pages found from
   them. Add or remove pages here; every page is on the source's host.
-- **What it is**, **In the Library** and **How often**, as above.
+- **What it is**, **In the Library** and **How often**, as above. **Set crawl frequencies**, under
+  **How often**, reads chosen pages or whole folders daily, weekly, monthly or only when asked, each
+  on its own.
+- **Crawl data**: **Fresh crawl** fetches every page again in full, and **Clear crawl data** (admin
+  or owner) deletes every crawled page, its history and the crawl logs. Both ask first, and neither
+  is offered while the source is being read.
 - **Remove this source** (admin or owner): Orbik stops reading it, and its folder leaves the
   Library with every page copied there. What the knowledge base already wrote from it stays, citing
   the pages it was written from. The website cannot be removed: change it under Settings.
-
-Beside them: the latest pages read and the ones left out and why, or for a list of pages what the
-last read found on each; **The copy**, the source's folder in the Library; and **Quoted in**, the
-knowledge base's files that cite its pages. Every source's full page list — the tree, its figures,
-frequencies and crawl logs — is a link away, at **All N pages**. For the website, that is the crawl
-page described in [Crawling your site](crawling.md).
 
 ## Found on your website
 
