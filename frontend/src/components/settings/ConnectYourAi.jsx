@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label";
 import { CopyButton } from "@/components/brand/CopyButton";
 import { Panel, PanelTitle, RowList } from "@/components/ui/panel";
 import { Pill } from "@/components/ui/pill";
+import { ChatAppLinks } from "./ChatApps";
 import { ConnectYourAiSkeleton } from "./SettingsSkeletons";
 import * as mcpApi from "@/lib/api/mcp";
 import * as oauthApi from "@/lib/api/oauth";
@@ -26,9 +27,9 @@ import { cn } from "@/lib/utils";
  * The card leads with a prompt the person pastes into their own AI, which connects Orbik for them
  * where it can and walks them through it where it cannot. The manual way follows: one tab per kind
  * of AI, each a few numbered steps with what to paste shown in full beside its copy button, and a
- * first prompt to try once connected. Claude's
- * apps, ChatGPT and Claude Code sign in through Orbik's OAuth, so they need no token; the token form
- * is for everything else. What is already connected comes after.
+ * first prompt to try once connected. The chat apps (Claude's, ChatGPT, Gemini, Grok) and Claude Code
+ * sign in through Orbik's OAuth, so they need no token; the token form is for everything else. What
+ * is already connected comes after.
  *
  * A token minted here reads this workspace, or — if the person says so — all of their workspaces,
  * including ones they create or join later. A set is safe for the same reason one workspace was: the
@@ -170,7 +171,7 @@ export function ConnectYourAi({ workspaceId, endpointUrl = defaultEndpointUrl() 
         <div>
           <p className="text-sm text-orb-gray">
             <span className="font-medium text-orb-white">Quickest: paste this into the AI you use.</span> A coding agent such as
-            Claude Code or Cursor adds Orbik itself; Claude.ai and ChatGPT tell you where to click.
+            Claude Code or Cursor adds Orbik itself; Claude.ai, ChatGPT, Gemini and Grok tell you where to click.
           </p>
           <PasteBlock label="Prompt" text={connectPrompt(endpointUrl, workspaceName)} />
         </div>
@@ -207,8 +208,9 @@ export function ConnectYourAi({ workspaceId, endpointUrl = defaultEndpointUrl() 
           {clientTab === "app" && (
             <Steps>
               <li>
-                In Claude.ai or Claude Desktop, open <span className="text-orb-white">Settings → Connectors → Add custom connector</span>.
-                In ChatGPT, add a custom connector the same way.
+                Open your app&apos;s connector settings and add a custom connector. In Claude Desktop it is{" "}
+                <span className="text-orb-white">Settings → Connectors → Add custom connector</span>.
+                <ChatAppLinks className="mt-2 max-w-md" />
               </li>
               <li>
                 Name it <span className="text-orb-white">Orbik</span> and paste this URL:
@@ -349,9 +351,9 @@ export function ConnectYourAi({ workspaceId, endpointUrl = defaultEndpointUrl() 
   );
 }
 
-/** The ways in, as the card's tabs name them. Claude's apps, ChatGPT and Claude Code sign in; the rest take a token. */
+/** The ways in, as the card's tabs name them. The chat apps and Claude Code sign in; the rest take a token. */
 const CLIENTS = Object.freeze([
-  { id: "app", label: "Claude.ai or ChatGPT", icon: AppWindow },
+  { id: "app", label: "Claude.ai, ChatGPT, Gemini, Grok", icon: AppWindow },
   { id: "claude-code", label: "Claude Code", icon: TerminalSquare },
   { id: "token", label: "Cursor and others", icon: KeyRound },
 ]);
@@ -368,9 +370,10 @@ function firstPrompt(workspaceName) {
 
 /**
  * A prompt that has the person's own AI connect Orbik for them: an agent that can add an MCP server
- * (Claude Code, Cursor and the like) does it, and a chat app that cannot (Claude.ai, ChatGPT) walks
- * them through its own settings instead. It names the URL in full and says sign-in needs no token,
- * so nothing has to be looked up elsewhere; the manual steps below it say the same by hand.
+ * (Claude Code, Cursor and the like) does it, and a chat app that cannot (Claude.ai, ChatGPT,
+ * Gemini, Grok) walks them through its own settings instead. It names the URL in full and says
+ * sign-in needs no token, so nothing has to be looked up elsewhere; the manual steps below it say
+ * the same by hand.
  */
 function connectPrompt(endpointUrl, workspaceName) {
   const which = workspaceName ? `the ${workspaceName} knowledge base` : "my workspace's knowledge base";
@@ -382,7 +385,7 @@ function connectPrompt(endpointUrl, workspaceName) {
     "Transport: Streamable HTTP. It signs in with OAuth, so no token or API key is needed.",
     "",
     `- If you can add MCP servers yourself (Claude Code, Cursor or another coding agent), add it now. In Claude Code, run: claude mcp add --transport http orbik ${endpointUrl} — then tell me to type /mcp and sign in to orbik.`,
-    "- If you cannot (Claude.ai, Claude Desktop, ChatGPT), give me the exact clicks in this app to add a custom connector named Orbik with that URL.",
+    "- If you cannot (Claude.ai, Claude Desktop, ChatGPT, Gemini, Grok), give me the exact clicks in this app to add a custom connector named Orbik with that URL.",
     "- If my client cannot sign in with OAuth, tell me to create a token in Orbik under Settings → Orbik MCP → Cursor and others.",
     "",
     "Signing in opens Orbik, where I choose which workspaces you may read. Once connected, read the knowledge base's index and tell me in one line what the company does.",

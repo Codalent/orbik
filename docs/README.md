@@ -7,7 +7,7 @@ The **Library** is a tree of Markdown files: a word-for-word copy of every page 
 a knowledge base above it that a model writes from the pages that matter most. People and agents
 edit it together, and what a person writes is kept. Orbik also derives your site's **brand** —
 colours, type, logo — drafts an **llms.txt** for you to publish, and serves all of it to Claude,
-ChatGPT, Cursor and other AI clients over **MCP**.
+ChatGPT, Gemini, Grok, Cursor and other AI clients over **MCP**.
 
 ## Where to start
 
@@ -28,7 +28,8 @@ ChatGPT, Cursor and other AI clients over **MCP**.
 
 - [Overview](connect-your-ai/README.md) — tokens, sign-in, workspaces and writing.
 - [Claude.ai and Claude Desktop](connect-your-ai/claude.md),
-  [ChatGPT](connect-your-ai/chatgpt.md), [Claude Code](connect-your-ai/claude-code.md),
+  [ChatGPT](connect-your-ai/chatgpt.md), [Gemini](connect-your-ai/gemini.md),
+  [Grok](connect-your-ai/grok.md), [Claude Code](connect-your-ai/claude-code.md),
   [Cursor and others](connect-your-ai/cursor-and-others.md).
 - [Tool reference](connect-your-ai/tools.md) — every tool your AI can call.
 

@@ -107,6 +107,11 @@ run. See [The Library](../guides/library.md).
 
 On **Home**, **Connect Orbik MCP** asks where you use AI:
 
+- **Claude.ai, ChatGPT, Gemini, Grok**, shown first: copy the **connector URL**
+  (`http://localhost:8080/mcp` here), open your app's connector settings from its button in the
+  step, add it as a custom connector, then sign in to Orbik and approve. These services reach your
+  install from the internet, so they need it on an HTTPS address; see
+  [A domain with HTTPS](../self-hosting/https.md).
 - **Claude Code, Cursor, Codex**: press **Copy prompt** and paste it into your agent. It adds the
   Orbik MCP server itself, then you sign in to Orbik in your browser and choose what it may read; no
   token is needed. **Set it up by hand instead** shows the Claude Code command, the URL for other
@@ -116,11 +121,6 @@ On **Home**, **Connect Orbik MCP** asks where you use AI:
   claude mcp add --transport http orbik http://localhost:8080/mcp \
     --header "Authorization: Bearer orbm_…"
   ```
-
-- **Claude.ai, ChatGPT**: copy the **connector URL** (`http://localhost:8080/mcp` here), open the
-  app's connector settings from the step, add it as a custom connector, then sign in to Orbik and
-  approve. These services reach your install from the internet, so they need it on an HTTPS
-  address; see [A domain with HTTPS](../self-hosting/https.md).
 
 The step ticks itself off once your AI first calls Orbik.
 

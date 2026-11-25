@@ -5,6 +5,12 @@ What changed in each release of Orbik. Releases are tagged `vX.Y.Z`; upgrading i
 
 ## Unreleased
 
+- **Gemini and Grok, and chat apps first.** Home's **Connect Orbik MCP** opens on **Claude.ai,
+  ChatGPT, Gemini, Grok**, ahead of the coding agents, and its second step is a button for each
+  app, under the app's own mark, to the settings page where a custom connector is added; Settings →
+  Orbik MCP shows the same buttons. Gemini (a custom app) and Grok (a custom connector) sign in to
+  Orbik like Claude.ai and ChatGPT. See [Gemini](docs/connect-your-ai/gemini.md) and
+  [Grok](docs/connect-your-ai/grok.md).
 - **A source's page has tabs.** Every source heads with its state and **Crawl now** (**Stop crawl**
   while it is read), and under the head are **Overview** (the crawl's figures, the month's budget,
   the latest pages, the copy, Quoted in), **Pages** (the tree, the findings, the crawl logs) and

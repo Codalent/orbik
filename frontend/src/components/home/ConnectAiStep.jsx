@@ -1,31 +1,30 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ArrowUpRight, Check, Copy, MessagesSquare, Terminal } from "lucide-react";
+import { Check, Copy, MessagesSquare, Terminal } from "lucide-react";
 
-import { Button, buttonVariants } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { ChatAppLinks } from "@/components/settings/ChatApps";
 import { ConnectInstructions, defaultEndpointUrl } from "@/components/settings/ConnectYourAi";
 import { createMcpToken } from "@/lib/api/mcp";
 import { STEP_STATE } from "@/lib/home/home";
 import { cn } from "@/lib/utils";
 
-/** The two kinds of AI a person uses, as the step's tabs name them. */
+/** The two kinds of AI a person uses, as the step's tabs name them; the chat apps first, and shown. */
 const TABS = Object.freeze([
+  { id: "chat", label: "Claude.ai, ChatGPT, Gemini, Grok", Icon: MessagesSquare },
   { id: "agent", label: "Claude Code, Cursor, Codex", Icon: Terminal },
-  { id: "chat", label: "Claude.ai, ChatGPT", Icon: MessagesSquare },
-]);
-
-/** Where each chat app adds a custom connector. */
-const CONNECTOR_SETTINGS = Object.freeze([
-  { label: "Open Claude settings", href: "https://claude.ai/settings/connectors" },
-  { label: "Open ChatGPT settings", href: "https://chatgpt.com/#settings/Connectors" },
 ]);
 
 /**
  * The body of "Connect Orbik MCP" on Home: connecting the person's own AI in as few moves as it
  * takes.
+ *
+ * **Claude.ai, ChatGPT, Gemini, Grok**, shown first, cannot add a server themselves: copy the
+ * connector URL, open the app's connector settings (each under its own mark, `ChatAppLinks`), and
+ * come back to Orbik to sign in and approve.
  *
  * **Claude Code, Cursor, Codex** — an agent that can change its own MCP configuration — get a
  * prompt to paste: the agent adds Orbik and sends the person to sign in, through Orbik's OAuth, so
@@ -33,9 +32,6 @@ const CONNECTOR_SETTINGS = Object.freeze([
  * any other client, and a token for where nobody can sign in, minted inline and shown with the same
  * instructions the Settings card shows (`ConnectInstructions`), so the two places never disagree.
  * A token minted here reads this workspace and only reads; more is chosen on Settings.
- *
- * **Claude.ai, ChatGPT** cannot add a server themselves: copy the connector URL, open the app's
- * connector settings, and come back to Orbik to sign in and approve.
  *
  * The step is done once the AI has called, not when it is added, so under both it says it is
  * waiting for that first call. Home re-reads itself (every five seconds once a client is connected,
@@ -50,7 +46,7 @@ const CONNECTOR_SETTINGS = Object.freeze([
  */
 export function ConnectAiStep({ workspaceId, workspaceName, state, settingsHref, onChanged }) {
   const endpointUrl = defaultEndpointUrl();
-  const [tab, setTab] = useState("agent");
+  const [tab, setTab] = useState("chat");
 
   return (
     <div className="min-w-0 space-y-4">
@@ -80,13 +76,13 @@ export function ConnectAiStep({ workspaceId, workspaceName, state, settingsHref,
         ))}
       </div>
 
-      {tab === "agent" ? (
-        <div role="tabpanel" id="home-ai-panel-agent" aria-labelledby="home-ai-tab-agent" className="space-y-3">
-          <AgentPanel workspaceId={workspaceId} workspaceName={workspaceName} endpointUrl={endpointUrl} settingsHref={settingsHref} onChanged={onChanged} />
-        </div>
-      ) : (
+      {tab === "chat" ? (
         <div role="tabpanel" id="home-ai-panel-chat" aria-labelledby="home-ai-tab-chat">
           <ChatPanel endpointUrl={endpointUrl} />
+        </div>
+      ) : (
+        <div role="tabpanel" id="home-ai-panel-agent" aria-labelledby="home-ai-tab-agent" className="space-y-3">
+          <AgentPanel workspaceId={workspaceId} workspaceName={workspaceName} endpointUrl={endpointUrl} settingsHref={settingsHref} onChanged={onChanged} />
         </div>
       )}
 
@@ -146,17 +142,10 @@ function ChatPanel({ endpointUrl }) {
       </li>
       <li className="flex min-w-0 flex-col gap-3 rounded-[13px] border border-orb-line p-4">
         <span className="text-xs font-medium tabular-nums text-orb-muted">2 · Add it as a custom connector</span>
-        <div className="flex flex-wrap gap-2">
-          {CONNECTOR_SETTINGS.map((link) => (
-            <a key={link.href} href={link.href} target="_blank" rel="noreferrer" className={cn(buttonVariants({ variant: "outline", size: "sm" }), "border-orb-line")}>
-              {link.label}
-              <ArrowUpRight aria-hidden="true" />
-              <span className="sr-only">(opens in a new tab)</span>
-            </a>
-          ))}
-        </div>
+        <ChatAppLinks />
         <span className="text-xs leading-relaxed text-orb-gray">
-          Name it Orbik and paste the URL. You come back to Orbik to sign in and choose what it may read.
+          Each opens the app&apos;s connector settings. Name it Orbik and paste the URL. You come back to Orbik to sign in
+          and choose what it may read.
         </span>
       </li>
     </ol>

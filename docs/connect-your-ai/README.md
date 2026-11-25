@@ -1,7 +1,7 @@
 # Connect your AI
 
-Orbik MCP lets your own AI — Claude, ChatGPT, Claude Code, Cursor or an agent you built — read a
-workspace's knowledge base, and save to its Library if you allow it.
+Orbik MCP lets your own AI — Claude, ChatGPT, Gemini, Grok, Claude Code, Cursor or an agent you
+built — read a workspace's knowledge base, and save to its Library if you allow it.
 
 A connected AI reads the Library, the word-for-word copy of every crawled page under `/sources`
 (the website under `/sources/website`, and each other [source](../guides/sources.md) beside it), the
@@ -26,6 +26,8 @@ a prompt you can paste into your AI to have it connect Orbik for you.
 | --- | --- | --- |
 | Claude.ai, Claude Desktop | Custom connector; you sign in to Orbik | [Claude](claude.md) |
 | ChatGPT | Connector; you sign in to Orbik | [ChatGPT](chatgpt.md) |
+| Gemini | Custom app; you sign in to Orbik | [Gemini](gemini.md) |
+| Grok | Custom connector; you sign in to Orbik | [Grok](grok.md) |
 | Claude Code | `claude mcp add`; sign in, or a token | [Claude Code](claude-code.md) |
 | Cursor, other editors, the Anthropic and OpenAI APIs, your own agents | A token | [Cursor and others](cursor-and-others.md) |
 
@@ -33,12 +35,13 @@ Every tool and argument a connected AI is offered is in the [MCP tool reference]
 
 ## Two kinds of credential
 
-**Signing in.** Claude.ai, Claude Desktop, ChatGPT and Claude Code connect with OAuth: you give them
-the URL, they send you to Orbik in your browser, and on the consent screen you choose which
-workspaces the app may read and whether it may write. There is nothing to copy. Claude.ai, Claude
-Desktop and ChatGPT reach Orbik from their own servers, so they need the install on an HTTPS address
-the internet can reach; see [A domain with HTTPS](../self-hosting/https.md). Claude Code runs on
-your machine and can sign in to `http://localhost:8080` as well.
+**Signing in.** Claude.ai, Claude Desktop, ChatGPT, Gemini, Grok and Claude Code connect with
+OAuth: you give them the URL, they send you to Orbik in your browser, and on the consent screen you
+choose which workspaces the app may read and whether it may write. There is nothing to copy.
+Claude.ai, Claude Desktop, ChatGPT, Gemini and Grok reach Orbik from their own servers, so they need
+the install on an HTTPS address the internet can reach; see
+[A domain with HTTPS](../self-hosting/https.md). Claude Code runs on your machine and can sign in to
+`http://localhost:8080` as well.
 
 **A token.** For clients that take a URL and a header. On **Settings → Orbik MCP**, choose **Cursor
 and others**, name the connection and press **Create token**. The token starts with `orbm_`, is

@@ -28,6 +28,8 @@
         { "path": "connect-your-ai/README.md", "label": "Overview" },
         "connect-your-ai/claude.md",
         "connect-your-ai/chatgpt.md",
+        "connect-your-ai/gemini.md",
+        "connect-your-ai/grok.md",
         "connect-your-ai/claude-code.md",
         "connect-your-ai/cursor-and-others.md",
         "connect-your-ai/tools.md"

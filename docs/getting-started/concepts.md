@@ -120,8 +120,8 @@ your AI asks: the reasoning is your AI's. There are two kinds of credential:
 
 - **A token** you create under **Settings → Orbik MCP** and paste into Claude Code, Cursor or
   another client that takes one.
-- **Sign-in (OAuth)**, which Claude.ai, Claude Desktop and ChatGPT use: you add the address as a
-  custom connector, sign in to Orbik and approve.
+- **Sign-in (OAuth)**, which Claude.ai, Claude Desktop, ChatGPT, Gemini and Grok use: you add the
+  address as a custom connector, sign in to Orbik and approve.
 
 Either can cover one workspace, several or all of the ones you can read. A credential reads by
 default; one you allow to write can add and change files and folders in the Library, recorded as
