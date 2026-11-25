@@ -159,7 +159,14 @@ only an extension sets (below); core has no limit.
   is another site: refused with `409 SITE_CHANGE_UNCONFIRMED` until
   sent with `confirmSiteChange: true`, refused while a crawl runs, and then clears the crawled pages
   as Clear crawled data does, drops the old host's sitemaps and requests a crawl of the new site.
-  The Library and the brand are left as they are.
+  The Library and the brand are left as they are; the icon read from the old site is forgotten.
+- The workspace's icon, in `icon` on every item of `GET /v1/workspaces` (`choice`, `current`, and
+  the `site` and `upload` pictures with a `version` each): `GET /v1/workspaces/:id/icon?v=…`
+  (`&origin=site|upload` for one by name) streams the picture, read-only and up;
+  `POST …/icon/upload` takes a picture as the raw body and shows it, and `PUT …/icon`
+  `{"choice": "site"|"upload"|"none"}` chooses, admin and up. The website's picture is the
+  crawler's, read at every crawl (docs/architecture/crawler.md § "The workspace's icon"). To verify,
+  crawl the website and read `workspace_icons`, or `curl` the routes with a session.
 - `DELETE /v1/workspaces/:id` — the owner only, with `{"confirmName": "<the exact name>"}`
   (`400 CONFIRMATION_MISMATCH` otherwise); `409 WORKSPACE_BUSY` while a run or claimed job is
   executing for it. Removes every per-workspace record (`workspaceErasureRepository.js` lists the

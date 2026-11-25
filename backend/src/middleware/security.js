@@ -37,11 +37,17 @@ export const EXTENSION_HOOK_PREFIX = "/v1/hooks/";
 export const DEVBAR_PATH = "/v1/devbar";
 
 /**
- * The one session route whose body is a file rather than JSON: a person's upload to a brand. It
- * reads its own body, raw, under the upload limit, and keeps every other check: the session, the
- * CSRF header and the browser policy.
+ * The session routes whose body is a file rather than JSON: a person's upload to a brand, and a
+ * workspace's icon. Each reads its own body, raw, under its upload limit, and keeps every other
+ * check: the session, the CSRF header and the browser policy.
  */
 export const BRAND_UPLOAD_PATH = /^\/v1\/workspaces\/[0-9a-f]{24}\/brand\/uploads$/;
+export const WORKSPACE_ICON_UPLOAD_PATH = /^\/v1\/workspaces\/[0-9a-f]{24}\/icon\/upload$/;
+
+/** Whether a path is one of the routes above, whose body is a file. */
+function isFileUpload(path) {
+  return BRAND_UPLOAD_PATH.test(path) || WORKSPACE_ICON_UPLOAD_PATH.test(path);
+}
 
 /** The largest JSON body the API reads, everywhere but where a route says otherwise. */
 export const JSON_BODY_LIMIT = "32kb";
@@ -69,14 +75,14 @@ export function applySecurityMiddleware(app, config) {
   });
   app.use((req, res, next) => (isPublicProtocol(req.path) ? next() : browserCors(req, res, next)));
   // devbar checks its own content types: a screen recording is sent raw, as video/webm or video/mp4.
-  const ownsContentType = (path) => isPublicProtocol(path) || BRAND_UPLOAD_PATH.test(path) || path.startsWith(`${DEVBAR_PATH}/`);
+  const ownsContentType = (path) => isPublicProtocol(path) || isFileUpload(path) || path.startsWith(`${DEVBAR_PATH}/`);
   app.use((req, res, next) => (ownsContentType(req.path) ? next() : requireJsonForMutation(req, res, next)));
   // `/mcp` reads its own body, after the credential is known: a credential that may write sends
   // whole Library files and is given room for one, and a read-only one keeps this limit. Parsing
   // there also means nobody without a credential can make the API read a large body.
   // devbar reads its own body, with its own limit: an item with a screenshot is a few megabytes.
   const json = express.json({ limit: JSON_BODY_LIMIT, strict: true });
-  const unparsed = (path) => path === MCP_PATH || path.startsWith(EXTENSION_HOOK_PREFIX) || path.startsWith(`${DEVBAR_PATH}/`) || BRAND_UPLOAD_PATH.test(path);
+  const unparsed = (path) => path === MCP_PATH || path.startsWith(EXTENSION_HOOK_PREFIX) || path.startsWith(`${DEVBAR_PATH}/`) || isFileUpload(path);
   app.use((req, res, next) => (unparsed(req.path) ? next() : json(req, res, next)));
 }
 

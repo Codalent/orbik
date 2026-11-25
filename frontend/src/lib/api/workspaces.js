@@ -1,4 +1,4 @@
-import { apiFetch } from "./client";
+import { apiFetch, apiUpload, getApiBaseUrl } from "./client";
 import { requireId } from "./ids";
 
 /**
@@ -51,4 +51,35 @@ export function updateWorkspace(workspaceId, changes, { confirmSiteChange = fals
  */
 export function deleteWorkspace(workspaceId, confirmName) {
   return apiFetch(workspacePath(workspaceId), { method: "DELETE", body: JSON.stringify({ confirmName }) });
+}
+
+/**
+ * The address of a workspace's icon, for an `<img>`: the one it is shown with, or by `origin` the
+ * website's (`site`) or the uploaded one (`upload`). Absolute, because the API may be on another
+ * origin; the session cookie travels with it as with a brand image. `version` is the picture's, from
+ * the workspace list's `icon`, so a new picture is a new address and a kept copy is never stale.
+ *
+ * @param {string} workspaceId
+ * @param {string} version
+ * @param {"site"|"upload"|null} [origin]
+ */
+export function workspaceIconUrl(workspaceId, version, origin = null) {
+  const query = new URLSearchParams({ ...(origin ? { origin } : {}), v: version });
+  return `${getApiBaseUrl()}${workspacePath(workspaceId)}/icon?${query}`;
+}
+
+/**
+ * Uploads a picture as the workspace's icon and shows it from then on; admins and the owner. The
+ * API reads what it is from its bytes. Returns the workspace's `icon` as the list carries it.
+ */
+export function uploadWorkspaceIcon(workspaceId, file) {
+  return apiUpload(`${workspacePath(workspaceId)}/icon/upload`, file, { name: file.name });
+}
+
+/**
+ * Chooses what the workspace is shown with: `site`, the website's icon as the crawler finds it;
+ * `upload`, the uploaded one; or `none`, the first letter of its name. Admins and the owner.
+ */
+export function chooseWorkspaceIcon(workspaceId, choice) {
+  return apiFetch(`${workspacePath(workspaceId)}/icon`, { method: "PUT", body: JSON.stringify({ choice }) });
 }

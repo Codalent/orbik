@@ -35,6 +35,14 @@ A sitemap a person names (`sitemapUrls`) may be on the start address's hostname 
 
 One thing is left to the next crawl: crawl settings saved from a form that was opened before a move put the old address back (`PUT /crawl` takes a start address as typed, which is also how a person takes a site back off a host that has stopped answering). A crawl running at that moment skips its remaining pages as out of scope, and the next crawl moves the site again.
 
+## The workspace's icon
+
+The crawl of a workspace's website also reads the site's icon, which is what the workspace is shown with by default (docs/guides/workspaces-and-members.md § "The workspace's icon"). Every page's extraction records the icons its `<link>` elements name (`icons` on the snapshot's `extracted`: `rel` `icon` or `apple-touch-icon`, the resolved `url`, and the `sizes`, `type` and `media` it declares). When a run's fetch of the website's home page gets an answer, a 304 included, it queues one `crawler.icon` job (`agents/src/crawler/siteIcon.js`, keyed by the run), early in the run so a new workspace has its icon before most of its pages are read. Another source's home page queues none.
+
+The job reads the icons from the newest snapshot of the home page that was served whole, ranks them — an `apple-touch-icon` first, then the largest declared size, an icon for one colour scheme only after the rest, `/favicon.ico` last — and tries up to four, through the site's own client, so the request is paced with the crawl's pages and refused on a non-public address. One on the site's own host is asked for only when robots.txt allows it. The first answer whose bytes are a PNG, JPEG, WebP, GIF, AVIF, ICO or SVG (sanitised) of up to 512 KB is kept in `workspace_icons` (`createWorkspaceIconStore` in `@orbik/assets`); the same picture as last time only moves its `checkedAt`. It costs no crawl budget. Nothing about it can fail the crawl: an icon that cannot be had is logged (`crawler.site_icon_not_found`, with each address and why) and the workspace keeps the icon it had.
+
+The row also holds a picture a person uploaded and their choice of which is shown (`site`, the default; `upload`; or `none`, the name's letter), written by the API (`GET`/`PUT /v1/workspaces/:id/icon`, `POST …/icon/upload`). The crawler writes only the website's picture, so it never overrides a person's. A website moved to another site forgets the old site's picture (`workspaceService.update`), and deleting the workspace removes the row.
+
 ## Pace
 
 At most four requests a second to one host by default (`minHostIntervalMs`, 250 ms, in `agents/src/crawler/siteConfig.js`; a site document may carry its own value, and nothing in the web app sets one). The site can only slow that down:

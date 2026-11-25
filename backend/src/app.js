@@ -56,7 +56,7 @@ import { createOauthConsentRouter } from "./routes/oauthConsentRoutes.js";
 import { createBrandRepository } from "./repositories/brandRepository.js";
 import { createBrandService } from "./services/brandService.js";
 import { createBrandRouter } from "./routes/brandRoutes.js";
-import { createAssetStore, createAssetUrlSigner } from "@orbik/assets";
+import { createAssetStore, createAssetUrlSigner, createWorkspaceIconStore } from "@orbik/assets";
 import { createBrandChangeLog, createDesignSystemStore } from "@orbik/design-system";
 import { createCrawlBudget } from "@orbik/crawl-budget";
 import { createIndexEraser, createRetrieval } from "@orbik/retrieval";
@@ -261,11 +261,12 @@ export function createApp({ config, database, readiness, extensions = createExte
     brandRepository,
   });
 
-  // Workspaces themselves: made, listed and selected, renamed or moved to another website, and
-  // deleted. Built after everything a deletion reaches into — the crawl, the brand images —
-  // because removing a workspace is removing what each of them holds for it. The index
+  // Workspaces themselves: made, listed and selected, renamed or moved to another website, given
+  // an icon, and deleted. Built after everything a deletion reaches into — the crawl, the brand
+  // images — because removing a workspace is removing what each of them holds for it. The index
   // eraser needs only Qdrant, not the embedding key `retrieval` above needs, so a workspace indexed
-  // before a key was taken away can still be removed from the index.
+  // before a key was taken away can still be removed from the index. The icons are the crawler's
+  // and the person's (`createWorkspaceIconStore`), and a deletion sweeps them with the other rows.
   const workspaceService = createWorkspaceService({
     userRepository,
     workspaceRepository,
@@ -275,6 +276,7 @@ export function createApp({ config, database, readiness, extensions = createExte
     erasure: createWorkspaceErasureRepository(database),
     credentialRelease,
     assetStore,
+    iconStore: createWorkspaceIconStore({ database }),
     indexEraser: createIndexEraser({ config }),
     logger: log,
   });

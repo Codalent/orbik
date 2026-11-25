@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 
+import { WORKSPACE_ICON_LIMITS, readIconImage, toIconSummary } from "@orbik/assets";
 import { aliasHostOf, aliasOf, isWwwPair, readOntoSiteHost, toObjectId } from "@orbik/core";
 
 import { AppError } from "../errors/appError.js";
@@ -57,6 +58,8 @@ function seedFollowsWebsite(site, websiteUrl) {
  * @param {object} [dependencies.erasure] `createWorkspaceErasureRepository`
  * @param {object} [dependencies.credentialRelease] lets go of MCP tokens and OAuth grants
  * @param {object} [dependencies.assetStore] the brand images, in GridFS
+ * @param {object} [dependencies.iconStore] the workspaces' icons (`createWorkspaceIconStore`);
+ *   without it every workspace is shown with its letter and icons cannot be set
  * @param {{eraseWorkspace: Function}} [dependencies.indexEraser] the vector database's points
  * @param {Function} [dependencies.logger]
  * @param {() => Date} [dependencies.now]
@@ -70,6 +73,7 @@ export function createWorkspaceService({
   erasure = null,
   credentialRelease = null,
   assetStore = null,
+  iconStore = null,
   indexEraser = null,
   logger = () => {},
   now = () => new Date(),
@@ -80,6 +84,17 @@ export function createWorkspaceService({
     const user = await userRepository.findActiveById(userId);
     if (!user) throw new AppError({ status: 401, code: "AUTHENTICATION_REQUIRED", message: "Authentication is required." });
     return user;
+  }
+
+  /** One workspace's summary with its icon. */
+  async function summaryOf(workspace) {
+    return toWorkspaceSummary(workspace, iconStore ? await iconStore.find(workspace._id) : null);
+  }
+
+  /** The icon store, or the refusal an install without one gives. */
+  function requireIconStore() {
+    if (!iconStore) throw new AppError({ status: 404, code: "ICON_NOT_FOUND", message: "This workspace has no icon." });
+    return iconStore;
   }
 
   return {
@@ -120,7 +135,7 @@ export function createWorkspaceService({
           userId: String(userId),
         });
       }
-      return { workspace: toWorkspaceSummary({ ...workspace, role: "owner" }), selectedWorkspaceId: workspace._id.toHexString(), destination: "workspace-home", created };
+      return { workspace: await summaryOf({ ...workspace, role: "owner" }), selectedWorkspaceId: workspace._id.toHexString(), destination: "workspace-home", created };
     },
 
     /**
@@ -137,8 +152,9 @@ export function createWorkspaceService({
       if (String(user.selectedWorkspaceId ?? "") !== String(fallback?._id ?? "")) {
         await userRepository.setSelectedWorkspace(userId, fallback?._id ?? null);
       }
+      const icons = iconStore ? await iconStore.findMany(items.map((item) => item._id)) : new Map();
       return {
-        items: items.map(toWorkspaceSummary),
+        items: items.map((item) => toWorkspaceSummary(item, icons.get(item._id.toHexString()) ?? null)),
         selectedWorkspaceId: fallback?._id.toHexString() ?? null,
         destination: fallback ? "workspace-home" : "workspace-onboarding",
       };
@@ -149,7 +165,7 @@ export function createWorkspaceService({
       await requireActive(userId);
       const workspace = await requireWorkspaceAccess(userId, workspaceId, { role: "read-only" });
       await userRepository.setSelectedWorkspace(userId, workspace._id);
-      return { workspace: toWorkspaceSummary(workspace), selectedWorkspaceId: workspace._id.toHexString(), destination: "workspace-home" };
+      return { workspace: await summaryOf(workspace), selectedWorkspaceId: workspace._id.toHexString(), destination: "workspace-home" };
     },
 
     /**
@@ -175,7 +191,8 @@ export function createWorkspaceService({
      *   the sitemaps named for the old host, and asks for a crawl of the new site at once, as
      *   setting a crawl up does (that crawl spends crawl budget). It does not touch the Library:
      *   its copies of the old pages are retired as the new crawl's pages are mirrored, and what
-     *   people and agents wrote stays until it is rewritten. The brand is left as it is.
+     *   people and agents wrote stays until it is rewritten. The brand is left as it is; the
+     *   website's icon is forgotten, and the new site's crawl reads its own.
      *
      * Without a crawl site there is nothing to move: the Crawl page offers the new website as its
      * start address. The crawl site is changed before the workspace, so a change that fails half
@@ -228,6 +245,8 @@ export function createWorkspaceService({
             const pages = await crawlRepository.clearSiteData(site._id);
             await crawlRepository.moveSeed(site._id, { seedUrl: changes.websiteUrl, newSite: true, now: at });
             await crawlRepository.requestCrawlNow(site._id, at, userId);
+            // The old site's icon is not the new one's; the crawl just requested reads that.
+            await iconStore?.clearSite(workspace._id);
             crawl = { change: "new-site", pagesCleared: pages, crawlRequested: true, seedUrl: changes.websiteUrl };
           } else if (seedFollowsWebsite(site, workspace.websiteUrl)) {
             const seedUrl = onCrawledHost(changes.websiteUrl, site);
@@ -251,7 +270,61 @@ export function createWorkspaceService({
         websiteUrl: websiteChanged ? changes.websiteUrl : undefined,
       });
       if (!updated) throw new AppError({ status: 404, code: "WORKSPACE_NOT_FOUND", message: "Workspace was not found." });
-      return { workspace: toWorkspaceSummary({ ...updated, role: workspace.role }), crawl };
+      return { workspace: await summaryOf({ ...updated, role: workspace.role }), crawl };
+    },
+
+    /**
+     * One of a workspace's icons, to send as the picture it is: the one it is shown with, or the
+     * website's or the uploaded one by name, which Settings shows side by side. Anybody who can
+     * open the workspace; `404 ICON_NOT_FOUND` when there is no such picture.
+     *
+     * @param {{userId: unknown, workspaceId: string, origin?: "site"|"upload"|null}} input
+     */
+    async openIcon({ userId, workspaceId, origin = null }) {
+      await requireActive(userId);
+      const workspace = await requireWorkspaceAccess(userId, workspaceId, { role: "read-only" });
+      const icon = await requireIconStore().open(workspace._id, origin);
+      if (!icon) throw new AppError({ status: 404, code: "ICON_NOT_FOUND", message: "This workspace has no icon of that kind." });
+      return icon;
+    },
+
+    /**
+     * Keeps an uploaded picture as the workspace's icon, and shows it from now on. Admin and up, as
+     * for the name. What it is is read from its bytes; a file that is not a picture an icon can be,
+     * or is larger than one may be, is refused with what it can take.
+     *
+     * @param {{userId: unknown, workspaceId: string, bytes: Buffer, fileName?: string|null}} input
+     * @returns {Promise<{icon: object}>} the icon's summary, as the workspace list carries it
+     */
+    async uploadIcon({ userId, workspaceId, bytes, fileName = null }) {
+      await requireActive(userId);
+      const workspace = await requireWorkspaceAccess(userId, workspaceId, { role: "admin" });
+      const store = requireIconStore();
+      if (bytes.length > WORKSPACE_ICON_LIMITS.bytes) {
+        throw new AppError({ status: 400, code: "ICON_TOO_LARGE", message: `An icon can be up to ${WORKSPACE_ICON_LIMITS.bytes / 1024} KB. A square picture of 256 pixels or so is plenty.` });
+      }
+      const image = readIconImage(bytes);
+      if (!image) {
+        throw new AppError({ status: 400, code: "ICON_UNREADABLE", message: "That is not a picture an icon can be. Send a PNG, JPEG, WebP, GIF, AVIF, ICO or SVG file." });
+      }
+      const row = await store.putUpload({ workspaceId: workspace._id, image, userId, fileName });
+      return { icon: toIconSummary(row) };
+    },
+
+    /**
+     * Chooses what the workspace is shown with: its website's icon, the uploaded one, or `none`,
+     * the first letter of its name. Admin and up. The upload needs uploading first
+     * (`409 ICON_NOT_UPLOADED`); the website's may be chosen before a crawl has found one.
+     *
+     * @param {{userId: unknown, workspaceId: string, choice: "site"|"upload"|"none"}} input
+     * @returns {Promise<{icon: object}>}
+     */
+    async chooseIcon({ userId, workspaceId, choice }) {
+      await requireActive(userId);
+      const workspace = await requireWorkspaceAccess(userId, workspaceId, { role: "admin" });
+      const row = await requireIconStore().choose(workspace._id, choice);
+      if (!row) throw new AppError({ status: 409, code: "ICON_NOT_UPLOADED", message: "Upload an icon first." });
+      return { icon: toIconSummary(row) };
     },
 
     /**

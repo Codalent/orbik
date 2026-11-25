@@ -33,6 +33,7 @@ const WORKSPACE_COLLECTIONS = Object.freeze([
   AGENT_COLLECTIONS.designSystems,
   AGENT_COLLECTIONS.designSystemRevisions,
   AGENT_COLLECTIONS.brandChanges,
+  AGENT_COLLECTIONS.workspaceIcons,
   AGENT_COLLECTIONS.libraryNodes,
   AGENT_COLLECTIONS.libraryRevisions,
   AGENT_COLLECTIONS.libraryStructures,

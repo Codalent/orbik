@@ -1,3 +1,4 @@
+import { WORKSPACE_ICON_CHOICES, WORKSPACE_ICON_ORIGINS } from "@orbik/assets";
 import { classifyAddress } from "@orbik/core";
 
 import { isCanonicalObjectId, plainObject, validationError } from "./shared.js";
@@ -146,5 +147,56 @@ export function validateWorkspaceDelete(req, _res, next) {
   }
   if (fields.length) return next(validationError(fields));
   req.validated = { workspaceId: workspaceId.toLowerCase(), confirmName: body.confirmName };
+  next();
+}
+
+/**
+ * Validates the read of an icon: `origin`, the website's (`site`) or the uploaded one (`upload`)
+ * by name, or none for the one the workspace is shown with; and `v`, the version its address
+ * carries so that a new picture is a new address, which is not otherwise read.
+ */
+export function validateIconQuery(req, _res, next) {
+  const fields = [];
+  for (const key of Object.keys(req.query ?? {})) {
+    if (key !== "origin" && key !== "v") fields.push({ field: key, code: "UNKNOWN_FIELD", message: "Only origin and v are accepted." });
+  }
+  const origin = req.query?.origin;
+  if (origin !== undefined && !Object.values(WORKSPACE_ICON_ORIGINS).includes(origin)) {
+    fields.push({ field: "origin", code: "INVALID", message: "origin must be site or upload." });
+  }
+  if (req.query?.v !== undefined && !/^[0-9a-f]{1,64}$/.test(String(req.query.v))) {
+    fields.push({ field: "v", code: "FORMAT", message: "v must be a version as the workspace list gives it." });
+  }
+  if (fields.length) return next(validationError(fields));
+  req.validated = { ...req.validated, origin: origin ?? null };
+  next();
+}
+
+/** Validates an icon upload: the file as the body, and `name`, the name it came with. */
+export function validateIconUpload(req, _res, next) {
+  const fields = [];
+  for (const key of Object.keys(req.query ?? {})) {
+    if (key !== "name") fields.push({ field: key, code: "UNKNOWN_FIELD", message: "Only name is accepted." });
+  }
+  const name = typeof req.query?.name === "string" ? req.query.name.trim() : "";
+  if (name.length > 200) fields.push({ field: "name", code: "RANGE", message: "That file name is too long." });
+  if (!Buffer.isBuffer(req.body) || !req.body.length) fields.push({ field: "body", code: "REQUIRED", message: "Send the picture as the request body." });
+  if (fields.length) return next(validationError(fields));
+  req.validated = { ...req.validated, bytes: req.body, fileName: name || null };
+  next();
+}
+
+/** Validates the choice of what a workspace is shown with: `{"choice": "site"|"upload"|"none"}`. */
+export function validateIconChoice(req, _res, next) {
+  const body = plainObject(req.body);
+  const fields = [];
+  if (Object.keys(body).some((key) => key !== "choice")) {
+    fields.push({ field: "request", code: "UNKNOWN_FIELD", message: "Only choice is allowed." });
+  }
+  if (!WORKSPACE_ICON_CHOICES.includes(body.choice)) {
+    fields.push({ field: "choice", code: "INVALID", message: `choice must be one of: ${WORKSPACE_ICON_CHOICES.join(", ")}.` });
+  }
+  if (fields.length) return next(validationError(fields));
+  req.validated = { ...req.validated, choice: body.choice };
   next();
 }
