@@ -68,8 +68,8 @@ The interval is measured from when the previous request to the host was actually
   (`resumesAt`, below). Saving the settings of a site that exists is always accepted. The page
   reads the same from `budget.state` and disables those buttons with the reason under them. The
   scheduler's own visits still run, since discovery is free; a run that runs out part-way ends
-  `succeeded` with `pagesSkippedNoBudget`, which the page shows as "Stopped: out of crawl pages".
-- **Fresh crawl**, beside "Crawl now" and confirmed with a second press, asks for every eligible
+  `succeeded` with `pagesSkippedNoBudget`, which the source's head shows as "Out of crawl pages".
+- **Fresh crawl**, on the source's Settings tab and confirmed in a dialog, asks for every eligible
   page of the site in full: each page is marked wanted and its cached validators are forgotten, so
   nothing comes back "unchanged" (`POST /crawl/runs` with `{ "fresh": true }`). Frequencies are
   ignored for that one crawl and untouched afterwards; history is kept. It spends crawl budget for
@@ -125,7 +125,7 @@ The interval is measured from when the previous request to the host was actually
   and the brand read: a field added later costs a fresh crawl of every site to fill.
 - **Crawl frequencies are chosen by a person, per page, with no AI involved.** Every page starts on
   manual trigger: it is fetched once when discovered and again only when somebody asks.
-  **Set crawl frequencies**, beside "Crawl now", opens the page list with checkboxes. Tick pages or
+  **Set crawl frequencies**, on the source's Settings tab, opens the page list with checkboxes. Tick pages or
   whole folders, choose daily, weekly, monthly, or manual trigger, and apply; the choice is written
   to each page as its own override (`PUT /crawl/frequencies`), so a folder-wide choice and a
   single-page choice cannot disagree about a page. A folder means every page under it as the crawl
@@ -225,7 +225,7 @@ A run's phase is one of: **queued** (waiting for the sites ahead of it), **disco
 
 Three reads keep the web app current, each at its own pace:
 
-- **Crawl status** (`GET /crawl`), shared by the sidebar and the crawl page, is re-read every four seconds while a crawl is running or queued and every thirty seconds otherwise, which is how a crawl the scheduler started gets noticed. When it sees a crawl get queued, start or end, it has the activity monitor (below) read again at once, so a crawl shorter than the monitor's idle interval is not missed. The page's table of pages (`GET /crawl/tree`) is remounted when the run starts and when it ends, and while it runs its top level is read again in place as the figures grow, keeping open folders open. A notice about an action ("Crawl queued…") is shown only until the crawl moves to its next stage.
+- **Crawl status** (`GET /crawl`), shared by the sidebar and the crawl page, is re-read every four seconds while a crawl is running or queued and every thirty seconds otherwise, which is how a crawl the scheduler started gets noticed. When it sees a crawl get queued, start or end, it has the activity monitor (below) read again at once, so a crawl shorter than the monitor's idle interval is not missed. The page's table of pages (`GET /crawl/tree`) is remounted when the run starts and when it ends, and while it runs its top level is read again in place as the figures grow, keeping open folders open. The notice after the first setup ("Crawl queued…") is shown only until the crawl moves to its next stage.
 - **The figures' lists** (`GET /crawl/findings?kind=broken|orphans|duplicates&limit&skip`): pressing **Broken**, **Nothing links here** or **Duplicate URLs** lists those pages flat, by address, in place of the tree. The figures on `GET /crawl` (`urls.broken`, `urls.orphans`, `urls.duplicates`) are counted from `crawl_urls` by the same filters, so the two agree: broken is a last status of 400 or more on a page that is not a duplicate, as in the tree.
 - **The crawl page's activity log** (`GET /crawl/activity`) is re-read every two seconds while a crawl is live. It shows queue position, the phase, a progress bar, recent job outcomes and retry messages, fetched pages, and budget deferrals.
 - **The activity monitor** at the foot of the sidebar polls `GET /v1/activity` and shows, across every workspace the account owns: crawls that are queued or running with a progress bar, agent runs that are queued, waiting for a machine, or running with the tool they are on, model calls in flight, and the Library agent copying a site's pages into Sources (a queue job rather than a run, reported under `library`). It asks every three seconds while something is live and every fifteen when not.

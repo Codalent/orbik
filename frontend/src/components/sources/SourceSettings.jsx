@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Check, ChevronRight, Link2, Plus, X } from "lucide-react";
+import { CalendarClock, Check, ChevronRight, Link2, Plus, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { useConfirm } from "@/components/ui/confirm-dialog";
@@ -48,8 +48,14 @@ const same = (left, right) => JSON.stringify(left) === JSON.stringify(right);
  * @param {Array<{id: string, label: string, guidance: string}>} props.purposes what a source can be
  * @param {() => Promise<void>} props.onSaved
  * @param {() => void} props.onRemoved
+ * @param {string|null} [props.redirectedFromHost] the name the crawl was moved from, when the
+ *   start address redirects to its `www.` twin (docs/guides/crawling.md)
+ * @param {() => void} [props.onSetFrequencies] opens the page by page frequency picker; absent
+ *   before the first crawl, when there are no pages to choose, and for a role that may not crawl
+ * @param {import("react").ReactNode} [props.children] drawn after the settings and before removing
+ *   the source: the Settings tab's crawl data
  */
-export function SourceSettings({ workspaceId, source, detail, purposes, onSaved, onRemoved }) {
+export function SourceSettings({ workspaceId, source, detail, purposes, onSaved, onRemoved, redirectedFromHost = null, onSetFrequencies, children }) {
   const canEdit = useCan("member", workspaceId);
   const canRemove = useCan("admin", workspaceId);
   const [confirm, confirmDialog] = useConfirm();
@@ -155,6 +161,7 @@ export function SourceSettings({ workspaceId, source, detail, purposes, onSaved,
               <input id="source-seed" type="text" inputMode="url" spellCheck={false} value={values.seedUrl} onChange={(event) => set("seedUrl")(event.target.value)} aria-invalid={Boolean(fieldErrors.seedUrl) || undefined} className={cn(FIELD, "mt-2 max-w-md")} />
               <p className="mt-2 text-compact text-orb-muted">
                 {source.primary ? `Your website, ${source.host}.` : `On ${source.host}.`} Every crawl begins here and follows links and sitemaps outward, on {source.host} only.
+                {redirectedFromHost && ` ${redirectedFromHost} redirects to ${source.host}, so Orbik crawls the site there.`}
               </p>
             </Section>
             <Section title={source.primary ? "How much of it" : "What to leave out"}>
@@ -229,9 +236,20 @@ export function SourceSettings({ workspaceId, source, detail, purposes, onSaved,
           </Select>
           <p className="mt-2 text-compact text-orb-muted">
             {source.primary
-              ? "How often a page is read when nobody chose for it. Set single pages daily, weekly or monthly from the page list."
+              ? "How often a page is read when nobody chose for it."
               : `${describeMonthlyCost(pageCount, frequencyInterval(values.frequency))}. Orbik copies only what changed.`}
           </p>
+          {onSetFrequencies && (
+            // Outside the saved form's changes: the picker applies what it is given at once.
+            <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-orb-line/70 pt-4">
+              <p className="min-w-[11rem] flex-1 text-compact text-orb-muted">
+                Pages or whole folders can be read daily, weekly, monthly or only when you ask, each on its own.
+              </p>
+              <Button type="button" variant="outline" size="sm" onClick={onSetFrequencies}>
+                <CalendarClock aria-hidden="true" className="size-4" />Set crawl frequencies
+              </Button>
+            </div>
+          )}
         </Section>
 
         {!source.primary && (
@@ -251,6 +269,8 @@ export function SourceSettings({ workspaceId, source, detail, purposes, onSaved,
           </span>
         </div>
       )}
+
+      {children}
 
       {!source.primary && canRemove && (
         <section aria-labelledby="remove-source" className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-3 rounded-xl border border-orb-coral/30 px-5 py-4">

@@ -11,6 +11,20 @@ What changed in each release of Orbik. Releases are tagged `vX.Y.Z`; upgrading i
   Orbik MCP shows the same buttons. Gemini (a custom app) and Grok (a custom connector) sign in to
   Orbik like Claude.ai and ChatGPT. See [Gemini](docs/connect-your-ai/gemini.md) and
   [Grok](docs/connect-your-ai/grok.md).
+- **A source's page has tabs.** Every source heads with its state and **Crawl now** (**Stop crawl**
+  while it is read), and under the head are **Overview** (the crawl's figures, the month's budget,
+  the latest pages, the copy, Quoted in), **Pages** (the tree, the findings, the crawl logs) and
+  **Settings** (everything that can be set, **Set crawl frequencies**, **Fresh crawl** and **Clear
+  crawl data**). The crawl page's row of buttons and the settings gear are gone; the website's
+  crawl settings are its Settings tab. Fresh crawl and Clear crawl data ask in a dialog rather
+  than by a second press. See [docs/guides/sources.md](docs/guides/sources.md#a-sources-page).
+- **Figures in colour.** A headline figure takes the colour of what it means across the web app:
+  on a source, **Crawled** is lime, **Duplicate URLs** cyan, **Nothing links here** orange and
+  **Broken** coral when they count a page; the crawl budget's gauge is lime, then orange in the
+  month's last fifth.
+- **A page opens as itself.** Selecting a page of a crawl opens a wide panel with its Markdown
+  rendered (or raw, to copy or download), and what the crawl recorded about it in a narrow column
+  beside it.
 - **No self-service signup.** Orbik is for a person or an organization running it for its own
   people: accounts come from the setup page, invites, access requests an admin approves, and
   `seed:user`. `ORBIK_SIGNUP` and `ORBIK_SIGNUP_VERIFY_EMAIL` are gone, with the signup form, the
@@ -105,7 +119,8 @@ What changed in each release of Orbik. Releases are tagged `vX.Y.Z`; upgrading i
 - **Agents.** **Agents → Knowledge base** is the agent's own page rather than a second copy of the
   Library: its switch, what it is waiting on, the folders it writes into, the source ledger, what
   its last run changed and its recent runs, with links into the Library. While any agent is
-  working, its row and the rail's **Agents** item are marked as working, whoever started it.
+  working, its row and the rail's **Agents** item are marked as working, whoever started it and
+  whatever page is open.
 - **Home.** The ask box appears once Ask can answer; before the first crawl has finished, Home no
   longer shows a box saying why it cannot. The workspace's rail is a little narrower.
 

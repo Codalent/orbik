@@ -1,205 +1,88 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useState } from "react";
-import { ArrowRight, Info, LibraryBig, Play, RefreshCw, Square } from "lucide-react";
+import { Info } from "lucide-react";
 
-import { PageFrame } from "@/components/workspaces/PageFrame";
+import { CrawlNextStep } from "@/components/crawl/CrawlNextStep";
+import { CrawlSummary, useCrawlBudgetLink } from "@/components/crawl/CrawlSummary";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Button, buttonVariants } from "@/components/ui/button";
-import { PageHeader } from "@/components/ui/page-header";
 import { Panel, PanelTitle, RowList } from "@/components/ui/panel";
-import { Pill } from "@/components/ui/pill";
-import { Skeleton, SkeletonRegion } from "@/components/ui/skeleton";
-import { requestCrawl, stopCrawl, crawlScope } from "@/lib/api/crawl";
-import { useRevalidateWorkspace } from "@/lib/api/cache";
-import { describeDuration, describeElapsed, describeNextCrawl } from "@/lib/crawl/format";
-import { formatDate, pathOf, personFromEmail } from "@/lib/format";
-import { describeRelation, describeState, isLive, libraryHref, shortUrl } from "@/lib/sources/sources";
-import { useSource, useSources } from "@/lib/sources/useSources";
-import { useCan } from "@/lib/workspaces/roles";
+import { crawlScope } from "@/lib/api/crawl";
+import { describeDuration, describeElapsed } from "@/lib/crawl/format";
+import { useCrawlOverview } from "@/lib/crawl/useCrawlOverview";
+import { pathOf } from "@/lib/format";
+import { isLive, libraryHref, shortUrl } from "@/lib/sources/sources";
+import { useSource } from "@/lib/sources/useSources";
 import { cn } from "@/lib/utils";
-import { sourceIcon } from "./SourceGlyph";
-import { SourceSettings } from "./SourceSettings";
+import { SourceFrame, sourceTabHref } from "./SourceFrame";
 
 /**
- * One source: what it is, how it is doing, its settings, and what is in the Library from it.
- *
- * The website has a page like every other source; its pages — the tree, the frequencies, the crawl
- * logs — are one link away, at `…/sources/website/pages`, as every source's are.
+ * One source's Overview tab: how it is doing and what came of it. The crawl's figures, coloured by
+ * what they mean, each finding a link to the pages it counts on the Pages tab; the month's crawl
+ * budget; the latest pages read (or, for a list of pages, what the last read found on each); the
+ * source's folder of the Library; and the knowledge base's files that quote it. What can be set
+ * about the source is on its Settings tab, and every page on its Pages tab.
  *
  * @param {object} props
  * @param {string} props.workspaceId
  * @param {string} props.sourceId a source id, or `website`
  */
 export function SourcePage({ workspaceId, sourceId }) {
-  const router = useRouter();
-  const { data, failed, error, refresh } = useSource(workspaceId, sourceId);
-  const { data: list } = useSources(workspaceId);
-  const revalidate = useRevalidateWorkspace(workspaceId);
-  const canCrawl = useCan("member", workspaceId);
-  const [busy, setBusy] = useState(null);
-  const [notice, setNotice] = useState(null);
+  return (
+    <SourceFrame workspaceId={workspaceId} sourceId={sourceId} tab="overview">
+      <SourceOverview workspaceId={workspaceId} sourceId={sourceId} />
+    </SourceFrame>
+  );
+}
 
-  if (!data) {
-    return (
-      <PageFrame label="Source" className="max-w-6xl">
-        {failed ? (
-          <Alert variant="destructive" role="alert">
-            <AlertDescription>
-              {error?.code === "SOURCE_NOT_FOUND" ? "This source is not in this workspace any more." : "This source could not be loaded. Refresh to try again."}
-            </AlertDescription>
-          </Alert>
-        ) : <SourceSkeleton />}
-      </PageFrame>
-    );
-  }
-
-  const { source } = data;
-  const website = list?.sources?.find((entry) => entry.primary) ?? null;
-  const state = describeState(source);
+function SourceOverview({ workspaceId, sourceId }) {
+  // Both reads are the frame's, from the cache: this only draws them.
+  const { data } = useSource(workspaceId, sourceId);
+  const source = data.source;
+  const { crawl: overview } = useCrawlOverview(crawlScope(workspaceId, source.primary ? "website" : source.id));
+  const budgetLink = useCrawlBudgetLink(workspaceId);
   const live = isLive(source);
-  const reading = source.state === "reading" || source.state === "first-read";
-  const scope = crawlScope(workspaceId, source.primary ? "website" : source.id);
-  const Icon = sourceIcon(source);
-  const addedBy = personFromEmail(source.addedBy?.email);
-  const pagesHref = `/workspaces/${workspaceId}/sources/${source.primary ? "website" : source.id}/pages`;
-
-  /** Runs one action on the source's crawl, then reads everything again. */
-  async function act(name, run) {
-    setBusy(name);
-    setNotice(null);
-    try {
-      const result = await run();
-      if (name === "read") setNotice(result.alreadyRunning ? "It is being read already." : "Asked for: it starts within a minute.");
-      if (name === "stop") setNotice(result.stopped === "running" ? "Stopping: the pages it has not read are left for the next read." : result.stopped === "queued" ? "The read that was asked for is taken back." : "Nothing was being read.");
-      await Promise.all([revalidate(), refresh()]);
-    } catch (failure) {
-      setNotice(failure.message ?? "That did not work.");
-    } finally {
-      setBusy(null);
-    }
-  }
+  const pagesHref = sourceTabHref(workspaceId, sourceId, "pages");
+  const runStatus = overview?.activeRun ? "running" : overview?.latestRun?.status ?? null;
 
   return (
-    <PageFrame label={source.name} className="max-w-6xl space-y-7">
-      <PageHeader
-        icon={Icon}
-        title={source.name}
-        status={(
-          <>
-            <Pill tone={state.tone === "muted" ? "neutral" : state.tone} dot pulse={state.pulse}>{headlineOf(source)}</Pill>
-            <Pill>{describeRelation(source, website?.host)}</Pill>
-          </>
-        )}
-        description={descriptionOf(source, website)}
-        meta={(
-          <>
-            {reading && source.activeRun
-              ? <span>Started {describeElapsed(source.activeRun.startedAt)}</span>
-              : source.lastReadAt ? <span>Read {formatDate(source.lastReadAt)}</span> : <span>Not read yet</span>}
-            {!live && source.nextReadAt && source.enabled && (
-              <>
-                <span aria-hidden="true">·</span>
-                <span>next read {describeNextCrawl(source.nextReadAt)}</span>
-              </>
-            )}
-            {addedBy && (
-              <>
-                <span aria-hidden="true">·</span>
-                <span>added by {addedBy.name} on {formatDate(source.createdAt, { time: false })}</span>
-              </>
-            )}
-            <span aria-hidden="true">·</span>
-            <span>copies into {source.libraryPath}</span>
-          </>
-        )}
-        actions={(
-          <>
-            {canCrawl && (live ? (
-              <Button type="button" variant="outline" disabled={busy !== null} onClick={() => act("stop", () => stopCrawl(scope))}>
-                <Square aria-hidden="true" />{busy === "stop" ? "Stopping…" : "Stop crawl"}
-              </Button>
-            ) : (
-              <Button type="button" variant="outline" disabled={busy !== null} onClick={() => act("read", () => requestCrawl(scope))}>
-                {source.lastReadAt ? <RefreshCw aria-hidden="true" /> : <Play aria-hidden="true" />}{busy === "read" ? "Asking…" : "Read now"}
-              </Button>
-            ))}
-            <Link href={libraryHref(workspaceId, source.libraryPath)} className={buttonVariants({ variant: "outline" })}>
-              <LibraryBig aria-hidden="true" />Open in Library
-            </Link>
-          </>
-        )}
-      />
-
-      {notice && <p role="status" className="text-compact text-orb-cyan">{notice}</p>}
+    <div className="space-y-6 px-6 py-6">
       {source.latestRun?.error && !live && ["refused", "rate-limited", "failed"].includes(source.state) && (
         <Alert variant="destructive" role="alert"><AlertDescription>{source.latestRun.error.message}</AlertDescription></Alert>
       )}
       {source.state === "out-of-budget" && (
-        <p className="text-compact text-orb-orange">The last read stopped when this month’s crawl pages ran out. The pages it did not reach are read next time.</p>
+        <p className="text-compact text-orb-orange">The last crawl stopped when this month’s crawl pages ran out. The pages it did not reach are read next time.</p>
       )}
 
       {live && <Progress source={source} leftOut={data.leftOut?.total ?? 0} />}
 
-      <div className="flex flex-wrap items-start gap-6">
-        <div className="min-w-0 flex-[999_1_28rem]">
-          <SourceSettings
-            key={source.id}
-            workspaceId={workspaceId}
-            source={source}
-            detail={data}
-            purposes={list?.purposes ?? []}
-            onSaved={async () => { await Promise.all([revalidate(), refresh()]); }}
-            onRemoved={() => router.replace(`/workspaces/${workspaceId}/sources`)}
-          />
-        </div>
-        <aside aria-label={`About ${source.name}`} className="flex min-w-0 flex-[1_1_18rem] flex-col gap-4">
-          {source.mode === "pages"
-            ? <LastRead source={source} detail={data} />
-            : <LatestPages source={source} detail={data} pagesHref={pagesHref} />}
-          {!source.primary && source.relation === "own" && data.website?.linksHere > 0 && <NextToWebsite source={source} detail={data} />}
+      {overview?.site && (
+        <CrawlSummary
+          urls={overview.urls}
+          counters={(overview.activeRun ?? overview.latestRun)?.counters ?? {}}
+          runStatus={runStatus}
+          budget={overview.budget}
+          findingHref={(kind) => `${pagesHref}?finding=${kind}`}
+          budgetLink={budgetLink}
+        />
+      )}
+
+      {/* The step after the first crawl, said here as well as on Home, once a crawl has finished and
+          while nothing else is going on. */}
+      {source.primary && !live && overview?.latestRun?.status === "succeeded" && <CrawlNextStep workspaceId={workspaceId} />}
+
+      <div className="grid items-start gap-4 lg:grid-cols-2">
+        {source.mode === "pages"
+          ? <LastRead source={source} detail={data} />
+          : <LatestPages source={source} detail={data} pagesHref={pagesHref} />}
+        <div className="flex min-w-0 flex-col gap-4">
           <TheCopy workspaceId={workspaceId} source={source} detail={data} />
+          {!source.primary && source.relation === "own" && data.website?.linksHere > 0 && <NextToWebsite source={source} detail={data} />}
           {data.quotedIn?.total > 0 && <QuotedIn workspaceId={workspaceId} quoted={data.quotedIn} />}
-          {source.mode === "pages" && (
-            <Link href={pagesHref} className="flex items-center gap-1 self-start text-xs text-orb-cyan hover:underline">
-              Every page, with its crawl history <ArrowRight aria-hidden="true" className="size-3" />
-            </Link>
-          )}
-        </aside>
+        </div>
       </div>
-    </PageFrame>
+    </div>
   );
-}
-
-/** The pill beside the name: the state, shortened. */
-function headlineOf(source) {
-  switch (source.state) {
-    case "first-read": return "First crawl";
-    case "reading": return "Reading";
-    case "queued": return "Queued";
-    case "refused": return "Refused";
-    case "rate-limited": return "Asked to slow down";
-    case "failed": return "Failed";
-    case "stopped": return "Stopped";
-    case "out-of-budget": return "Out of crawl pages";
-    case "never-read": return "Not read yet";
-    default: return "Up to date";
-  }
-}
-
-/** One sentence on what the source is and how much of its host is read. */
-function descriptionOf(source, website) {
-  if (source.primary) {
-    return `Your website, ${source.host}. Orbik follows every link and sitemap on that host, and nothing beyond it; other sites of yours are sources of their own.`;
-  }
-  if (source.relation === "elsewhere") {
-    return `${source.purposeLabel} on ${source.host}. Orbik reads the pages listed here${source.followPagination ? " and their own next pages" : ""}, and nothing else on that site.`;
-  }
-  const where = describeRelation(source, website?.host) === "Subdomain" ? `a subdomain of ${website?.host?.replace(/^www\./, "")}` : "a site of yours";
-  const how = source.mode === "section" ? `only the pages under ${source.section}` : source.mode === "pages" ? "only the pages listed here" : "every link on that host";
-  return `${source.purposeLabel} on ${source.host}, ${where}. Orbik follows ${how}, and nothing beyond it.`;
 }
 
 /** How far the read in progress has got: copied, left out, waiting. */
@@ -390,17 +273,5 @@ function QuotedIn({ workspaceId, quoted }) {
         ))}
       </ul>
     </Panel>
-  );
-}
-
-function SourceSkeleton() {
-  return (
-    <SkeletonRegion label="Loading the source…" className="space-y-7">
-      <div className="flex gap-4"><Skeleton className="size-11 rounded-xl" /><div className="flex-1 space-y-2"><Skeleton className="h-7 w-48" /><Skeleton className="h-4 w-full max-w-xl" /></div></div>
-      <div className="flex flex-wrap gap-6">
-        <div className="flex-[999_1_28rem] space-y-4">{[0, 1, 2].map((key) => <Skeleton key={key} className="h-36 rounded-xl" />)}</div>
-        <div className="flex-[1_1_18rem] space-y-4">{[0, 1].map((key) => <Skeleton key={key} className="h-44 rounded-xl" />)}</div>
-      </div>
-    </SkeletonRegion>
   );
 }

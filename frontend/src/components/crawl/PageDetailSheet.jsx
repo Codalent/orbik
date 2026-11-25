@@ -1,7 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import useSWR from "swr";
+import { Copy, Download } from "lucide-react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -11,6 +14,7 @@ import { BUDGET_REFUSALS } from "@/lib/crawl/budget";
 import { describeFrequency } from "@/lib/crawl/format";
 import { PATTERN_FREQUENCIES, frequencyToInterval, intervalToFrequency } from "@/lib/validation/crawl";
 import { cn } from "@/lib/utils";
+import { splitFrontMatter } from "./CrawlMarkdown";
 
 /** The frequency picker's item for "no setting of its own, follow the pattern". */
 const INHERIT = "inherit";
@@ -46,12 +50,15 @@ const SOURCE_LABELS = Object.freeze({
 });
 
 /**
- * Shows everything one crawl recorded about a single page.
+ * One page, as its crawl read it: the page itself, rendered from the Markdown the crawler kept,
+ * with everything recorded about it in a narrow column beside it — the status and indexability,
+ * its crawl frequency, its other URLs, its content and markup, who links to it, its history and
+ * how it was found.
  *
- * All of it was already being stored and thrown away by the list projection — the headings, the
- * hreflang set, the structured data types, the images missing alt text, the redirect chain, the
- * response size and timing. The only genuinely new question this asks is which pages link here,
- * which the link graph has been indexed for since it was built and which nothing had ever read.
+ * The Markdown leads because it is what every agent, the Library and Ask read of the page: opening
+ * a page shows what Orbik has of it. The column holds what used to fill the whole panel — the
+ * headings, the hreflang set, the structured data types, the images missing alt text, the redirect
+ * chain, the response size and timing, and which pages link here.
  *
  * @param {object} props
  * @param {string} props.workspaceId workspace the page belongs to
@@ -80,17 +87,19 @@ export function PageDetailSheet({ workspaceId, urlHash, onClose, canCrawl = true
   return (
     <Sheet open={Boolean(urlHash)} onOpenChange={(open) => { if (!open) onClose(); }}>
       {/*
-        Full height by default; the width override is what makes this a working panel rather than
-        the narrow drawer the base component ships — a page's detail is dense, and reading a URL
-        and its inbound anchors in `max-w-sm` means wrapping every line.
+        Nearly the window's width: the page is read here, and a page read in a drawer is a column
+        of wrapped lines. From `lg` up the page and the column beside it scroll each on their own,
+        so the details stay in view down a long page; below, they stack and the panel scrolls.
       */}
       <SheetContent
         side="right"
-        className="w-full gap-0 overflow-y-auto border-orb-line bg-orb-space p-0 sm:w-[40%] sm:min-w-[26rem] data-[side=right]:sm:max-w-[46rem]"
+        className="gap-0 overflow-y-auto border-orb-line bg-orb-space p-0 data-[side=right]:w-full data-[side=right]:sm:w-[94vw] data-[side=right]:sm:max-w-[80rem] lg:overflow-hidden"
       >
         <SheetHeader className="gap-1 border-b border-orb-line p-5 pr-14">
           <SheetTitle className="font-mono text-sm break-all text-orb-white">
-            {page ? displayPath(page.url) : "Page"}
+            {page ? (
+              <a href={page.url} target="_blank" rel="noreferrer" className="underline-offset-4 hover:text-orb-cyan hover:underline">{displayPath(page.url)}</a>
+            ) : "Page"}
           </SheetTitle>
           <SheetDescription className="text-orb-muted">
             {page?.title ?? (failed ? "This page could not be loaded." : "Loading…")}
@@ -98,18 +107,20 @@ export function PageDetailSheet({ workspaceId, urlHash, onClose, canCrawl = true
         </SheetHeader>
 
         {page && (
-          <div className="flex flex-col gap-6 p-5">
-            <Verdict page={page} />
-            {loaded.schedule && page.eligible && (
-              <Schedule page={page} schedule={loaded.schedule} onChange={changeSchedule} onRecrawl={recrawl} editable={canCrawl} />
-            )}
-            <Variants variants={loaded.variants} />
-            <Content page={page} />
-            <Technical page={page} />
-            <Markdown key={page.urlHash} workspaceId={workspaceId} urlHash={page.urlHash} summary={loaded.markdown ?? null} />
-            <Links inbound={loaded.inbound} outbound={loaded.outbound} page={page} />
-            <History history={loaded.history} />
-            <Discovery page={page} />
+          <div className="flex flex-col lg:min-h-0 lg:flex-1 lg:flex-row">
+            <PagePreview key={page.urlHash} workspaceId={workspaceId} page={page} summary={loaded.markdown ?? null} />
+            <aside aria-label="What the crawl recorded" className="flex shrink-0 flex-col gap-6 border-t border-orb-line p-5 lg:w-[23rem] lg:overflow-y-auto lg:border-l lg:border-t-0">
+              <Verdict page={page} />
+              {loaded.schedule && page.eligible && (
+                <Schedule page={page} schedule={loaded.schedule} onChange={changeSchedule} onRecrawl={recrawl} editable={canCrawl} />
+              )}
+              <Variants variants={loaded.variants} />
+              <Content page={page} />
+              <Technical page={page} />
+              <Links inbound={loaded.inbound} outbound={loaded.outbound} page={page} />
+              <History history={loaded.history} />
+              <Discovery page={page} />
+            </aside>
           </div>
         )}
       </SheetContent>
@@ -317,10 +328,11 @@ function Links({ inbound, outbound, page }) {
         </p>
       ) : (
         <ul className="flex flex-col gap-1">
-          {inbound.map((link) => (
+          {inbound.map((link, index) => (
             // The anchor follows the path rather than being pushed to the far edge: the words
             // somebody used to link here only mean anything read against the page they are on.
-            <li key={link.urlHash} className="flex flex-wrap items-baseline gap-x-3 border-b border-orb-line/60 py-1 text-xs last:border-0">
+            // One page can link here more than once, in other words, so its address is no key.
+            <li key={`${link.urlHash}:${index}`} className="flex flex-wrap items-baseline gap-x-3 border-b border-orb-line/60 py-1 text-xs last:border-0">
               <span className="max-w-full truncate font-mono text-orb-gray">{displayPath(link.url)}</span>
               {link.anchor && <span className="italic text-orb-muted">“{link.anchor}”</span>}
             </li>
@@ -384,91 +396,106 @@ function Discovery({ page }) {
 }
 
 /**
- * The page's content as Markdown: how much there is, and the text on request.
+ * The page as Orbik keeps it: its Markdown, rendered, with how much there is and when its content
+ * last changed above it, and the raw text, a copy and a download a press away.
  *
- * The text is fetched when asked for rather than with the panel, because it is the largest thing
- * a page has and most visits to the panel are about status, links, or frequency. Once loaded it
- * stays, so hiding and showing costs nothing. Copy and download are the two things people do
- * with it — paste into a model, or keep the file.
+ * Read with the panel, since it is what the panel is opened for, and cached by the page's path, so
+ * opening the page again shows it at once. Links open in a new tab, leaving the panel where it is;
+ * images are asked for without saying where from.
  */
-function Markdown({ workspaceId, urlHash, summary }) {
-  const [text, setText] = useState(null);
-  const [open, setOpen] = useState(false);
-  const [busy, setBusy] = useState(false);
+function PagePreview({ workspaceId, page, summary }) {
+  const key = summary ? `${crawlPagePath(workspaceId, page.urlHash)}/markdown` : null;
+  const { data: text = null, error, isLoading } = useSWR(key, () => getCrawlPageMarkdown(workspaceId, page.urlHash), { revalidateOnFocus: false });
+  const parsed = useMemo(() => (text ? splitFrontMatter(text) : null), [text]);
+  const [raw, setRaw] = useState(false);
   const [notice, setNotice] = useState(null);
-
-  if (!summary) {
-    return (
-      <Section title="Markdown">
-        <p className="text-xs text-orb-muted">Not rendered yet. It is written the next time this page is crawled.</p>
-      </Section>
-    );
-  }
-
-  /** Shows the text, fetching it the first time. */
-  async function reveal() {
-    if (text !== null) { setOpen((value) => !value); return; }
-    setBusy(true);
-    setNotice(null);
-    try {
-      setText(await getCrawlPageMarkdown(workspaceId, urlHash));
-      setOpen(true);
-    } catch {
-      setNotice("The Markdown could not be loaded. Try again.");
-    } finally {
-      setBusy(false);
-    }
-  }
 
   async function copy() {
     try {
-      const value = text ?? (await getCrawlPageMarkdown(workspaceId, urlHash));
-      if (text === null) setText(value);
-      await navigator.clipboard.writeText(value);
+      await navigator.clipboard.writeText(text);
       setNotice("Copied.");
     } catch {
-      setNotice("Copying is not available here. Show the text and copy it by hand.");
+      setNotice("Copying is not available here.");
     }
   }
 
-  /** Hands the browser a file. The link is built from the text already in memory. */
-  async function download() {
-    try {
-      const value = text ?? (await getCrawlPageMarkdown(workspaceId, urlHash));
-      if (text === null) setText(value);
-      const blob = new Blob([value], { type: "text/markdown;charset=utf-8" });
-      const href = URL.createObjectURL(blob);
-      const anchor = document.createElement("a");
-      anchor.href = href;
-      anchor.download = `${(urlHash ?? "page").slice(0, 12)}.md`;
-      anchor.click();
-      setTimeout(() => URL.revokeObjectURL(href), 1000);
-    } catch {
-      setNotice("The Markdown could not be loaded. Try again.");
-    }
+  /** Hands the browser a file, built from the text already in memory. */
+  function download() {
+    const blob = new Blob([text], { type: "text/markdown;charset=utf-8" });
+    const href = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = href;
+    anchor.download = `${filenameFor(page.url)}.md`;
+    anchor.click();
+    setTimeout(() => URL.revokeObjectURL(href), 1000);
   }
 
   return (
-    <Section title="Markdown">
-      <Rows
-        rows={[
-          ["Size", `${(summary.bytes / 1024).toFixed(1)} KB${summary.words ? ` · ${summary.words.toLocaleString()} words` : ""}${summary.truncated ? " · truncated" : ""}`, summary.truncated],
-          ["Content changed", summary.updatedAt ? new Date(summary.updatedAt).toLocaleString() : "—", false],
-        ]}
-      />
-      <div className="mt-3 flex flex-wrap items-center gap-2">
-        <Button type="button" variant="outline" size="sm" onClick={reveal} disabled={busy}>
-          {busy ? "Loading…" : open ? "Hide text" : "Show text"}
-        </Button>
-        <Button type="button" variant="ghost" size="sm" onClick={copy}>Copy</Button>
-        <Button type="button" variant="ghost" size="sm" onClick={download}>Download .md</Button>
-        {notice && <span role="status" className="text-xs text-orb-muted">{notice}</span>}
+    <section aria-label="The page as Orbik keeps it" className="flex min-w-0 flex-1 flex-col lg:overflow-y-auto">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-orb-line px-5 py-2.5 lg:sticky lg:top-0 lg:z-10 lg:bg-orb-space sm:px-8">
+        <p className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-orb-muted">
+          <span className="font-mono text-2xs font-medium uppercase tracking-[0.14em]">Markdown</span>
+          {summary && (
+            <>
+              <span aria-hidden="true">·</span>
+              <span className={cn("tabular-nums", summary.truncated && "text-orb-orange")}>
+                {(summary.bytes / 1024).toFixed(1)} KB{summary.words ? ` · ${summary.words.toLocaleString()} words` : ""}{summary.truncated ? " · truncated at 1 MB" : ""}
+              </span>
+              {summary.updatedAt && (
+                <>
+                  <span aria-hidden="true">·</span>
+                  <span>content changed {new Date(summary.updatedAt).toLocaleDateString()}</span>
+                </>
+              )}
+            </>
+          )}
+        </p>
+        {text !== null && (
+          <div className="flex shrink-0 items-center gap-1.5">
+            {notice && <span role="status" className="mr-1 text-xs text-orb-muted">{notice}</span>}
+            <Button type="button" variant={raw ? "default" : "ghost"} size="sm" onClick={() => setRaw((value) => !value)} aria-pressed={raw}>Raw</Button>
+            <Button type="button" variant="ghost" size="sm" onClick={copy}><Copy aria-hidden="true" className="size-3.5" />Copy</Button>
+            <Button type="button" variant="ghost" size="sm" onClick={download}><Download aria-hidden="true" className="size-3.5" />Download</Button>
+          </div>
+        )}
       </div>
-      {open && text !== null && (
-        <pre className="mt-3 max-h-[28rem] overflow-auto whitespace-pre-wrap break-words rounded-lg border border-orb-line bg-orb-black/40 p-3 font-mono text-[0.7rem] leading-relaxed text-orb-gray">{text}</pre>
-      )}
-    </Section>
+
+      <div className="px-5 py-6 sm:px-8">
+        {!summary ? (
+          <p className="text-sm text-orb-muted">{noMarkdownReason(page)}</p>
+        ) : error && text === null ? (
+          <p role="alert" className="text-sm text-orb-coral">The Markdown could not be loaded. Close the panel and open the page again to retry.</p>
+        ) : text === null || isLoading ? (
+          <p className="text-sm text-orb-muted">Loading…</p>
+        ) : raw ? (
+          <pre className="whitespace-pre-wrap break-words rounded-lg border border-orb-line bg-orb-black/40 p-4 font-mono text-xs leading-relaxed text-orb-gray">{text}</pre>
+        ) : (
+          <article className="doc-prose max-w-3xl">
+            {parsed?.meta.description && <p className="mb-6 text-base text-orb-gray">{parsed.meta.description}</p>}
+            <ReactMarkdown remarkPlugins={[remarkGfm]} components={MARKDOWN_COMPONENTS}>{parsed?.body ?? text}</ReactMarkdown>
+          </article>
+        )}
+      </div>
+    </section>
   );
+}
+
+/**
+ * Links leave the panel open behind them; images are fetched lazily and without a referrer. `node`
+ * is react-markdown's own prop, not an attribute, so it is not passed on.
+ */
+const MARKDOWN_COMPONENTS = Object.freeze({
+  a: ({ node, ...props }) => <a {...props} target="_blank" rel="noreferrer" />,
+  // eslint-disable-next-line @next/next/no-img-element -- a crawled page's own image, at its own address
+  img: ({ node, alt = "", ...props }) => <img {...props} alt={alt} loading="lazy" referrerPolicy="no-referrer" />,
+});
+
+/** Why a page has no Markdown, in its own terms. */
+function noMarkdownReason(page) {
+  if (page.status === null) return "Not crawled yet. Its Markdown is written when it is fetched.";
+  if (page.status >= 400) return `This page answered ${page.status} when it was last fetched, so nothing was read from it.`;
+  if (page.isVariant) return "This address is a duplicate: its Markdown is kept once, with the page it is folded into.";
+  return "Not rendered yet. Its Markdown is written the next time this page is crawled.";
 }
 
 /** A titled block, so the panel reads as sections rather than one long list. */
@@ -486,7 +513,7 @@ function Section({ title, children }) {
 /** Label and value pairs on a shared grid, so values line up down the panel. */
 function Rows({ rows }) {
   return (
-    <dl className="grid grid-cols-[8rem_minmax(0,1fr)] gap-x-3 gap-y-1.5 text-xs">
+    <dl className="grid grid-cols-[6.5rem_minmax(0,1fr)] gap-x-3 gap-y-1.5 text-xs">
       {rows.map(([label, value, warn]) => (
         <div key={label} className="contents">
           <dt className="text-orb-muted">{label}</dt>
@@ -534,4 +561,10 @@ function formatBytes(bytes) {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+/** A file name for a page's Markdown: its path, made safe, or `index` for the home page. */
+function filenameFor(url) {
+  const path = displayPath(url).replace(/^\/+|\/+$/g, "") || "index";
+  return path.replace(/[^A-Za-z0-9._-]+/g, "-").slice(0, 120);
 }

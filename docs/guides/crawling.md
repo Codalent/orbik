@@ -45,19 +45,30 @@ crawl's results but not the controls.
 
 ## The crawl page
 
-Every source has one: **All N pages** on the source's page under **Sources** (the website's is at
-**Sources** → **Website**). The old address, `/agents/crawler`, leads to the website's.
+Every source has one: the **Pages** tab of its page under **Sources** (the website's is at
+**Sources** → **Website** → **Pages**). The old address, `/agents/crawler`, leads to the website's.
 
-Along the top are the crawl's state and its controls: **Crawl now**, **Fresh crawl**, **Set crawl
-frequencies**, **Crawl logs** (every run, how it was started and how it ended), the settings gear
-(on the website's; another source's settings are on its page) and **Clear crawl data**. Hover over a button for what it does. **Next visit in …** is when Orbik
-next comes back on its own (see [Keeping pages up to date](#keeping-pages-up-to-date)).
+A source's page has three tabs under one head. The head says how the crawl stands, the site's
+address, when it was last crawled and **Next visit in …**, when Orbik next comes back on its own
+(see [Keeping pages up to date](#keeping-pages-up-to-date)), and holds **Crawl now** (**Stop
+crawl** while a crawl runs or waits to). Hover over **Crawl now** for what it fetches.
 
-While a crawl runs, the page shows its progress as pages fetched "of about N". N grows as the
+- **Overview** — the figures below, the month's crawl budget, the latest pages read, the source's
+  folder in the Library and the knowledge base's files that quote it.
+- **Pages** — every page, the pages behind each finding, and **Crawl logs** (every run, how it was
+  started and how it ended).
+- **Settings** — where the crawl starts and what it leaves out, **Set crawl frequencies**, **Fresh
+  crawl** and **Clear crawl data**, with the rest of the source's settings
+  ([Sources](sources.md#a-sources-page)).
+
+While a crawl runs, the head shows its progress as pages fetched "of about N". N grows as the
 crawl finds new pages through links, which is why it is a count rather than a percentage. A live
-log underneath lists what each page answered.
+log on the Pages tab lists what each page answered.
 
-The figures under it describe the site as the last crawl left it:
+The figures on the Overview tab describe the site as the last crawl left it, each in the colour of
+what it means: **Crawled** is lime once the last crawl has finished, and **Duplicate URLs** cyan,
+**Nothing links here** orange and **Broken** coral whenever they count a page. A figure of none
+stays grey.
 
 | Figure | Means |
 |---|---|
@@ -67,12 +78,13 @@ The figures under it describe the site as the last crawl left it:
 | **Broken** | Pages that answered with an error when they were last fetched |
 | **Nothing links here** | Pages reached through the sitemap alone |
 
-Press **Duplicate URLs**, **Broken** or **Nothing links here** to list those pages in place of the
-tree, each with what it answered (and, for a duplicate, the page it is folded into); press it again,
-or **Show every page**, for the tree.
+Press **Duplicate URLs**, **Broken** or **Nothing links here** to list those pages on the Pages tab,
+each with what it answered (and, for a duplicate, the page it is folded into). On the Pages tab the
+same three are buttons above the list, in the same colours and with their counts; **Every page**,
+or **Show every page**, brings back the tree.
 
-Below them is every page as a tree of paths, with each page's crawl frequency. Hover over a column's
-heading for what it counts:
+The Pages tab lists every page as a tree of paths, with each page's crawl frequency. Hover over a
+column's heading for what it counts:
 
 | Column | Means |
 |---|---|
@@ -81,8 +93,10 @@ heading for what it counts:
 | **Not crawled** | Pages found but not fetched yet: they wait for the next crawl |
 | **Recrawl** | How often the page is fetched again. **Manual**: only when somebody asks. **varies**: the folder holds pages of several kinds; open it to see each one's |
 
-Select a page to see what was read from it — status, title, description, headings, canonical — its
-**Markdown**, its own crawl frequency and a **Crawl now** for that page alone.
+Select a page to open it: its Markdown, rendered as Orbik keeps it (**Raw** shows the text, **Copy**
+and **Download** take it elsewhere), and beside it what the crawl recorded — status and
+indexability, title, description, headings, canonical, the pages that link to it, its history and
+how it was found — with its own crawl frequency and a **Crawl now** for that page alone.
 
 While a crawl is queued or running it is also listed in the **Activity** box at the foot of the
 Sources and Agents sidebars (on a phone, the one line under them), named by its workspace and, for
@@ -105,7 +119,8 @@ that are not yours, point the crawler at a page of your own with `ORBIK_CRAWLER_
 Every page starts on **Manual trigger**: it is fetched once when it is found, and again only when
 somebody asks.
 
-- **Set crawl frequencies** opens the page list with checkboxes. Tick pages or whole folders,
+- **Set crawl frequencies**, under **How often** on the source's Settings tab, opens the page list
+  with checkboxes. Tick pages or whole folders,
   choose **Daily**, **Weekly**, **Monthly** or **Manual trigger**, and press **Apply**. A folder
   means the pages under it today; pages found later start on manual trigger.
 - One page's frequency can be changed from its detail panel.
@@ -114,11 +129,12 @@ somebody asks.
   it has never fetched, and fetches again the pages whose frequency has come round; a page on
   **Manual** is not fetched again on a visit. A page that comes back unchanged changes nothing
   downstream.
-- **Crawl now** asks for a crawl straight away. It shows **Queued** until the scheduler starts it,
-  within a minute, and fetches what is due: new pages, pages somebody asked for, and pages whose
-  frequency has come round. Pages on Manual are not fetched again.
-- **Fresh crawl**, pressed twice to confirm, fetches every page of the site again in full, whatever
-  its frequency. Frequencies are left as they were. Use it when much of the site has changed at
+- **Crawl now** asks for a crawl straight away. The source shows **Queued** until the scheduler
+  starts it, within a minute (**Stop crawl** takes the request back), and it fetches what is due:
+  new pages, pages somebody asked for, and pages whose frequency has come round. Pages on Manual are
+  not fetched again.
+- **Fresh crawl**, on the Settings tab and confirmed in a dialog, fetches every page of the site
+  again in full, whatever its frequency. Frequencies are left as they were. Use it when much of the site has changed at
   once.
 
 > [!NOTE]
@@ -163,9 +179,9 @@ press **Crawl now**. Orbik does not disguise itself or solve challenges to get p
 
 ## Changing where the crawl starts
 
-**Crawl settings** (the gear on the website's crawl page, or **Where it starts** on its page under
-Sources) changes **Start crawling from** and the sitemap addresses. Changes apply to the next
-crawl, and the schedule is not reset.
+**Where it starts**, on the source's Settings tab, changes **Start crawling from**, and **Sitemaps**
+under it takes more sitemap addresses. Changes apply to the next crawl, and the schedule is not
+reset.
 
 The workspace's own website is changed on **Settings** → **Workspace**, by an admin or the owner:
 
@@ -181,8 +197,8 @@ The workspace's own website is changed on **Settings** → **Workspace**, by an 
 
 ## Clearing crawled data
 
-**Clear crawl data**, pressed twice to confirm, deletes every crawled page, its history and the
-crawl logs. The crawl settings are kept. It cannot be undone, it needs an admin or the owner, and
+**Clear crawl data**, on the source's Settings tab and confirmed in a dialog, deletes every crawled
+page, its history and the crawl logs. The crawl settings are kept. It cannot be undone, it needs an admin or the owner, and
 it is refused while a crawl is running. Press **Crawl now** afterwards to read the site again.
 
 How the crawler works inside — the queue, the pace and the Markdown rules — is in

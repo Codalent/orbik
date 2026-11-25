@@ -53,7 +53,7 @@ pills and counts. Big figures are `font-display text-[2rem] font-bold tabular-nu
 | `Panel`, `PanelTitle` | `ui/panel.jsx` | Every bordered box. `Card` from `ui/card.jsx` is drawn the same and may stay where it is |
 | `RowList` | `ui/panel.jsx` | A divided list inside a panel; each row an `<li>` with `px-3 py-2.5 sm:px-4` |
 | `EmptyState` | `ui/panel.jsx` | What will appear here, and when, in a dashed box |
-| `StatTile` | `ui/stat-tile.jsx` | A headline figure, in a grid of two to four (`grid-cols-2 lg:grid-cols-4 gap-3`) |
+| `StatTile` | `ui/stat-tile.jsx` | A headline figure, in a grid of two to five (`grid-cols-2 lg:grid-cols-4 gap-3`). Its `tone` colours the whole tile by the meanings above — `good` lime, `info` cyan, `attention` orange, `failed` coral — and is left off a figure with nothing to say |
 | `Pill`, `StatusDot` | `ui/pill.jsx` | Short states and kinds; tones as above |
 | `Avatar` | `ui/avatar.jsx` | A person's initial |
 | `CopyButton` | `brand/CopyButton.jsx` | Anything a person pastes elsewhere: tokens, URLs, IDs, proposed text |
@@ -65,6 +65,9 @@ pills and counts. Big figures are `font-display text-[2rem] font-bold tabular-nu
 
 - A page sits in `PageFrame` (`workspaces/PageFrame.jsx`): a gutter and a width ceiling. Pages
   with a two-column body use `max-w-6xl`.
+- Several views of one thing — a source's Overview, Pages and Settings — are tabs under one head
+  that stays put, each tab its own route (`sources/SourceFrame.jsx`): the state and the one action
+  never move, what is set is on Settings, and what is read is on the others.
 - Head, then headline figures, then the body. Sections are `space-y-4` inside, pages `space-y-6`
   to `space-y-12` between sections.
 - Icon tiles: `size-9` (sections) or `size-11` (page head), `rounded-lg`/`rounded-xl`, bordered,

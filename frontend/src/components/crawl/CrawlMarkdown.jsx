@@ -268,9 +268,9 @@ function groupByFolder(items, filter) {
  * Separates the front matter the crawler wrote from the body, reading the few keys it uses.
  *
  * A hand-rolled reader rather than a YAML parser: the crawler writes exactly one shape, six
- * quoted string keys, and that is all this needs to read back.
+ * quoted string keys, and that is all this needs to read back. The page panel reads it too.
  */
-function splitFrontMatter(text) {
+export function splitFrontMatter(text) {
   const match = /^---\n([\s\S]*?)\n---\n?/.exec(text);
   if (!match) return { meta: {}, body: text };
   const meta = {};
