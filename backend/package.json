@@ -19,7 +19,7 @@
   "dependencies": {
     "@codalent/devbar": "^0.3.0",
     "@modelcontextprotocol/node": "^2.1.0",
-    "@modelcontextprotocol/server": "^2.1.0",
+    "@modelcontextprotocol/server": "^2.3.0",
     "@orbik/agent-definitions": "workspace:*",
     "@orbik/assets": "workspace:*",
     "@orbik/core": "workspace:*",
