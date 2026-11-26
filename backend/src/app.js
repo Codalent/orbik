@@ -252,13 +252,15 @@ export function createApp({ config, database, readiness, extensions = createExte
   });
   const brandService = createBrandService({ workspaceRepository, brandRepository, assetUrls });
   // Chat reuses the run service rather than creating runs its own way, so a question costs, is
-  // recorded and can be cancelled exactly as pressing Run on any agent does.
+  // recorded and can be cancelled exactly as pressing Run on any agent does. Each answer's model
+  // and cost are read from the AI call log as the answer is folded in.
   const conversationService = createConversationService({
     workspaceRepository,
     conversationRepository: createConversationRepository(agentCollections),
     runRepository,
     runService,
     brandRepository,
+    aiCallRepository,
   });
 
   // Workspaces themselves: made, listed and selected, renamed or moved to another website, given

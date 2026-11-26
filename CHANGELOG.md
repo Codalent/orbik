@@ -5,6 +5,12 @@ What changed in each release of Orbik. Releases are tagged `vX.Y.Z`; upgrading i
 
 ## Unreleased
 
+- **Two more web slots.** `headerItems` puts compact controls in the workspace header, before the
+  account menu, and `answerNotes` puts notes on the line under each finished Ask answer, given the
+  run, the model that answered and what the run's model calls cost. Each answer in
+  `GET /v1/workspaces/:id/conversations/:conversationId` now carries `model` and `costUsd`, read
+  from the AI call log when the answer is folded in. See
+  [docs/architecture/extensions.md](docs/architecture/extensions.md#web-extensions).
 - **Gemini and Grok, and chat apps first.** Home's **Connect Orbik MCP** opens on **Claude.ai,
   ChatGPT, Gemini, Grok**, ahead of the coding agents, and its second step is a button for each
   app, under the app's own mark, to the settings page where a custom connector is added; Settings →

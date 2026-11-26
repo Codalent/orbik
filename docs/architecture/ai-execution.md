@@ -288,6 +288,9 @@ The log is read, never written, by the API, scoped to the workspaces the account
   and cost and calls by model.
 - `GET /v1/ai-calls/{callId}` — one call with its full text.
 
+An Ask answer also carries its run's total from these rows, `model` and `costUsd` on the turn,
+held to the same readers ([library.md](library.md#ask-a-chat-over-the-index)).
+
 Both lists take the same filters: `period` (`1h`, `24h`, `7d`, `30d`), `source` (`agent-run`,
 `chat`, `embedding`, `crawl-schedule` — chat is an agent run of `library-chat`, and `agent-run` is
 every other agent), `model` (the model that answered, or the one asked for while running),

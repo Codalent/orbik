@@ -1,6 +1,7 @@
 import { AppError } from "../errors/appError.js";
 import { AI_CALL_PERIODS } from "../validators/aiCallValidators.js";
 import { CHAT_AGENT_SLUGS } from "./conversationService.js";
+import { AI_CALL_LOG_ROLE, hasRole } from "./workspaceAccess.js";
 
 /**
  * What each source a person filters by is, in terms of what the worker stores.
@@ -22,7 +23,8 @@ const SOURCES = Object.freeze({
  *
  * Calls are scoped to an account through its workspaces: every call the worker records belongs
  * to a workspace — a run's, or a crawl site's — and an account sees the calls of the workspaces
- * it can open, owned or as a member, at any role. The log answers "what has the AI been doing on my behalf", and the answer spans
+ * it can open, owned or as a member, at any role (`AI_CALL_LOG_ROLE`, which an Ask answer's model
+ * and cost are held to as well). The log answers "what has the AI been doing on my behalf", and the answer spans
  * workspaces; a workspace is a filter on it, never a way out of it.
  *
  * @param {object} dependencies
@@ -33,7 +35,7 @@ const SOURCES = Object.freeze({
 export function createAiCallService({ workspaceRepository, aiCallRepository, now = () => new Date() }) {
   async function accessibleWorkspaceIds(userId) {
     const workspaces = await workspaceRepository.listAccessible(userId);
-    return workspaces.map((workspace) => workspace._id);
+    return workspaces.filter((workspace) => hasRole(workspace.role, AI_CALL_LOG_ROLE)).map((workspace) => workspace._id);
   }
 
   /**

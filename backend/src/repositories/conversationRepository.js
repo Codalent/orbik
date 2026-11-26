@@ -110,31 +110,39 @@ export function createConversationRepository(collections) {
  * One conversation as the interface reads it.
  *
  * @param {object} conversation a stored conversation
+ * @param {object} [options]
+ * @param {boolean} [options.cost] whether the reader is shown each answer's model and cost, which
+ *   only the role that reads the AI call log is
  */
-export function toConversation(conversation) {
+export function toConversation(conversation, { cost = false } = {}) {
   return {
     id: conversation._id.toHexString(),
     title: conversation.title,
     createdAt: toIso(conversation.createdAt),
     updatedAt: toIso(conversation.updatedAt),
-    messages: (conversation.messages ?? []).map(toMessage),
+    messages: (conversation.messages ?? []).map((message) => toMessage(message, { cost })),
   };
 }
 
-/** One conversation in a list: enough to choose between threads, without their contents. */
-export function toConversationSummary(conversation) {
+/**
+ * One conversation in a list: enough to choose between threads, without their contents.
+ *
+ * @param {object} conversation a stored conversation
+ * @param {object} [options] as {@link toConversation}
+ */
+export function toConversationSummary(conversation, { cost = false } = {}) {
   const last = (conversation.messages ?? []).at(-1);
   return {
     id: conversation._id.toHexString(),
     title: conversation.title,
     createdAt: toIso(conversation.createdAt),
     updatedAt: toIso(conversation.updatedAt),
-    lastMessage: last ? toMessage(last) : null,
+    lastMessage: last ? toMessage(last, { cost }) : null,
   };
 }
 
 /** One turn. */
-function toMessage(message) {
+function toMessage(message, { cost }) {
   return {
     id: message.id,
     role: message.role,
@@ -154,6 +162,11 @@ function toMessage(message) {
     // Where the person was when they asked, so the thread can show it beside the question.
     context: message.context ?? null,
     runId: message.runId ? String(message.runId) : null,
+    // The model that answered and what the run's model calls cost at list price, in US dollars,
+    // from the AI call log once the run is folded in. Null until then, for a turn with no run, and
+    // for a reader whose role does not read the log.
+    model: cost && typeof message.model === "string" ? message.model : null,
+    costUsd: cost && typeof message.costUsd === "number" ? message.costUsd : null,
     status: message.status ?? null,
     error: message.error ?? null,
     at: toIso(message.at),
