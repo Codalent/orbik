@@ -19,6 +19,11 @@ const KEY_LIKE = /\bsk-[A-Za-z0-9_*-]+/g;
  * a request carrying either is rejected before the model sees it. For these models the two are
  * left off and the model answers without extended thinking. Leaving them off is valid for every
  * model, so a name listed here by mistake costs depth, never a failed call.
+ *
+ * Every model the catalog offers as a tier (Claude Opus 5.5, Sonnet 5.5 and Haiku 5.5) takes
+ * adaptive thinking, every effort level a capability asks for, and the 64,000-token ceiling, so
+ * the request a capability makes is the same whichever tier serves it; only the server-side
+ * fallback below differs by model.
  */
 const WITHOUT_ADAPTIVE_THINKING = new Set(["claude-haiku-4-5"]);
 
@@ -180,7 +185,7 @@ export function createAnthropicProvider({ apiKey, client, callLog = null, purpos
           model: used,
           usage,
           costUsd: tokensToDollars(usage, priced),
-          pricing: ratesFor(priced),
+          pricing: ratesFor(priced, usage),
           turns: 1,
           response: text,
           toolCalls: content.filter((block) => block.type === "tool_use").map((block) => ({ tool: block.name, summary: null })),

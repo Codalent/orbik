@@ -1,4 +1,4 @@
-import { AGENT_CAPABILITIES, AGENT_WRITERS } from "@orbik/protocol";
+import { AGENT_CAPABILITIES, AGENT_WRITERS, MODEL_TIER_VALUES } from "@orbik/protocol";
 
 /**
  * Ask on the Brand page: the chat that builds a workspace's brand from the files a person drops
@@ -27,6 +27,8 @@ export const BRAND_CHAT = Object.freeze({
     "Builds the brand from the files you drop on the Brand page — logos, brand guides, fonts, token files, images — " +
     "and from what you tell it, as you, with every change shown and undoable.",
   capability: AGENT_CAPABILITIES.reasoning,
+  // Every tier, picked in the Ask panel's composer like the Library chat's.
+  modelTiers: MODEL_TIER_VALUES,
   tools: [
     "brand.get",
     "brand.assets",
@@ -281,6 +283,7 @@ export const BRAND_CHAT_READ = Object.freeze({
   name: "Ask (Brand, read-only)",
   summary: "Answers questions about the brand and the files uploaded to it, for a person whose role is read-only.",
   capability: AGENT_CAPABILITIES.reasoning,
+  modelTiers: MODEL_TIER_VALUES,
   tools: ["brand.get", "brand.assets", "brand.asset", "brand.uploads", "brand.viewFile", "content.search", "library.tree", "library.read"],
   runtimeRequirements: [],
   readingBudget: { pages: 6, characters: 60_000 },

@@ -1,4 +1,4 @@
-import { AGENT_CAPABILITIES, RUNTIME_REQUIREMENTS } from "@orbik/protocol";
+import { AGENT_CAPABILITIES, MODEL_TIERS, RUNTIME_REQUIREMENTS } from "@orbik/protocol";
 import {
   SOURCE_WEBSITE_PATH,
   describeDefaultStructure,
@@ -148,6 +148,10 @@ export const BUSINESS_KNOWLEDGE_BASE = Object.freeze({
   // and the deepest available thinking is what filled the context in v1 until the provider
   // refused. The router decides which model satisfies that.
   capability: AGENT_CAPABILITIES.longContext,
+  // Which model writes it is the person's Model setting on the agent's page, stored on its setup
+  // and followed by every write run. The two most capable tiers only: the smallest writes a
+  // knowledge base nobody should have to correct, and the API refuses it here, not only the page.
+  modelTiers: [MODEL_TIERS.large, MODEL_TIERS.medium],
   tools: [
     "content.siteMap",
     "content.listPages",

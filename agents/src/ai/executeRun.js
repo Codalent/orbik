@@ -9,7 +9,7 @@ import {
 } from "@orbik/core";
 import { activeExtensions, agentAllowed } from "@orbik/extensions";
 import { LIBRARY_WRITE_CHANNELS } from "@orbik/library";
-import { AGENT_EVENT_TYPES, AGENT_WRITERS, RUN_STATUS, toDispatchPayload } from "@orbik/protocol";
+import { AGENT_EVENT_TYPES, AGENT_WRITERS, DEFAULT_MODEL_TIER, RUN_STATUS, toDispatchPayload } from "@orbik/protocol";
 import { ObjectId } from "mongodb";
 
 import { AgentError, classifyFailure } from "../runtime/errors.js";
@@ -91,6 +91,7 @@ export function createExecuteRunHandler({ runtimes, retrieval = null }) {
     const actor = definition.writesAs === AGENT_WRITERS.person
       ? await personActor(database, run)
       : null;
+    const modelTier = await tierFor(database, run, definition);
     const tools = createToolRegistry({
       // Core's tools and any the worker's extensions added; a definition gets only the ones it names.
       tools: allTools(),
@@ -133,6 +134,8 @@ export function createExecuteRunHandler({ runtimes, retrieval = null }) {
         isCancelled: () => ledger.isCancelRequested(runId),
         // So the call log can say which run, workspace, and site each model call was for.
         trace: { runId, workspaceId: run.workspaceId, siteId },
+        // Which of the model catalog's tiers it runs on; a plain-code runtime has no use for it.
+        modelTier,
       });
 
       let outcome = null;
@@ -239,6 +242,30 @@ async function planRefusal(database, run, slug) {
   const limits = await extensions.limitsFor({ ownerId: workspace?.ownerId ?? null, workspaceId: workspace?._id ?? null });
   if (agentAllowed(limits, slug)) return null;
   return { code: "PLAN_LIMIT_REACHED", message: "This workspace's plan does not include this agent." };
+}
+
+/**
+ * The model tier a run uses, as a key of the model catalog: the one it was started with (an Ask
+ * question carries the person's choice), else the one chosen on the agent's setup (the knowledge
+ * base's Model setting, which every write run follows, the scheduler's included, read when the run
+ * starts so a choice made after it was queued still counts), else the default.
+ *
+ * Held to the tiers the definition allows (`modelTiers`), whatever the run or the setup says: the
+ * API refuses any other, and this is the same rule for a row written some other way. An agent that
+ * allows only the default is never asked. Which model the tier is, and what serves a tier the
+ * provider lacks, is the model router's.
+ */
+async function tierFor(database, run, definition) {
+  const allowed = definition.modelTiers ?? [DEFAULT_MODEL_TIER];
+  if (allowed.length < 2) return DEFAULT_MODEL_TIER;
+  let wanted = typeof run.modelTier === "string" ? run.modelTier : null;
+  if (!wanted && run.workspaceId) {
+    const setup = await database
+      .collection(AGENT_COLLECTIONS.agentSetups)
+      .findOne({ workspaceId: new ObjectId(run.workspaceId), agentSlug: definition.slug }, { projection: { modelTier: 1 } });
+    wanted = typeof setup?.modelTier === "string" ? setup.modelTier : null;
+  }
+  return allowed.includes(wanted) ? wanted : DEFAULT_MODEL_TIER;
 }
 
 /**

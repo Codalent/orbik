@@ -1,4 +1,5 @@
 import { agentDefinitions, findAgentDefinition } from "@orbik/agent-definitions";
+import { DEFAULT_MODEL_TIER } from "@orbik/protocol";
 
 /**
  * Converts an agent definition to the summary the catalog exposes.
@@ -17,6 +18,8 @@ export function toAgentSummary(definition) {
     tools: definition.tools ?? [],
     inputSchema: definition.inputSchema ?? { type: "object" },
     runtimeRequirements: definition.runtimeRequirements ?? [],
+    // The model catalog's tiers its runs may use, most capable first; the default alone for most.
+    modelTiers: definition.modelTiers ?? [DEFAULT_MODEL_TIER],
   };
 }
 

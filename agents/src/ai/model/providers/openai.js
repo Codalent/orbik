@@ -121,7 +121,7 @@ export function createOpenAiProvider({ apiKey, fetchImpl = fetch, callLog = null
           model: used,
           usage,
           costUsd: tokensToDollars(usage, model),
-          pricing: ratesFor(model),
+          pricing: ratesFor(model, usage),
           turns: 1,
           response: content.filter((block) => block.type === "text").map((block) => block.text).join("\n"),
           toolCalls: content.filter((block) => block.type === "tool_use").map((block) => ({ tool: block.name, summary: null })),

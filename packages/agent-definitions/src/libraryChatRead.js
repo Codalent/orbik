@@ -1,4 +1,4 @@
-import { AGENT_CAPABILITIES, RUNTIME_REQUIREMENTS } from "@orbik/protocol";
+import { AGENT_CAPABILITIES, MODEL_TIER_VALUES, RUNTIME_REQUIREMENTS } from "@orbik/protocol";
 
 import { LIBRARY_CHAT } from "./libraryChat.js";
 
@@ -23,6 +23,8 @@ export const LIBRARY_CHAT_READ = Object.freeze({
     "Answers questions from your own site and Library with a citation under every claim, for a " +
     "person whose role in the workspace is read-only: it cannot save to or rearrange the Library.",
   capability: AGENT_CAPABILITIES.reasoning,
+  // The same choice in the composer as `library-chat`.
+  modelTiers: MODEL_TIER_VALUES,
   tools: [
     "content.search",
     "library.tree",

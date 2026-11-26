@@ -269,6 +269,27 @@ export function createAgentSetupStore({ database, now = () => new Date() }) {
       );
     },
 
+    /**
+     * Records which tier of the model catalog the agent's runs use: a key such as `medium`, never
+     * a model, so the choice follows the catalog when a newer model takes the tier. Whether the
+     * agent allows it is the caller's to have checked; the worker holds a run to the definition's
+     * tiers again when it starts.
+     *
+     * Upserts, as {@link setWorking} does: an agent nobody has set to work yet has no setup.
+     */
+    async setModelTier({ workspaceId, agentSlug, modelTier }) {
+      const current = now();
+      const filter = { workspaceId: toObjectId(workspaceId), agentSlug };
+      return setups.findOneAndUpdate(
+        filter,
+        {
+          $set: { modelTier, updatedAt: current },
+          $setOnInsert: { ...filter, pages: [], working: false, lastRunAt: null, createdAt: current },
+        },
+        { upsert: true, returnDocument: "after" },
+      );
+    },
+
     /** Records when the agent last measured the pages, so the next due time can be reasoned about. */
     async recordRun({ workspaceId, agentSlug, at }) {
       await setups.updateOne(

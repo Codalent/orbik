@@ -152,6 +152,9 @@ export function createRunRepository(collections) {
         // them. The same person as `requestedBy` for every run the API accepts; a run the
         // scheduler or the worker starts has nobody.
         startedBy: input.startedBy ? toObjectId(input.startedBy) : null,
+        // The model catalog's tier the run was asked to use: an Ask question's, as the person
+        // picked it. Null for every other run, which uses its agent's setup's tier or the default.
+        modelTier: typeof input.modelTier === "string" ? input.modelTier : null,
       };
 
       try {

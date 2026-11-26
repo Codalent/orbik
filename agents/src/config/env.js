@@ -118,7 +118,7 @@ export function parseAgentEnvironment(source) {
     schedulerIntervalMs,
     dispatcherIntervalMs,
     anthropicApiKey,
-    /** The provider every reasoning call goes to, and its capability-to-model table. */
+    /** The provider every reasoning call goes to, and its route table: capability to effort, ceiling and provider. */
     aiProvider,
     aiProviderConfigured: Boolean(providerKeys[aiProvider]),
     routes: ROUTES_BY_PROVIDER[aiProvider],

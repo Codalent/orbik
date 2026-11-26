@@ -40,6 +40,25 @@ an answer can point at the part of a page that says it.
   you can take it off before sending. It is a hint for what "this" and "here" mean, not a limit:
   Ask searches the whole workspace either way.
 
+## Choosing the model
+
+Beside the send button, the model picker says which AI model answers your next question. It lists
+every model the install offers, most capable first, each with what it costs beside the most capable
+one: with Claude, **Claude Opus 5.5** (the default), **Claude Sonnet 5.5** at about half the cost,
+and **Claude Haiku 5.5** at a small fraction of it. A cheaper model answers simple questions well;
+the most capable is worth it for a question that needs several searches put together, or for a big
+rearrangement.
+
+- The choice applies to the next question you send, and stays chosen: Orbik remembers it for you in
+  this workspace, in this browser.
+- You can change it between questions of one conversation. The next answer is written by the new
+  model, which reads the conversation so far.
+- Under each answer, beside **Copy**, is the name of the model that answered it. When the provider
+  passed a declined question to another model, that model is the one named.
+
+An install whose AI provider is OpenAI offers its two models instead. When the install changes its
+provider, a choice it no longer offers goes back to the default.
+
 ## Saving and rearranging
 
 Members and above can tell Ask to save something to the Library ("Save this to the Library: …") or
@@ -68,7 +87,7 @@ fonts or design tokens, or say what to change. See [Brand](brand.md).
   nothing.
 - **A model for the answer.** Each question is an agent run, made with the reasoning provider's
   key: `ORBIK_ANTHROPIC_API_KEY`, or `ORBIK_OPENAI_API_KEY` when that is the only one set (or
-  `ORBIK_AI_PROVIDER=openai`). Without it, the panel says that AI is not available before anything
+  `ORBIK_AI_PROVIDER=openai`), on the model chosen in the picker. Without it, the panel says that AI is not available before anything
   is typed (the install's admin is told which setting to change), and Home does not offer
   questions. Every call is listed under
   **Settings** → **AI calls**.

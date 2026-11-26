@@ -21,5 +21,12 @@ export function createAgentSetupController(agentSetupService) {
         res.json(await agentSetupService.setWorking({ userId: req.auth.userId, ...req.validated }));
       } catch (error) { next(error); }
     },
+
+    /** Chooses the model tier the agent's runs use. */
+    async setModel(req, res, next) {
+      try {
+        res.json(await agentSetupService.setModel({ userId: req.auth.userId, ...req.validated }));
+      } catch (error) { next(error); }
+    },
   };
 }

@@ -262,6 +262,7 @@ retries. Nothing crashes.
 pnpm dev                          # run frontend, backend, and agents with watchers
 pnpm lint                         # eslint across every package
 pnpm --dir agents run agent:run   # run one agent from the command line
+pnpm --dir agents run check:models   # is the model catalog behind the provider's model list?
 ```
 
 There are no automated tests in this repository; changes are verified against the running

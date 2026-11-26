@@ -1,4 +1,4 @@
-import { AGENT_CAPABILITIES, AGENT_WRITERS, RUNTIME_REQUIREMENTS } from "@orbik/protocol";
+import { AGENT_CAPABILITIES, AGENT_WRITERS, MODEL_TIER_VALUES, RUNTIME_REQUIREMENTS } from "@orbik/protocol";
 
 /**
  * Ask: the chat in the side panel, open from any page of a workspace.
@@ -35,6 +35,9 @@ export const LIBRARY_CHAT = Object.freeze({
   // Reasoning rather than long-context: the passages arrive already selected, and a rearrangement
   // is a plan over a tree, not a read of a whole site.
   capability: AGENT_CAPABILITIES.reasoning,
+  // Every tier: the person picks one in the composer, for the next question, and the question's
+  // run carries it.
+  modelTiers: MODEL_TIER_VALUES,
   tools: [
     "content.search",
     "library.tree",
