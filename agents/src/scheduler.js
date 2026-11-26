@@ -9,6 +9,7 @@ import { createAgents } from "./registeredAgents.js";
 import { ensureAgentIndexes } from "./db/indexes.js";
 import { parseAgentEnvironment } from "./config/env.js";
 import { createRuntime } from "./runtime/index.js";
+import { createModelCatalogCheck } from "./ai/model/catalogCheck.js";
 import { createTelemetry } from "./telemetry.js";
 
 /**
@@ -55,10 +56,16 @@ const {
 const telemetry = createTelemetry({ database, config, extensions, logger: log });
 telemetry.announce();
 
+// Once a day, with Anthropic as the reasoning provider and its key set: whether the provider lists
+// a model newer than a tier's, or no longer lists one, told to the log, `system_state` and the
+// extensions. It never fails anything else.
+const catalogCheck = createModelCatalogCheck({ database, config, events: extensions, logger: log });
+
 // An extension's loops start and stop with the core ones.
 const loops = [
   crawlScheduler, agentScheduler, dispatcher, libraryScheduler, outboxScheduler, structureDispatcher,
   ...(telemetry.loop ? [telemetry.loop] : []),
+  ...(catalogCheck.loop ? [catalogCheck.loop] : []),
   ...extensions.loops,
 ];
 

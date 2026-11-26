@@ -8,8 +8,11 @@
  * do — which is rare.
  *
  * A definition names tools; it never names a provider or a model. `capability` says what kind of
- * thinking the agent needs, and the model router decides what satisfies that.
+ * thinking the agent needs, and the model router decides what satisfies that. `modelTiers` says
+ * which of the catalog's tiers its runs may be asked to use (`./modelCatalog.js`): the default
+ * alone unless it says more.
  */
+import { DEFAULT_MODEL_TIER, MODEL_TIER_VALUES } from "./modelCatalog.js";
 import {
   TOOL_NAME_PATTERN,
   assertValid,
@@ -66,6 +69,7 @@ const AGENT_DEFINITION_FIELDS = Object.freeze([
   "runtimeRequirements",
   "readingBudget",
   "writesAs",
+  "modelTiers",
 ]);
 
 /**
@@ -166,6 +170,7 @@ export function parseAgentDefinition(input) {
   const writesAs = source.writesAs === undefined || source.writesAs === null
     ? AGENT_WRITERS.agent
     : requireEnum(source.writesAs, "definition.writesAs", Object.values(AGENT_WRITERS), errors);
+  const modelTiers = parseModelTiers(source.modelTiers, errors);
 
   assertValid("INVALID_AGENT_DEFINITION", errors);
   return Object.freeze({
@@ -181,7 +186,31 @@ export function parseAgentDefinition(input) {
     runtimeRequirements: Object.freeze([...runtimeRequirements]),
     readingBudget,
     writesAs,
+    modelTiers,
   });
+}
+
+/**
+ * Validates which tiers of the model catalog an agent's runs may use, in the catalog's order.
+ *
+ * On the definition, and enforced where a choice is accepted (the API) and where it is used (the
+ * worker), because it is a property of the agent: a knowledge base written by the smallest model
+ * is not one worth keeping, while a question in the Ask panel may well be answered by it. Hiding a
+ * tier in the interface alone would leave every other client free to pick it.
+ *
+ * Optional: a definition without one runs on the default tier and offers no choice. One that has
+ * one must include the default, which is what a run gets when nobody chose.
+ */
+function parseModelTiers(value, errors) {
+  if (value === undefined || value === null) return Object.freeze([DEFAULT_MODEL_TIER]);
+  const tiers = requireStringArray(value, "definition.modelTiers", { max: MODEL_TIER_VALUES.length, itemRules: { max: 16 } }, errors);
+  if (!Array.isArray(tiers)) return Object.freeze([DEFAULT_MODEL_TIER]);
+  if (tiers.some((tier) => !MODEL_TIER_VALUES.includes(tier))) {
+    errors.push(`definition.modelTiers may name only ${MODEL_TIER_VALUES.join(", ")}.`);
+  }
+  if (new Set(tiers).size !== tiers.length) errors.push("definition.modelTiers must not repeat a tier.");
+  if (!tiers.includes(DEFAULT_MODEL_TIER)) errors.push(`definition.modelTiers must include the default tier, ${DEFAULT_MODEL_TIER}.`);
+  return Object.freeze(MODEL_TIER_VALUES.filter((tier) => tiers.includes(tier)));
 }
 
 /**

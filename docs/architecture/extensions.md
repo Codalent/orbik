@@ -10,7 +10,7 @@ There are two halves, one for the server processes and one for the web app:
 
 | | Where | What it can do |
 |---|---|---|
-| Server extensions | `ORBIK_EXTENSIONS`, loaded by the API, the worker, the scheduler and `grant:crawl-budget` | plan limits, events, the edition and its features, API routes, scheduler loops, worker agents, agents in the catalog with their tools and runtimes, the email sender, making accounts from its own routes, Google sign-in for new accounts |
+| Server extensions | `ORBIK_EXTENSIONS`, loaded by the API, the worker, the scheduler, `grant:crawl-budget` and `check:models` | plan limits, events, the edition and its features, API routes, scheduler loops, worker agents, agents in the catalog with their tools and runtimes, the email sender, making accounts from its own routes, Google sign-in for new accounts |
 | Web extensions | the `@orbik/web-extensions` package the web app imports | rail items, pages, settings sections, banners, items in the workspace header, notes under Ask answers, agents' pages, account pages, account menu items, the `/signup` page, notices in the create-workspace wizard |
 
 The rule that keeps the two repositories honest: **core starts and serves every page with no
@@ -92,6 +92,7 @@ extension never fails the action it is told about.
 | `workspace.created` | API | `{ workspace: { id, name, websiteUrl, ownerId }, userId }` |
 | `workspace.deleted` | API | `{ workspace: { id, name, websiteUrl, ownerId }, userId }`, after every record core keeps of it is gone; remove what the extension stored about it |
 | `ai.call.finished` | API, worker | `{ call }`: the `ai_calls` row as written — workspace, run, agent, model, usage, `costUsd`, status |
+| `ai.catalog.findings.changed` | scheduler, `check:models` | `{ provider, findings, previous, checkedAt }`, when the day's comparison of the provider's model list with the model catalog finds something other than the last check found (an empty `findings` when the catalog has caught up); the first check that finds nothing tells nobody. Each finding is `{ kind: "not-listed", model, name, tier }`, a tier's model the provider no longer lists, or `{ kind: "newer", model, name, createdAt, family, tier, catalogModel }`, a listed model newer than a tier's in its family. For telling someone once that the catalog needs a model added ([ai-execution.md](ai-execution.md#keeping-the-catalog-current)) |
 
 ### API
 
@@ -140,7 +141,9 @@ core agent is, and recorded in `agent_runs`, `agent_run_events` and `ai_calls` l
 
 - `host.addAgentDefinitions(...definitions)` — every process. A definition has the shape
   `parseAgentDefinition` in `@orbik/protocol` accepts, the shape of core's own in
-  `packages/agent-definitions/src/`.
+  `packages/agent-definitions/src/`. `modelTiers` says which tiers of the model catalog its runs may
+  use (the default alone when left out); one that allows more gets a Model setting on its setup
+  (`PUT /v1/workspaces/:id/agents/:slug/model`), which its runs follow ([ai-execution.md](ai-execution.md#models-the-catalog-tiers-and-routes)).
 - `host.addTools(...tools)` — every process (definitions are checked against them wherever the
   catalog is read; only the worker calls them). A tool is `{ name, description, inputSchema,
   parseInput(input, errors), handler(input, context) }`: `name` is namespaced (`acme.listIssues`),
@@ -159,12 +162,14 @@ core agent is, and recorded in `agent_runs`, `agent_run_events` and `ai_calls` l
   throwing: they answer `{ skipped, reason }` or `{ failed, reason }` instead) and `AgentError`.
   It returns `{ run(request) }`.
 
-`run({ definition, input, tools, signal, isCancelled, trace })` is an async generator. It yields
+`run({ definition, input, tools, signal, isCancelled, trace, modelTier })` is an async generator. It yields
 the run's events (`AGENT_EVENT_TYPES` in `@orbik/protocol`: `started`, `progress` with a `message`,
 `tool-started` and `tool-completed` with a `tool`, `completed` with the `result`) and returns
 `{ result, usage }`. `tools` is the run's registry (`tools.invoke(name, input, signal)`), holding
 the tools the definition names. Pass `trace`, with `agentSlug` and `agentVersion` added, to
-`writeText` and `writeStructured`, so the call log names the run. To fail the run with a code and a
+`writeText` and `writeStructured`, so the call log names the run. `modelTier` is the tier the run
+was given, held to the definition's `modelTiers`; `writeText` and `writeStructured` do not take it,
+and are routed by their capability alone (`fast` work on the smallest tier, the rest on the default). To fail the run with a code and a
 message a person can act on, throw `new AgentError({ code, message, retryable: false })`; anything
 else is recorded as `UNEXPECTED_ERROR`.
 

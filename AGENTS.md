@@ -117,8 +117,18 @@ With Qdrant down, indexing and search report `INDEX_UNAVAILABLE` and record the 
 the docs call required. Every reasoning call — agent runs, the Library chat and the short texts
 and structured answers plain-code agents ask for — goes to one provider, `ORBIK_AI_PROVIDER`
 (`anthropic` or `openai`; unset, Anthropic when `ORBIK_ANTHROPIC_API_KEY` is set and OpenAI
-otherwise), through that provider's table in `agents/src/ai/model/modelRouter.js`
-(`ANTHROPIC_ROUTES`, `OPENAI_ROUTES`; docs/architecture/ai-execution.md). The worker logs the choice
+otherwise), through that provider's route table in `agents/src/ai/model/modelRouter.js`
+(`ANTHROPIC_ROUTES`, `OPENAI_ROUTES`), which gives each kind of work (capability) its effort and
+output ceiling but names no model. Which model serves a call is a **tier** (`large`, `medium`,
+`small`) of the model catalog, `packages/protocol/src/modelCatalog.js` (`MODEL_CATALOG` in
+`@orbik/protocol`): each provider's tiers, every model's display name and its list price, the one
+file the router, the price table (`agents/src/ai/model/usage.js`) and the API (`GET /v1/ai/models`,
+for the web app) read. A person picks a tier for an Ask question and as the knowledge base agent's
+Model setting; what is stored is always the tier key, the default is the top tier, and which tiers
+an agent may use is `modelTiers` on its definition, enforced by the API and the worker
+(docs/architecture/ai-execution.md § "Models"). Adding or re-pricing a model is an edit to the
+catalog; new models never appear on their own, and the scheduler checks the provider's model list
+against the catalog once a day (`check:models` below). The worker logs the choice
 at start (`ai.provider`) and records whether the provider's key and the embedding key are set in
 `system_state` (`_id: "ai"`), which the API reports as `ai: {reasoning, search}` in `GET /v1/edition`
 so pages can say AI is unavailable before a person presses Run. Without the chosen provider's key, model runs fail saying no AI provider
@@ -253,6 +263,12 @@ pnpm --dir backend run reset:password -- --email user@example.com
 # It adds to the CURRENT month only, and next month starts from the plan's allowance again.
 # --email works when that account owns one workspace; otherwise name it with --workspace <id>.
 pnpm --dir backend run grant:crawl-budget -- --email user@example.com --pages 50000
+
+# Compare the reasoning provider's model list with the model catalog now, as the scheduler does once
+# a day (Anthropic as the provider, with its key): a tier's model no longer listed, or a newer model
+# in a tier's family. Records the result in system_state (_id "ai-models"), tells the extensions
+# ai.catalog.findings.changed when the findings changed, and prints them. Reads agents/.env.
+pnpm --dir agents run check:models
 ```
 
 ## Open source, extensions and the Docker install
@@ -261,7 +277,7 @@ This repository is the open-source, self-hostable Orbik, complete on its own: wi
 loaded every plan limit is unlimited, every agent runs, and `GET /v1/edition` says `community`. A
 deployment — Orbik's own cloud among them — adds plans, billing and pages only through the
 extension seam (docs/architecture/extensions.md): server extensions named by `ORBIK_EXTENSIONS`
-(`@orbik/extensions`, loaded by the API, the worker, the scheduler and `grant:crawl-budget`) and the
+(`@orbik/extensions`, loaded by the API, the worker, the scheduler, `grant:crawl-budget` and `check:models`) and the
 web app's slot package `@orbik/web-extensions`, empty here. Plan limits are read through the
 loaded host (`limitsFor`, or `activeExtensions()` deep in the worker), never from a stored row.
 Never import anything from outside this repository: `eslint.boundary.mjs` fails the lint on it, and

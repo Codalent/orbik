@@ -36,6 +36,7 @@ export function createConversationController(conversationService) {
           question: req.validated.question,
           context: req.validated.context,
           attachments: req.validated.attachments,
+          modelTier: req.validated.modelTier,
         });
         res.status(202).json(result);
       } catch (error) { next(error); }
@@ -50,6 +51,7 @@ export function createConversationController(conversationService) {
           question: req.validated.question,
           context: req.validated.context,
           attachments: req.validated.attachments,
+          modelTier: req.validated.modelTier,
         });
         res.status(202).json(result);
       } catch (error) { next(error); }

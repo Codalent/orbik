@@ -33,6 +33,8 @@ import { createAiCallRepository } from "./repositories/aiCallRepository.js";
 import { createAiCallService } from "./services/aiCallService.js";
 import { createAgentSetupService } from "./services/agentSetupService.js";
 import { createAgentSetupRouter } from "./routes/agentSetupRoutes.js";
+import { createAiModelRouter } from "./routes/aiModelRoutes.js";
+import { createModelService } from "./services/modelService.js";
 import { createKnowledgeRepository } from "./repositories/knowledgeRepository.js";
 import { createKnowledgeService } from "./services/knowledgeService.js";
 import { createKnowledgeRouter } from "./routes/knowledgeRoutes.js";
@@ -195,12 +197,16 @@ export function createApp({ config, database, readiness, extensions = createExte
     crawlRepository,
     limitsFor,
   });
+  // Which models the install offers, from the model catalog and the provider the worker recorded:
+  // for the Ask panel's picker and an agent's Model setting.
+  const modelService = createModelService({ database });
   const agentSetupService = createAgentSetupService({
     workspaceRepository,
     setupStore,
     agentScheduleRepository: createAgentScheduleRepository(agentCollections),
     runRepository,
     crawlRepository,
+    modelService,
   });
   const knowledgeRepository = createKnowledgeRepository(agentCollections, database);
   const knowledgeService = createKnowledgeService({
@@ -390,6 +396,7 @@ export function createApp({ config, database, readiness, extensions = createExte
     }),
   }));
   app.use(createAgentSetupRouter({ agentSetupService, csrfProtection }));
+  app.use(createAiModelRouter({ modelService }));
   app.use(createKnowledgeRouter({ knowledgeService, csrfProtection }));
   app.use(createLibraryRouter({ libraryService, csrfProtection }));
   app.use(createHomeRouter({ homeService, csrfProtection }));

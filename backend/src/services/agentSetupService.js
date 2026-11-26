@@ -2,6 +2,7 @@ import { isOnRequestAgent, scheduleProfileFor } from "@orbik/core";
 
 import { AppError } from "../errors/appError.js";
 import { findAgent, toAgentSummary } from "./agentCatalog.js";
+import { CHAT_AGENT_SLUGS } from "./conversationService.js";
 import { createWorkspaceAccessCheck } from "./workspaceAccess.js";
 
 /**
@@ -21,6 +22,9 @@ function toSetupSummary(setup) {
       addedAt: page.addedAt ? page.addedAt.toISOString() : null,
     })),
     working: Boolean(setup.working),
+    // The model tier a person chose for the agent's runs, or null for the default. The tier its
+    // runs use now, with what each tier is, is `models` beside the setup.
+    modelTier: typeof setup.modelTier === "string" ? setup.modelTier : null,
     lastRunAt: setup.lastRunAt ? setup.lastRunAt.toISOString() : null,
     nextRunAt: setup.nextRunAt ? setup.nextRunAt.toISOString() : null,
     createdAt: setup.createdAt.toISOString(),
@@ -41,6 +45,8 @@ function toSetupSummary(setup) {
  * @param {object} dependencies.agentScheduleRepository the on/off switch in `agent_schedules`
  * @param {object} dependencies.runRepository agent runs, for when an agent last finished
  * @param {object} dependencies.crawlRepository crawl data, for readiness
+ * @param {object} [dependencies.modelService] the models the install offers, for an agent's Model
+ *   setting (`services/modelService.js`); without it the setup carries no `models`
  * @param {() => Date} [dependencies.now] clock
  */
 export function createAgentSetupService({
@@ -49,6 +55,7 @@ export function createAgentSetupService({
   agentScheduleRepository,
   runRepository,
   crawlRepository,
+  modelService = null,
   now = () => new Date(),
 }) {
   const requireWorkspaceAccess = createWorkspaceAccessCheck(workspaceRepository);
@@ -100,6 +107,17 @@ export function createAgentSetupService({
     return { nextRunAt: ranRecently ? new Date(lastRunAt.getTime() + cadenceMs) : current };
   }
 
+  /**
+   * The agent's model: the tiers it may use on the install's provider, which one its runs use now,
+   * and whether a person can choose. The Ask agents' tier is chosen with each question instead.
+   */
+  function modelsOf(definition, setup) {
+    if (!modelService) return {};
+    return modelService
+      .forAgent(definition, { chosen: setup?.modelTier ?? null, perRequest: CHAT_AGENT_SLUGS.includes(definition.slug) })
+      .then((models) => ({ models }));
+  }
+
   /** The setup with the schedule's next due time folded in, so one read answers "when next". */
   async function withSchedule(workspaceId, agentSlug, setup) {
     if (!setup) return null;
@@ -120,6 +138,41 @@ export function createAgentSetupService({
         agent: toAgentSummary(definition),
         setup: toSetupSummary(await withSchedule(workspace._id, agentSlug, setup)),
         readiness,
+        ...(await modelsOf(definition, setup)),
+      };
+    },
+
+    /**
+     * Chooses the model tier the agent's runs use, by the roles that change its other settings
+     * (member and up).
+     *
+     * A tier, never a model: what is stored is a key of the model catalog, so the choice follows
+     * the catalog when a newer model takes the tier. Refused for a tier the agent's definition
+     * does not allow (the knowledge base allows the two most capable), and for an agent with no
+     * choice to make: one that runs on the default only, and the Ask agents, whose tier comes with
+     * each question. Every run the agent starts afterwards uses it, the scheduler's included; a
+     * tier the provider lacks is served by the default.
+     */
+    async setModel({ userId, workspaceId, agentSlug, modelTier }) {
+      const workspace = await requireWorkspaceAccess(userId, workspaceId, { role: "member" });
+      const definition = requireAgent(agentSlug);
+      const allowed = definition.modelTiers ?? [];
+      if (allowed.length < 2 || CHAT_AGENT_SLUGS.includes(definition.slug)) {
+        throw new AppError({
+          status: 409,
+          code: "MODEL_NOT_SETTABLE",
+          message: CHAT_AGENT_SLUGS.includes(definition.slug)
+            ? "Ask's model is chosen with each question, in the Ask panel."
+            : "This agent always uses the most capable model; it has no Model setting.",
+        });
+      }
+      if (!allowed.includes(modelTier)) {
+        throw new AppError({ status: 400, code: "MODEL_TIER_NOT_ALLOWED", message: "This agent cannot use that model." });
+      }
+      const updated = await setupStore.setModelTier({ workspaceId: workspace._id, agentSlug, modelTier });
+      return {
+        setup: toSetupSummary(await withSchedule(workspace._id, agentSlug, updated)),
+        ...(await modelsOf(definition, updated)),
       };
     },
 

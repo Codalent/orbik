@@ -5,8 +5,10 @@ to the install's reasoning provider — Anthropic with `ORBIK_ANTHROPIC_API_KEY`
 `ORBIK_OPENAI_API_KEY`, as `ORBIK_AI_PROVIDER` chooses. The embeddings behind the retrieval index go
 to OpenAI with `ORBIK_OPENAI_API_KEY` either way, because Anthropic has no embeddings endpoint.
 
-A user never picks a provider, a model, or a temperature, and never supplies a key or a login of
-their own. Those are Orbik's problem. What a user sees is a **Run** button.
+A user never picks a provider or a temperature, and never supplies a key or a login of their own.
+Those are Orbik's problem. What a user sees is a **Run** button. The one choice a person has is how
+capable, and so how dear, a model is: a **tier** of the install's model catalog, picked for an Ask
+question or as the knowledge base agent's Model setting ([Models](#models-the-catalog-tiers-and-routes)).
 
 ## The shape
 
@@ -40,11 +42,11 @@ dispatcher (`agents/src/ai/runDispatcher.js`) and executed by the one handler in
 
 | Package | Owns | Depends on Mongo? |
 |---|---|---|
-| `@orbik/protocol` | Run states, agent definitions, agent events, validation primitives — the contract the API and the agents worker share | **No** — it has no dependencies at all |
+| `@orbik/protocol` | Run states, agent definitions, agent events, validation primitives and the model catalog: the contract the API and the agents worker share | **No**: it has no dependencies at all |
 | `@orbik/agent-definitions` | Every agent's definition: instructions, tool allow-list, schemas. The only copy; the API reads it for the catalog and the worker to execute a run. A deployment's extensions may add agents to it at startup (`extendAgentCatalog`; [extensions.md](extensions.md#agents)) | Not itself; it imports `@orbik/tools` to check each tool a definition names |
 | `@orbik/tools` | The deterministic tool registry, scoped to one workspace; and the MCP naming (`toolAlias`, `ORBIK_MCP_SERVER`) the API's MCP server uses | Yes |
 | `@orbik/retrieval` | The retrieval index and the embeddings module | Yes |
-| `agents/src/ai/` | The run handler, the model runtime, model router, provider adapter | Yes |
+| `agents/src/ai/` | The run handler, the model runtime, model router, provider adapters, price table, the daily catalog check | Yes |
 
 ## Four decisions worth knowing
 
@@ -140,20 +142,10 @@ The API reads the record at most every 15 seconds, so a worker restarted with a 
 that. A page reads `ai.reasoning === false` to say, before a person presses **Run now**, that the
 run would fail, and disables what needs a model.
 
-Each provider has a route table in `agents/src/ai/model/modelRouter.js` that decides which model
-serves which kind of work; `parseAgentEnvironment` (`agents/src/config/env.js`) puts the chosen one
-on the config as `routes`, and every model router the worker builds is handed it:
-
-| Capability | `ANTHROPIC_ROUTES` | `OPENAI_ROUTES` | Effort | Used for |
-|---|---|---|---|---|
-| `fast` | `claude-haiku-5-5` | `gpt-6-luna` | low | short rewrites: the summaries plain-code agents ask for (none in this release) |
-| `reasoning` | `claude-opus-5-5` | `gpt-6.1-sol` | high | careful multi-step work with tools: llms.txt, the Library chat, the brand chat; and the Design system agent's two structured answers |
-| `long-context` | `claude-opus-5-5` | `gpt-6.1-sol` | low | work that needs room more than depth: the Library's write run |
-
-`OPENAI_ROUTES` is the table that served every call until 2026-10-15. Changing the provider is
-changing `ORBIK_AI_PROVIDER` and restarting the worker and the scheduler. `synthesisEnabled`
-(`agents/src/config/env.js`), which decides whether the Library scheduler starts write runs,
-follows the provider the chosen table's `long-context` row names, so it moves with the setting.
+Changing the provider is changing `ORBIK_AI_PROVIDER` and restarting the worker and the scheduler.
+`synthesisEnabled` (`agents/src/config/env.js`), which decides whether the Library scheduler starts
+write runs, follows the provider the chosen route table's `long-context` row names, so it moves with
+the setting.
 
 A model run is stopped after 30 round trips, and a long-context run after 60
 (`agents/src/ai/model/modelRuntime.js`): the Library's write run rewrites the subject tree file by
@@ -165,10 +157,11 @@ model's reply — its thinking included — back to it unchanged on the next tur
 declares each Orbik tool under its MCP alias (`crawl_listPages` for `crawl.listPages`), because a
 tool name there cannot carry a dot. A tool loop asks the provider to cache the conversation, so
 each turn reads the previous ones back at a fraction of the input price; a one-shot call does not,
-because it would pay the cache-write premium for nothing. A request to Claude Opus 5.5 carries
-`fallbacks: "default"`: when the model's safety classifiers decline it, the provider re-runs it on
-another model inside the same call, and the call log names the model that answered. A request
-still declined fails as `PROVIDER_REFUSED`.
+because it would pay the cache-write premium for nothing. A request to Claude Opus 5.5 or Claude
+Sonnet 5.5 carries `fallbacks: "default"`: when the model's safety classifiers decline it, the
+provider re-runs it on another model inside the same call, and the call log names the model that
+answered. Claude Haiku 5.5 has no such fallback. A request still declined fails as
+`PROVIDER_REFUSED`.
 
 A turn may also carry pictures and ask for its answer in a fixed shape. A message part
 `{type: "image", mimeType, data}` is sent as an image the model sees, and `format: {name, schema}`
@@ -210,6 +203,134 @@ not configured. Without the reasoning provider's key, what it cannot do, it says
 
 A key the provider rejects is reported the same way, and the message never hints at the key's value
 or shape.
+
+## Models: the catalog, tiers and routes
+
+Which models an install offers, what each is called and what it costs are one file, the **model
+catalog**: `packages/protocol/src/modelCatalog.js` (`MODEL_CATALOG` in `@orbik/protocol`, a package
+with no dependencies that the API and the agents processes both import). The worker's router reads
+it for which model serves a call, its price table for what the call cost, and the API for what the
+web app offers (`GET /v1/ai/models`), so adding a model is one reviewed edit. A catalog that breaks
+its own rules (a tier naming a model it does not price, tiers out of order) stops every process
+that imports it, at start.
+
+**A choice is a tier, never a model.** The tier keys are `large`, `medium` and `small`
+(`MODEL_TIERS`), most capable first, and they name no provider and no model. Each provider lists its
+tiers in the catalog, one model each; what is stored anywhere (an agent's setup, a run, a browser)
+is a key, so when a newer model replaces a tier's model in the catalog every stored choice follows
+it with no migration. The default is always the top tier. A provider may offer fewer tiers, and a
+stored tier the active provider lacks is served by the default:
+
+| Tier | Anthropic | OpenAI |
+|---|---|---|
+| `large` (the default) | Claude Opus 5.5 (`claude-opus-5-5`) | GPT-6.1 Sol (`gpt-6.1-sol`) |
+| `medium` | Claude Sonnet 5.5 (`claude-sonnet-5-5`) | none: served by `large` |
+| `small` | Claude Haiku 5.5 (`claude-haiku-5-5`) | GPT-6 Luna (`gpt-6-luna`) |
+
+The catalog also prices models nobody can choose: the ones a declined request is re-run on (Claude
+Opus 5, Claude Opus 4.8, Claude Sonnet 5), and ones older call-log rows name (Claude Haiku 4.5, GPT-6
+Astra).
+
+**Which tiers an agent may use is on its definition.** `modelTiers` (`parseAgentDefinition`; the
+default tier alone when a definition says nothing, and it must include the default) is enforced by
+the API where a choice is accepted and again by the worker where it is used, never only by what the
+interface hides:
+
+| Agent | `modelTiers` | Chosen |
+|---|---|---|
+| Ask (`library-chat`, `library-chat-read`, `brand-chat`, `brand-chat-read`) | all three | per question, in the Ask panel's composer; the question's request carries `modelTier` and the run stores it |
+| Business Knowledge Base | `large`, `medium` | the Model setting on the agent's page: `PUT /v1/workspaces/:id/agents/business-knowledge-base/model` `{"modelTier": "medium"}`, member and up, stored as `modelTier` on its `agent_setups` row |
+| llms.txt, Design system | the default | never: they get no setting |
+
+The run handler (`tierFor` in `agents/src/ai/executeRun.js`) takes the run's own `modelTier` (an
+Ask question's), else the one on the agent's setup (read when the run starts, so every write run
+follows the Model setting, the ones the Library scheduler starts included), else the default, and
+the default whenever that is not a tier the definition allows. The router then makes the tier a
+model on the active provider. The knowledge base's change of folders asked for in words
+(`structure.revise`) is not a write run and stays on the default.
+
+**Effort and the output ceiling stay the kind of work's.** Each provider's route table in
+`agents/src/ai/model/modelRouter.js` (`ANTHROPIC_ROUTES`, `OPENAI_ROUTES`) maps a definition's
+capability to how hard the model thinks and how much it may write, whichever tier serves it;
+`parseAgentEnvironment` (`agents/src/config/env.js`) puts the chosen table on the config as
+`routes`, and every model router the worker builds is handed it:
+
+| Capability | Tier | Effort | Output ceiling | Used for |
+|---|---|---|---|---|
+| `fast` | `small`, always | low | 8,000 | short rewrites: the summaries plain-code agents ask for (none in this release) |
+| `reasoning` | the run's | high | 64,000 | careful multi-step work with tools: llms.txt, the Library chat, the brand chat; and the Design system agent's two structured answers |
+| `long-context` | the run's | low | 64,000 | work that needs room more than depth: the Library's write run |
+
+The request a capability makes is valid on every model a tier offers. On Anthropic each of the
+three takes adaptive thinking, every effort level and a 64,000-token ceiling; the one difference is
+the server-side fallback below, which Claude Opus 5.5 and Claude Sonnet 5.5 take and Claude Haiku 5.5
+does not (it accepts no `fallbacks`), so a Haiku request goes without (`WITH_SERVER_FALLBACK` in the
+adapter). `OPENAI_ROUTES` is the table that served every call until 2026-10-15.
+
+**A conversation hands one model nothing of another's.** An Ask question is a run of its own; the
+earlier turns reach it as text in its input (`history`, `contextFrom` in
+`backend/src/services/conversationService.js`), and the run starts a new conversation with the model
+(`buildTask` in `modelRuntime.js`). Thinking blocks and other provider blocks are handed back only
+between the turns of one run's tool loop, which is on one model. So a person may change the model
+between two questions of a conversation: the next run is simply on the new model, reads the thread
+as text, and pays for its prompt afresh (a provider's cache is the model's own, and a run's prompt
+is cached only within the run anyway).
+
+**Prices.** US dollars per million tokens, as published, checked against the provider's pricing
+page (the Anthropic rows on 2026-11-26), five-minute cache writes:
+
+| Model | Input | Output | Cache write | Cache read |
+|---|---|---|---|---|
+| Claude Opus 5.5 | $4 | $20 | 1.25× input | 0.05× input ($0.20) |
+| Claude Sonnet 5.5 | $2 | $10 | 1.25× | 0.05× ($0.10) |
+| Claude Haiku 5.5, prompt up to 100,000 tokens | $0.10 | $0.50 | 1.25× | 0.1× |
+| Claude Haiku 5.5, longer prompt | $0.50 | $2.50 | 1.25× | 0.1× |
+| Claude Opus 5, Claude Opus 4.8 | $5 | $25 | 1.25× | 0.1× |
+| Claude Sonnet 5 | $2 | $10 | 1.25× | 0.1× |
+| Claude Haiku 4.5 | $1 | $5 | 1.25× | 0.1× |
+
+A second band (`longPrompt` in the catalog) prices a request by the length of its own prompt, every
+input token counted, cache reads and writes included; each request is priced on its own, and the
+cache multipliers apply to its band's input price. The OpenAI rows are the standard prices for a
+request of up to 272,000 input tokens, which no run here is meant to reach. A model not in the
+catalog is priced at $5 in and $25 out, so an unknown model never looks free.
+
+**In the web app.** `GET /v1/ai/models` (signed in) answers the active provider (what the worker
+recorded in `system_state`, `_id: "ai"`; Anthropic before any worker has), `defaultTier`, its
+`tiers` (`{tier, model, name, relativeCost}`, `relativeCost` being the mean of the input and output
+price ratios against the top tier: 0.5 for Claude Sonnet 5.5, 0.025 for Claude Haiku 5.5), and
+`names`, the display name of every model the catalog knows. The Ask panel's picker lists every tier
+by name with the cost said in words ("about half the cost", "a small fraction of the cost"), and
+remembers the choice per person and workspace in the browser (`orbik.ask.model.<user>.<workspace>`
+in `localStorage`; `frontend/src/lib/ask/modelChoice.js`). Under each finished answer, beside Copy,
+is the display name of the model that answered (the turn's `model`, or the id when the catalog does
+not know it). An agent's setup (`GET /v1/workspaces/:id/agents/:slug/setup`) carries `models`:
+`{provider, settable, defaultTier, tier, tiers}`, the tiers it may use on the active provider and the
+one its runs use now; the Knowledge base agent's page draws its Model setting from it.
+
+### Keeping the catalog current
+
+New models never join the catalog on their own: the provider's Models API gives names, dates and
+capabilities but no prices, and every cost is worked out from the catalog. Instead the scheduler
+compares the two once a day (`agents/src/ai/model/catalogCheck.js`), when Anthropic is the reasoning
+provider and `ORBIK_ANTHROPIC_API_KEY` is set. It lists the provider's models through the SDK
+(`client.models.list()`, every page) and reports:
+
+- `not-listed`: a tier's model the provider no longer lists;
+- `newer`: a listed model in a family a tier offers (an Opus, a Sonnet, a Haiku) newer than the
+  tier's model, by the `created_at` the provider gives both, or by the version in the id when it
+  gives no real date.
+
+Findings are logged as a warning (`ai.catalog_out_of_date`), recorded in `system_state` (`_id:
+"ai-models"`: `provider`, `checkedAt`, `listed`, `findings`, `findingsChangedAt`, `lastFailure`),
+and, when they differ from the last check's, told to the server extensions as
+`ai.catalog.findings.changed` ([extensions.md](extensions.md#events)), so a deployment can tell
+somebody once rather than every day. The day's check is claimed with one conditional update, so
+several schedulers make it once; the first look waits five minutes after the scheduler starts. A
+check that cannot list the models is logged (`ai.catalog_check_failed`) and recorded, and tried
+again the next day; it never fails anything else. `pnpm --dir agents run check:models` makes the
+same check by hand, records it, tells the extensions, and prints what it found. Acting on a finding
+is an edit to the catalog: add the model with its price and move the tier to it.
 
 ## Embeddings
 
@@ -270,8 +391,9 @@ cache read), the cost at list price, the per-million-token rates that cost was w
 workspace, site and agent it was for. Text is kept whole up to 200,000 characters and marked where
 it was cut.
 
-The cost is list price worked out from Orbik's own rate table, and the rates are recorded beside
-it, so a call's cost can always be re-derived from its tokens. Writing the log can never fail a
+The cost is list price worked out from the model catalog's prices, in the band the call's prompt
+fell in, and the rates are recorded beside it, so a call's cost can always be re-derived from its
+tokens. Writing the log can never fail a
 call; a write that fails is logged and the work continues.
 
 An embedding call's prompt is the batch of texts, numbered; `inputs` is how many there were; the
@@ -332,7 +454,8 @@ leaves the proposal out.
 
 ## What is not finished
 
-- **Routing per capability.** `ORBIK_AI_PROVIDER` chooses a whole table; sending one capability
-  to another model, or mixing providers, is still an edit to the tables in `modelRouter.js`.
+- **Routing per capability.** `ORBIK_AI_PROVIDER` chooses a whole table; mixing providers is still
+  an edit to the tables in `modelRouter.js`. A person chooses a tier only where an agent's
+  definition allows it, and only for Ask and the knowledge base.
 - **Credits and billing.** Runs are not metered or charged for. What each model call cost at list
   price is in the AI call log; a unit a user pays in comes with billing.

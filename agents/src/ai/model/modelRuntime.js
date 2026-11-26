@@ -53,10 +53,13 @@ export function createModelRuntime({ modelRouter, logger }) {
      * @param {object} request.tools scoped tool registry
      * @param {AbortSignal} request.signal cancellation
      * @param {() => Promise<boolean>} [request.isCancelled] asked between turns
+     * @param {string|null} [request.modelTier] the model catalog's tier the run uses, already held
+     *   to what the definition allows (`executeRun.js`); the default when not given. Every turn of
+     *   the loop is on the one model it resolves to
      * @yields {object} events matching `@orbik/protocol`'s `parseAgentEvent`
      */
-    async *run({ definition, input, tools, signal, isCancelled, trace = {} }) {
-      const route = modelRouter.resolve(definition);
+    async *run({ definition, input, tools, signal, isCancelled, trace = {}, modelTier = null }) {
+      const route = modelRouter.resolve(definition, { tier: modelTier });
       const usage = emptyUsage();
       const descriptions = tools.list();
       const offered = new Set(descriptions.map((tool) => tool.name));

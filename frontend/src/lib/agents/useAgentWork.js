@@ -51,6 +51,7 @@ export function useAgentWork({ workspaceId, agentSlug, onAgent, onFinished }) {
   const agent = setupRead.data?.agent ?? null;
   const setup = setupRead.data?.setup ?? null;
   const readiness = setupRead.data?.readiness ?? null;
+  const models = setupRead.data?.models ?? null;
   const working = Boolean(setup?.working);
   const inFlight = Boolean(run && !complete);
 
@@ -155,6 +156,12 @@ export function useAgentWork({ workspaceId, agentSlug, onAgent, onFinished }) {
     [mutateSetup],
   );
 
+  /** Chooses the model tier the agent's runs use, and keeps the server's answer. */
+  const chooseModel = useCallback((modelTier) => act(async () => {
+    const response = await setupApi.setAgentModel(workspaceId, agentSlug, modelTier);
+    await mutateSetup((current) => (current ? { ...current, setup: response.setup, models: response.models ?? current.models } : current), { revalidate: false });
+  }), [act, agentSlug, mutateSetup, workspaceId]);
+
   const toggleWorking = useCallback(() => act(async () => {
     const response = await setupApi.setAgentWorking(workspaceId, agentSlug, !working);
     await adoptSetup(response.setup);
@@ -175,6 +182,7 @@ export function useAgentWork({ workspaceId, agentSlug, onAgent, onFinished }) {
     agent,
     setup,
     readiness,
+    models,
     runs: history,
     loading,
     run,
@@ -187,6 +195,7 @@ export function useAgentWork({ workspaceId, agentSlug, onAgent, onFinished }) {
     runNow,
     runWith,
     toggleWorking,
+    chooseModel,
     stop,
     adoptSetup,
   };

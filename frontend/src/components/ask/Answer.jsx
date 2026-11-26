@@ -22,6 +22,7 @@ import { CopyButton } from "@/components/brand/CopyButton";
 import { OrbikMark } from "@/components/OrbikLogo";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { modelName, useModels } from "@/lib/api/models";
 import { aiUnavailableText, isAiUnavailableError, useAiAvailability } from "@/lib/ask/ai";
 import { extensionApi, useExtensionSlots } from "@/lib/extensions/slots";
 import { cn } from "@/lib/utils";
@@ -62,9 +63,11 @@ function libraryHref(workspaceId, path) {
  * calls it completed, not from what the model wrote in its reply, so "Changed in your Library" is
  * what happened — and each path in it opens where the thing now lives.
  *
- * Under a finished answer is one quiet line: Copy, and the notes an installed extension adds
- * (`answerNotes`), given the run behind the answer, the model that answered and what the run's
- * model calls cost, as the API folded them in from the AI call log.
+ * Under a finished answer is one quiet line: Copy, the name of the model that answered, and the
+ * notes an installed extension adds (`answerNotes`), given the run behind the answer, the model
+ * that answered and what the run's model calls cost, as the API folded them in from the AI call
+ * log. The model is named as the model catalog names it, or by its id when the catalog does not
+ * know it.
  *
  * @param {object} props
  * @param {object} props.message the turn
@@ -82,6 +85,8 @@ export function Answer({ message, workspaceId, pending = false, progress = [], l
   const { isAdmin } = useAiAvailability();
   // What an installed extension notes under an answer. None in the open-source edition.
   const { answerNotes } = useExtensionSlots();
+  // What each model is called, for the one that answered.
+  const { models } = useModels();
   if (message.role === "user") {
     return (
       <li className="flex flex-col items-end gap-1">
@@ -112,6 +117,9 @@ export function Answer({ message, workspaceId, pending = false, progress = [], l
   // answer with a run, a failed one included, since its run may still have made calls.
   const copyable = Boolean(message.text) && !waiting;
   const notes = !waiting && message.runId ? answerNotes : [];
+  // The model that answered, once the answer is in: null while it is written, when no call came
+  // back, and for a reader whose role does not read the AI call log.
+  const answeredBy = !waiting ? modelName(models?.names, message.model) : null;
 
   return (
     <li className="flex flex-col items-start gap-1">
@@ -201,9 +209,15 @@ export function Answer({ message, workspaceId, pending = false, progress = [], l
         {message.citations?.length > 0 && <Citations citations={message.citations} workspaceId={workspaceId} />}
       </div>
 
-      {(copyable || notes.length > 0) && (
-        <div className={cn("flex items-center", notes.length > 0 && "max-w-full flex-wrap gap-x-1")}>
+      {(copyable || answeredBy || notes.length > 0) && (
+        <div className={cn("flex items-center", (answeredBy || notes.length > 0) && "max-w-full flex-wrap gap-x-1")}>
           {copyable && <CopyButton text={message.text} variant="ghost" />}
+          {/* Set like Copy's label, small and muted, at the button's height. */}
+          {answeredBy && (
+            <span title="The model that answered" className="flex min-h-6 min-w-0 items-center px-2.5 text-xs text-orb-muted">
+              <span className="truncate">{answeredBy}</span>
+            </span>
+          )}
           {/* Each note is set like Copy's label, small and muted, at the button's height; one
               that renders nothing leaves no gap. */}
           {notes.map(({ id, Component }) => (

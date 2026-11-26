@@ -27,6 +27,20 @@ export {
 export { AGENT_EVENT_TYPES, MAX_EVENTS_PER_RUN, parseAgentEvent } from "./agentEvent.js";
 
 export {
+  DEFAULT_MODEL_PROVIDER,
+  DEFAULT_MODEL_TIER,
+  MODEL_CATALOG,
+  MODEL_TIERS,
+  MODEL_TIER_VALUES,
+  findModel,
+  isSameModel,
+  modelForTier,
+  modelNames,
+  providerTiers,
+  relativeCost,
+} from "./modelCatalog.js";
+
+export {
   BUTTON_VARIANTS,
   COLOR_ROLES,
   FONT_ROLES,

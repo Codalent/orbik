@@ -27,32 +27,35 @@ export function getConversation(workspaceId, conversationId) {
 }
 
 /**
- * The body a question is sent with: the question, and where in the app it was asked from when
- * that is known — the page's name, its address, and the Library file on screen — so "save this
- * here" or "move this file" means something.
+ * The body a question is sent with: the question, where in the app it was asked from when that is
+ * known (the page's name, its address, and the Library file on screen) so "save this here" or
+ * "move this file" means something, and the model tier picked to answer it.
  */
-function questionBody(question, context, attachments) {
+function questionBody(question, context, attachments, modelTier) {
   return JSON.stringify({
     question,
     ...(context ? { context } : {}),
     // Files already uploaded to the brand, sent with the message by their identifiers.
     ...(attachments?.length ? { attachments } : {}),
+    // A tier of the model catalog (`large`, `medium`, `small`), never a model; left out, the API
+    // answers with the default.
+    ...(modelTier ? { modelTier } : {}),
   });
 }
 
 /** Starts a conversation with its first question. */
-export function startConversation(workspaceId, question, context = null, attachments = []) {
+export function startConversation(workspaceId, question, context = null, attachments = [], modelTier = null) {
   return apiFetch(`/v1/workspaces/${requireId(workspaceId, "Workspace")}/conversations`, {
     method: "POST",
-    body: questionBody(question, context, attachments),
+    body: questionBody(question, context, attachments, modelTier),
   });
 }
 
 /** Asks a follow-up, which is answered with the turns before it as context. */
-export function askFollowUp(workspaceId, conversationId, question, context = null, attachments = []) {
+export function askFollowUp(workspaceId, conversationId, question, context = null, attachments = [], modelTier = null) {
   return apiFetch(
     `/v1/workspaces/${requireId(workspaceId, "Workspace")}/conversations/${requireId(conversationId, "Conversation")}/messages`,
-    { method: "POST", body: questionBody(question, context, attachments) },
+    { method: "POST", body: questionBody(question, context, attachments, modelTier) },
   );
 }
 

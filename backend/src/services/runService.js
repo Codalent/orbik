@@ -72,9 +72,14 @@ export function createRunService({
      * them with `library-chat-read`, a definition that has no tool that writes. The shared route
      * never passes it.
      *
+     * `modelTier` is passed only by Ask too: the tier of the model catalog the person picked for
+     * this question. It is held to the tiers the agent's definition allows, here and again by the
+     * worker, and stored on the run, which uses it; without one the run uses the agent's setup's
+     * choice or the default.
+     *
      * @returns {Promise<{run: object, created: boolean}>}
      */
-    async createRun({ userId, workspaceId, agentSlug, input, requestKey, confirmed = false, minimumRole = "member" }) {
+    async createRun({ userId, workspaceId, agentSlug, input, requestKey, confirmed = false, minimumRole = "member", modelTier = null }) {
       const workspace = await requireWorkspaceAccess(userId, workspaceId, { role: minimumRole });
 
       const definition = findAgent(agentSlug);
@@ -103,6 +108,10 @@ export function createRunService({
         });
       }
 
+      if (modelTier !== null && !(definition.modelTiers ?? []).includes(modelTier)) {
+        throw new AppError({ status: 400, code: "MODEL_TIER_NOT_ALLOWED", message: "This agent cannot use that model." });
+      }
+
       // The worker refuses it too, for the runs that never come through here; this is the same
       // rule said to the person who pressed Run.
       if (!agentAllowed(await limitsFor({ ownerId: workspace.ownerId, workspaceId: workspace._id }), definition.slug)) {
@@ -119,6 +128,7 @@ export function createRunService({
         requestKey,
         requestedBy: userId,
         startedBy: userId,
+        modelTier,
       });
     },
 

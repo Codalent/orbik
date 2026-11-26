@@ -132,6 +132,13 @@ The same switch, with the folders the agent writes into, the source ledger, what
 changed and its recent runs, is on its own page: **Agents → Knowledge base**. That page links into
 the Library for anything that is read or changed there, such as choosing the folders.
 
+That page also has the agent's **Model**: which AI model writes the knowledge base. It is the most
+capable one unless somebody chose otherwise; with Claude the choice is **Claude Opus 5.5** or
+**Claude Sonnet 5.5**, at about half the cost. The smallest model is not offered here: it is fine
+for a quick question in Ask, but not for writing a knowledge base people rely on. Every write run
+uses the model chosen, the ones a crawl starts included, from the next run on. Members and above
+choose it, as they set the agent to work; read-only members see which it is.
+
 - Set to work, it rewrites the knowledge base when a crawl finds that a page it is written from
   has changed, a page has been newly chosen, or a chosen page has left the site — once the crawl's
   copies have settled. A new blog post is copied and indexed on its own; it usually starts a run

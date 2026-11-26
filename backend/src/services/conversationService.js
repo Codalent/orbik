@@ -6,6 +6,7 @@ import { BRAND_ASSET_ORIGINS } from "@orbik/core";
 
 import { AppError } from "../errors/appError.js";
 import { toConversation, toConversationSummary } from "../repositories/conversationRepository.js";
+import { findAgent } from "./agentCatalog.js";
 import { toChangeView } from "./brandService.js";
 import { AI_CALL_LOG_ROLE, createWorkspaceAccessCheck, hasRole } from "./workspaceAccess.js";
 
@@ -188,11 +189,23 @@ export function createConversationService({
    * workspace the access check just resolved: a member or above gets Ask that can save and
    * rearrange, a read-only person the variant with only the tools that read. The guard is the
    * tool set, so the worker never has to know about roles.
+   *
+   * The question may carry the tier of the model catalog the person picked in the composer. It is
+   * refused before anything is written when the answering agent does not allow it, and otherwise
+   * stored on the run, which is answered on it. Each question is its own run, so a person may
+   * change it between questions of one conversation: the earlier turns reach the next run as text
+   * (`contextFrom`), never as one model's own blocks, so nothing of one model is handed to another.
    */
-  async function ask({ userId, workspace, conversation, question, context = null, attachments = [] }) {
+  async function ask({ userId, workspace, conversation, question, context = null, attachments = [], modelTier = null }) {
     const at = new Date();
     const files = await attachedFiles(workspace, attachments);
     const brand = fromBrandPage(context) || files.length > 0;
+    const agentSlug = brand
+      ? hasRole(workspace.role, "member") ? BRAND_CHAT_AGENT_SLUG : BRAND_CHAT_READ_AGENT_SLUG
+      : hasRole(workspace.role, "member") ? CHAT_AGENT_SLUG : CHAT_READ_AGENT_SLUG;
+    if (modelTier !== null && !(findAgent(agentSlug)?.modelTiers ?? []).includes(modelTier)) {
+      throw new AppError({ status: 400, code: "MODEL_TIER_NOT_ALLOWED", message: "Ask cannot use that model." });
+    }
     // `startedBy` on the question, as on the run it starts: whose turn this was, kept on the turn
     // itself so the record does not depend on the conversation staying one person's.
     const userMessage = {
@@ -227,11 +240,10 @@ export function createConversationService({
       ({ run } = await runService.createRun({
         userId,
         workspaceId: workspace._id.toHexString(),
-        agentSlug: brand
-          ? hasRole(workspace.role, "member") ? BRAND_CHAT_AGENT_SLUG : BRAND_CHAT_READ_AGENT_SLUG
-          : hasRole(workspace.role, "member") ? CHAT_AGENT_SLUG : CHAT_READ_AGENT_SLUG,
+        agentSlug,
         // Read-only is enough to start an Ask run; the slug above is what keeps it from writing.
         minimumRole: "read-only",
+        modelTier,
         input: {
           question,
           ...(history.length ? { history } : {}),
@@ -338,16 +350,16 @@ export function createConversationService({
     },
 
     /** Starts a conversation with its first question. */
-    async startConversation({ userId, workspaceId, question, context, attachments }) {
+    async startConversation({ userId, workspaceId, question, context, attachments, modelTier = null }) {
       const workspace = await requireWorkspaceAccess(userId, workspaceId, { role: "read-only" });
       if (attachments?.length && !hasRole(workspace.role, "member")) {
         throw new AppError({ status: 403, code: "ROLE_INSUFFICIENT", message: "Only a member of this workspace can add files to the brand." });
       }
-      return ask({ userId, workspace, conversation: null, question, context, attachments });
+      return ask({ userId, workspace, conversation: null, question, context, attachments, modelTier });
     },
 
     /** Asks a follow-up, which is answered with the turns before it as context. */
-    async askFollowUp({ userId, workspaceId, conversationId, question, context, attachments }) {
+    async askFollowUp({ userId, workspaceId, conversationId, question, context, attachments, modelTier = null }) {
       const { workspace, conversation } = await requireConversation(userId, workspaceId, conversationId);
       if (attachments?.length && !hasRole(workspace.role, "member")) {
         throw new AppError({ status: 403, code: "ROLE_INSUFFICIENT", message: "Only a member of this workspace can add files to the brand." });
@@ -355,7 +367,7 @@ export function createConversationService({
       // Reconciled first, so a follow-up sent the moment the previous answer arrived carries that
       // answer as context rather than an empty placeholder.
       const current = await reconcile(workspace._id, conversation);
-      return ask({ userId, workspace, conversation: current, question, context, attachments });
+      return ask({ userId, workspace, conversation: current, question, context, attachments, modelTier });
     },
 
     /** Removes one of the caller's conversations. The runs behind it stay in the run history. */

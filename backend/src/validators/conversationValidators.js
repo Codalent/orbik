@@ -1,4 +1,5 @@
 import { BRAND_UPLOAD_LIMITS } from "@orbik/core";
+import { MODEL_TIER_VALUES } from "@orbik/protocol";
 
 import { MAX_QUESTION } from "../services/conversationService.js";
 import { isCanonicalObjectId, plainObject, validationError } from "./shared.js";
@@ -7,12 +8,13 @@ import { isCanonicalObjectId, plainObject, validationError } from "./shared.js";
  * Validating what a person sends to the chat.
  *
  * There is very little of it, and that is the point: a caller supplies a question and, optionally,
- * where in the app it was asked from. Which workspace it is answered from — and who any change it
- * makes is recorded as — comes from the route and the session, the agent
- * and its version come from the catalog. A body
- * that carried an agent slug or a model name would be a body that let a caller redirect the
- * question somewhere it should not go, so those fields are not merely ignored — an unknown field
- * is a rejection, the same rule the tool arguments follow, for the same reason.
+ * where in the app it was asked from and the model tier to answer it with. Which workspace it is
+ * answered from, and who any change it makes is recorded as, comes from the route and the session;
+ * the agent and its version come from the catalog. A body that carried an agent slug or a model's
+ * name would be a body that let a caller redirect the question somewhere it should not go, so those
+ * fields are not merely ignored: an unknown field is a rejection, the same rule the tool arguments
+ * follow, for the same reason. The tier is a key of the model catalog, never a model:
+ * which model it is stays the catalog's, and which tiers the agent may use its definition's.
  */
 
 /** Listing bound, kept small enough that one response stays renderable. */
@@ -82,12 +84,17 @@ export function validateQuestionBody(req, _res, next) {
   const fields = [];
   const body = plainObject(req.body);
   for (const key of Object.keys(body)) {
-    if (key !== "question" && key !== "context" && key !== "attachments") {
+    if (key !== "question" && key !== "context" && key !== "attachments" && key !== "modelTier") {
       fields.push({ field: key, code: "UNKNOWN_FIELD", message: "This field is not accepted." });
     }
   }
   const context = contextOf(body.context, fields);
   const attachments = attachmentsOf(body.attachments, fields);
+  // The tier of the model catalog picked for this question; the default when left out.
+  const modelTier = body.modelTier === undefined || body.modelTier === null ? null : body.modelTier;
+  if (modelTier !== null && !MODEL_TIER_VALUES.includes(modelTier)) {
+    fields.push({ field: "modelTier", code: "INVALID", message: `modelTier must be one of ${MODEL_TIER_VALUES.join(", ")}.` });
+  }
 
   // Files sent with nothing typed are a message too: "here are these".
   const question = typeof body.question === "string" && body.question.trim()
@@ -104,7 +111,7 @@ export function validateQuestionBody(req, _res, next) {
   }
 
   if (fields.length) return next(validationError(fields));
-  req.validated = { ...req.validated, question, context, attachments };
+  req.validated = { ...req.validated, question, context, attachments, modelTier };
   next();
 }
 

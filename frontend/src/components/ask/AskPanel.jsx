@@ -32,6 +32,7 @@ import { FileChip } from "./FileChip";
 import { Button } from "@/components/ui/button";
 import { OrbikMark } from "@/components/OrbikLogo";
 import { IndexStatus } from "./IndexStatus";
+import { ModelPicker } from "./ModelPicker";
 import * as api from "@/lib/api/conversations";
 import { uploadBrandFile } from "@/lib/api/brand";
 import { carriesFiles, useFileDrag } from "@/lib/brand/useFileDrag";
@@ -39,6 +40,8 @@ import { useRevalidateWorkspace } from "@/lib/api/cache";
 import { useRunEvents } from "@/lib/agents/useRunEvents";
 import { useAiAvailability, aiUnavailableText } from "@/lib/ask/ai";
 import { useAskPanel, useAskShortcut } from "@/lib/ask/askPanel";
+import { useAskModel } from "@/lib/ask/modelChoice";
+import { useAuth } from "@/lib/auth/AuthProvider";
 import { cn } from "@/lib/utils";
 import { formatDate } from "@/lib/format";
 import { useCan } from "@/lib/workspaces/roles";
@@ -146,6 +149,10 @@ export function AskPanel({ workspaceId, pageName = null }) {
   // Without a reasoning provider no question can be answered: said before anything is typed.
   const ai = useAiAvailability();
   const shortcut = useAskShortcut();
+  // The model the next question is answered with: a tier, picked in the composer and remembered
+  // for this person in this workspace.
+  const userId = useAuth().user?.id ?? null;
+  const askModel = useAskModel({ workspaceId, userId });
 
   const [conversation, setConversation] = useState(null);
   const [question, setQuestion] = useState("");
@@ -366,8 +373,8 @@ export function AskPanel({ workspaceId, pageName = null }) {
     const attachments = ready.map((file) => file.id);
     try {
       const response = thread
-        ? await api.askFollowUp(workspaceId, thread.id, asked, sentContext, attachments)
-        : await api.startConversation(workspaceId, asked, sentContext, attachments);
+        ? await api.askFollowUp(workspaceId, thread.id, asked, sentContext, attachments, askModel.tier)
+        : await api.startConversation(workspaceId, asked, sentContext, attachments, askModel.tier);
       setQuestion("");
       setFiles([]);
       setSteps([]);
@@ -748,11 +755,29 @@ export function AskPanel({ workspaceId, pageName = null }) {
                     )}
                   </span>
                 )}
+                {/* Which model answers the next question. Every tier the install's provider offers,
+                    each with what it costs beside the most capable; one with a single model has
+                    nothing to choose. */}
+                {askModel.tiers.length > 1 && askModel.tier && (
+                  <ModelPicker
+                    tiers={askModel.tiers}
+                    value={askModel.tier}
+                    onChange={askModel.setTier}
+                    label="Model for the next question"
+                    title="The model that answers your next question"
+                    size="xs"
+                    disabled={Boolean(pending) || !ai.reasoning}
+                    className="ml-auto max-w-[11rem] shrink rounded-full border-orb-line bg-orb-space/60 text-orb-gray hover:text-orb-white"
+                  />
+                )}
                 <Button
                   type="submit"
                   size="icon-sm"
                   aria-label="Send"
-                  className="ml-auto shrink-0 rounded-full disabled:bg-orb-raised disabled:text-orb-muted disabled:opacity-100"
+                  className={cn(
+                    "shrink-0 rounded-full disabled:bg-orb-raised disabled:text-orb-muted disabled:opacity-100",
+                    !(askModel.tiers.length > 1 && askModel.tier) && "ml-auto",
+                  )}
                   disabled={!canSend}
                 >
                   {pending ? <Loader2 aria-hidden="true" className="animate-spin" /> : <ArrowUp aria-hidden="true" />}

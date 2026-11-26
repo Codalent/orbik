@@ -14,7 +14,8 @@
     "dev:scheduler": "node --watch src/scheduler.js",
     "start": "node src/worker.js",
     "lint": "eslint src",
-    "agent:run": "node src/cli/runAgent.js"
+    "agent:run": "node src/cli/runAgent.js",
+    "check:models": "node src/cli/checkModels.js"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.72.0",

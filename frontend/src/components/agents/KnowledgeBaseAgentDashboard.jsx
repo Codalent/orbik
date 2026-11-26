@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { ArrowUpRight, BookMarked, Copy, FileText, FolderTree, History, Pause, Play, ScrollText } from "lucide-react";
 import useSWR from "swr";
 
+import { ModelPicker } from "@/components/ask/ModelPicker";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { SectionHeading } from "@/components/ui/page-header";
 import { EmptyState, Panel, RowList } from "@/components/ui/panel";
@@ -15,6 +16,7 @@ import { AgentHeadView, AgentLimits, AgentPageSkeleton, AgentStats, AgentStatus,
 import { SourceLedger } from "./SourceLedger";
 import { LibraryRunChanges } from "@/components/library/LibraryAgentBar";
 import { useEdition } from "@/lib/api/edition";
+import { costHint } from "@/lib/api/models";
 import { libraryPath } from "@/lib/api/library";
 import { useAuth } from "@/lib/auth/AuthProvider";
 import { RUN_STATUS_LABELS, TERMINAL_RUN_STATUSES } from "@/lib/agents/runEvents";
@@ -53,8 +55,8 @@ const RUN_TONES = Object.freeze({ succeeded: "neutral", failed: "coral", cancell
  *
  * What the agent writes is the Library, which has a place of its own in the rail; this page links
  * there rather than drawing it again, as the Design system agent's page does for the Brand. What
- * is here is the agent: the switch that sets it to work, what it is waiting on, the folders it
- * writes into, the pages it writes from, and what its runs did.
+ * is here is the agent: the switch that sets it to work, the model it writes with, what it is
+ * waiting on, the folders it writes into, the pages it writes from, and what its runs did.
  *
  * There is no Run now. Nobody starts this agent: it reads each page the crawl brings back and
  * rewrites the Library when what those pages say has changed, so a button would only ever start a
@@ -210,6 +212,8 @@ export function KnowledgeBaseAgentDashboard({ workspaceId }) {
         </Panel>
       </section>
 
+      {work.models && <ModelSetting models={work.models} canEdit={canEdit} busy={busy} onChoose={work.chooseModel} />}
+
       <section aria-labelledby="kb-folders" className="space-y-3">
         <SectionHeading
           id="kb-folders"
@@ -284,6 +288,44 @@ export function KnowledgeBaseAgentDashboard({ workspaceId }) {
 
       <AgentLimits items={LIMITS} />
     </div>
+  );
+}
+
+/**
+ * Which model writes the Library: a tier of the model catalog, chosen here by the roles that set
+ * the agent to work, and used by every write run, the ones a crawl starts included. The API offers
+ * only the tiers the agent may use (the two most capable) on the install's provider, says which one
+ * its runs use now, and refuses any other.
+ */
+function ModelSetting({ models, canEdit, busy, onChoose }) {
+  const tiers = models.tiers ?? [];
+  const index = tiers.findIndex((entry) => entry.tier === models.tier);
+  const current = tiers[index] ?? tiers[0] ?? null;
+  const cost = index > 0 ? costHint(current?.relativeCost) : null;
+  const what = index > 0
+    ? (cost ? `${cost[0].toUpperCase()}${cost.slice(1)} of the most capable model.` : "")
+    : tiers.length > 1 ? "The most capable model this agent can use." : "The one model this install's AI provider offers for it.";
+  const choosable = canEdit && models.settable && tiers.length > 1;
+  return (
+    <section aria-labelledby="kb-model" className="space-y-3">
+      <SectionHeading id="kb-model">Model</SectionHeading>
+      <Panel className="flex flex-wrap items-start gap-x-6 gap-y-4">
+        <div className="min-w-[14rem] flex-1 space-y-1">
+          <p className="text-sm font-medium text-orb-white">{current?.name ?? "The most capable model"}</p>
+          <p className="text-sm leading-relaxed text-orb-gray">
+            {what ? `${what} ` : ""}Every write run uses it, the ones a crawl starts included.
+          </p>
+        </div>
+        {choosable ? (
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor="kb-model-choice" className="text-xs text-orb-muted">Writes with</label>
+            <ModelPicker id="kb-model-choice" tiers={tiers} value={current?.tier ?? null} onChange={onChoose} disabled={busy} label="Model" />
+          </div>
+        ) : (
+          !canEdit && tiers.length > 1 && <p className="text-compact text-orb-muted">A member of this workspace changes it.</p>
+        )}
+      </Panel>
+    </section>
   );
 }
 

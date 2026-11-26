@@ -22,8 +22,17 @@ export const PROCESSES = Object.freeze(["api", "worker", "scheduler", "script"])
  * - `workspace.deleted` (API): `{ workspace: { id, name, websiteUrl, ownerId }, userId }`, after
  *   every record of it core keeps is gone; an extension removes what it stored about it
  * - `ai.call.finished` (API and worker): `{ call }`, the `ai_calls` row as it was completed
+ * - `ai.catalog.findings.changed` (scheduler, and the `check:models` command): `{ provider,
+ *   findings, previous, checkedAt }`, when the daily comparison of the provider's model list with
+ *   the model catalog finds something other than it found last time, an empty list included
  */
-export const EVENTS = Object.freeze(["account.created", "workspace.created", "workspace.deleted", "ai.call.finished"]);
+export const EVENTS = Object.freeze([
+  "account.created",
+  "workspace.created",
+  "workspace.deleted",
+  "ai.call.finished",
+  "ai.catalog.findings.changed",
+]);
 
 /** The edition a process is when no extension names another. */
 export const COMMUNITY_EDITION = "community";

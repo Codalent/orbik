@@ -5,6 +5,31 @@ What changed in each release of Orbik. Releases are tagged `vX.Y.Z`; upgrading i
 
 ## Unreleased
 
+- **Choose the model.** The Ask panel's composer has a model picker: every model the install's AI
+  provider offers, most capable first, each with what it costs beside the most capable (with Claude:
+  Claude Opus 5.5, Claude Sonnet 5.5 at about half the cost, Claude Haiku 5.5 at a small fraction of
+  it). The choice applies to the next question, is remembered per person and workspace in the
+  browser, and defaults to the most capable; under each answer, beside **Copy**, is the name of the
+  model that answered. The Knowledge base agent's page has a **Model** setting (the two most capable
+  models only), chosen by members and above and used by every write run. What is chosen and stored
+  is a tier (`large`, `medium`, `small`), never a model, so a newer model taking a tier carries every
+  choice with it. `POST /v1/workspaces/:id/conversations` and `…/messages` take `modelTier`;
+  `PUT /v1/workspaces/:id/agents/:slug/model` sets an agent's; `GET /v1/ai/models` lists what is
+  offered. See [docs/guides/ask.md](docs/guides/ask.md#choosing-the-model) and
+  [docs/architecture/ai-execution.md](docs/architecture/ai-execution.md#models-the-catalog-tiers-and-routes).
+- **One model catalog.** Which models an install offers, their names and their list prices are one
+  file, `packages/protocol/src/modelCatalog.js`, read by the router, the price table and the API.
+  Agent definitions may say which tiers their runs may use (`modelTiers`). Two prices are corrected:
+  Claude Sonnet 5.5's cache reads cost 0.05× input ($0.10 per million tokens), not 0.1×, and a
+  Claude Haiku 5.5 request whose prompt is longer than 100,000 tokens is priced at $0.50 in and
+  $2.50 out, as the provider charges it. Calls already in the AI call log keep the cost they were
+  given.
+- **Keeping the catalog current.** With Claude as the provider, the scheduler compares Anthropic's
+  model list with the catalog once a day and logs a warning when a tier's model is no longer listed
+  or a newer one is; the finding is kept in `system_state` (`ai-models`) and a server extension is
+  told `ai.catalog.findings.changed` when it changes. `pnpm --dir agents run check:models` makes the
+  check now. New models never appear on their own: the list carries no prices. See
+  [docs/architecture/extensions.md](docs/architecture/extensions.md#events).
 - **Two more web slots.** `headerItems` puts compact controls in the workspace header, before the
   account menu, and `answerNotes` puts notes on the line under each finished Ask answer, given the
   run, the model that answered and what the run's model calls cost. Each answer in

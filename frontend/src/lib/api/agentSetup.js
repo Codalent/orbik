@@ -6,8 +6,9 @@ function base(workspaceId, agentSlug) {
 }
 
 /**
- * Where an agent's setup is read from — the setup, the agent itself, and whether there is a crawl
- * to choose pages from; also its cache key.
+ * Where an agent's setup is read from (the setup, the agent itself, whether there is a crawl to
+ * choose pages from, and its model: `models`, the tiers it may use, which one its runs use, and
+ * whether a person can choose); also its cache key.
  */
 export function agentSetupPath(workspaceId, agentSlug) {
   return `${base(workspaceId, agentSlug)}/setup`;
@@ -22,6 +23,17 @@ export function saveAgentSetup(workspaceId, agentSlug, { pages }) {
   return apiFetch(`${base(workspaceId, agentSlug)}/setup`, {
     method: "PUT",
     body: JSON.stringify({ pages }),
+  });
+}
+
+/**
+ * Chooses the model the agent's runs use, as a tier of the model catalog (`large`, `medium`), never
+ * a model. Answers the setup and the agent's `models` as they now stand.
+ */
+export function setAgentModel(workspaceId, agentSlug, modelTier) {
+  return apiFetch(`${base(workspaceId, agentSlug)}/model`, {
+    method: "PUT",
+    body: JSON.stringify({ modelTier }),
   });
 }
 

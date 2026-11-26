@@ -1,4 +1,5 @@
 import { normalizeTrackedPages, pageLimitsFor } from "@orbik/core";
+import { MODEL_TIER_VALUES } from "@orbik/protocol";
 
 import { plainObject, validationError } from "./shared.js";
 
@@ -51,3 +52,21 @@ export function validateWorkingBody(req, _res, next) {
   next();
 }
 
+
+/**
+ * Validates the model tier chosen for an agent: one of the catalog's tier keys, never a model's
+ * name. Whether this agent may use it is the service's to check, from its definition.
+ */
+export function validateModelBody(req, _res, next) {
+  const body = plainObject(req.body);
+  const fields = [];
+  for (const key of Object.keys(body)) {
+    if (key !== "modelTier") fields.push({ field: key, code: "UNKNOWN_FIELD", message: "This field is not accepted." });
+  }
+  if (!MODEL_TIER_VALUES.includes(body.modelTier)) {
+    fields.push({ field: "modelTier", code: "INVALID", message: `modelTier must be one of ${MODEL_TIER_VALUES.join(", ")}.` });
+  }
+  if (fields.length) return next(validationError(fields));
+  req.validated = { ...req.validated, modelTier: body.modelTier };
+  next();
+}

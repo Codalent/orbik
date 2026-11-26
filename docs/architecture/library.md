@@ -992,8 +992,19 @@ the latest of its reasoning calls to come back, as the log names it: the model t
 back to when it did, or null when no call came back. A turn folded in before these were kept is
 given them the next time its conversation is read. They are returned to a reader whose role reads
 the AI call log (`AI_CALL_LOG_ROLE`, read-only and up, so everyone who can open a conversation) and
-are null otherwise; core shows neither, and a web extension's `answerNotes` are handed both
-([extensions.md](extensions.md#web-extensions)).
+are null otherwise. Core shows the model's name beside Copy, and not the cost; a web extension's
+`answerNotes` are handed both ([extensions.md](extensions.md#web-extensions)).
+
+**It answers on the model the person picked.** The composer has a model picker: every tier of the
+install's model catalog on the active provider (`GET /v1/ai/models`), by its model's name, with what
+it costs beside the most capable in words. The choice is a tier key, remembered per person and
+workspace in the browser and the most capable by default; each question's request carries it as
+`modelTier`, the API refuses a value the answering agent's definition does not allow (`modelTiers`:
+all three for the four Ask agents), and the run stores it and is answered on it. Under each finished
+answer, beside Copy, is the name of the model that answered (the turn's `model`, or its id when the
+catalog does not know it). Each question is a run of its own that reads the earlier turns as text,
+so changing the model between two questions hands the new model nothing of the old one's
+([ai-execution.md](ai-execution.md#models-the-catalog-tiers-and-routes)).
 
 **A question is an agent run.** The `library-chat` definition (v3, capability `reasoning`) is dispatched by the same dispatcher, executes in
 the same worker, emits the same progress events, and lands in the same run history as every other
@@ -1598,6 +1609,7 @@ GET    /llms-txt                          the llms.txt file, parsed
 GET    /llms-txt?format=text              the file itself, as a download
 GET    /agents/:agentSlug/sources         verdicts, filterable by ?relevant=
 POST   /agents/:agentSlug/sources/include {"key": "<the listing's key>"} — write from this page after all
+PUT    /agents/business-knowledge-base/model {"modelTier": "large"|"medium"}, the model every write run uses
 
 GET    /conversations                     the workspace's chat threads, newest first
 POST   /conversations                     {"question": "…"} — starts one, returns 202 and a runId
@@ -1983,8 +1995,11 @@ required to mirror a site into its Library — without them nothing is indexed, 
 and the status line say which of the two is missing.
 
 The knowledge base is a `long-context` agent, llms.txt and the chat `reasoning` ones; the router in
-`agents/src/ai/model/modelRouter.js` decides what serves each, and neither definition names a model.
-See [ai-execution.md](ai-execution.md) for how a run executes.
+`agents/src/ai/model/modelRouter.js` decides how hard each thinks, and no definition names a model.
+Which model writes the knowledge base is the Model setting on its page, a tier of the model catalog
+stored as `modelTier` on its `agent_setups` row (Claude Opus 5.5 or Claude Sonnet 5.5 with
+Anthropic; never the smallest, which its definition does not allow), read by each write run when it
+starts. See [ai-execution.md](ai-execution.md) for how a run executes.
 
 To rebuild a workspace's Library, press "Rebuild the structure…" under "What changed" on the
 Library page (`POST /library/structure/rebuild`): the structure step opens again, new variants are
