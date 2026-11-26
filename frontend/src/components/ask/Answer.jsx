@@ -23,6 +23,7 @@ import { OrbikMark } from "@/components/OrbikLogo";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { aiUnavailableText, isAiUnavailableError, useAiAvailability } from "@/lib/ask/ai";
+import { extensionApi, useExtensionSlots } from "@/lib/extensions/slots";
 import { cn } from "@/lib/utils";
 
 /** How sure the answer is, in the words a person would use. */
@@ -61,6 +62,10 @@ function libraryHref(workspaceId, path) {
  * calls it completed, not from what the model wrote in its reply, so "Changed in your Library" is
  * what happened — and each path in it opens where the thing now lives.
  *
+ * Under a finished answer is one quiet line: Copy, and the notes an installed extension adds
+ * (`answerNotes`), given the run behind the answer, the model that answered and what the run's
+ * model calls cost, as the API folded them in from the AI call log.
+ *
  * @param {object} props
  * @param {object} props.message the turn
  * @param {string} props.workspaceId for linking Library paths
@@ -75,6 +80,8 @@ function libraryHref(workspaceId, path) {
  */
 export function Answer({ message, workspaceId, pending = false, progress = [], latest = false, onReply, onRevise, onBrandChanged, canChange = true }) {
   const { isAdmin } = useAiAvailability();
+  // What an installed extension notes under an answer. None in the open-source edition.
+  const { answerNotes } = useExtensionSlots();
   if (message.role === "user") {
     return (
       <li className="flex flex-col items-end gap-1">
@@ -101,6 +108,10 @@ export function Answer({ message, workspaceId, pending = false, progress = [], l
 
   const failed = message.status === "failed" || message.status === "cancelled";
   const waiting = pending || (!message.text && !failed);
+  // The line under the answer: Copy for one with words, and an extension's notes for any finished
+  // answer with a run, a failed one included, since its run may still have made calls.
+  const copyable = Boolean(message.text) && !waiting;
+  const notes = !waiting && message.runId ? answerNotes : [];
 
   return (
     <li className="flex flex-col items-start gap-1">
@@ -190,9 +201,22 @@ export function Answer({ message, workspaceId, pending = false, progress = [], l
         {message.citations?.length > 0 && <Citations citations={message.citations} workspaceId={workspaceId} />}
       </div>
 
-      {message.text && !waiting && (
-        <div className="flex items-center">
-          <CopyButton text={message.text} variant="ghost" />
+      {(copyable || notes.length > 0) && (
+        <div className={cn("flex items-center", notes.length > 0 && "max-w-full flex-wrap gap-x-1")}>
+          {copyable && <CopyButton text={message.text} variant="ghost" />}
+          {/* Each note is set like Copy's label, small and muted, at the button's height; one
+              that renders nothing leaves no gap. */}
+          {notes.map(({ id, Component }) => (
+            <div key={id} className="flex min-h-6 min-w-0 items-center px-2.5 text-xs text-orb-muted empty:hidden">
+              <Component
+                workspaceId={workspaceId}
+                api={extensionApi}
+                runId={message.runId}
+                model={message.model ?? null}
+                costUsd={message.costUsd ?? null}
+              />
+            </div>
+          ))}
         </div>
       )}
     </li>

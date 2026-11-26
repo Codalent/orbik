@@ -66,6 +66,38 @@ export const settingsSections = [];
 export const banners = [];
 
 /**
+ * Compact controls in the workspace header, after the theme switch and before the account menu,
+ * in this order, on every page of a workspace: something small that is always in view, such as
+ * what a deployment that meters usage has left, as an icon-sized button that may open a popover.
+ * The header keeps its height and must still fit a phone, so an item is no taller than the
+ * controls beside it (2rem) and no wider than it needs to be. An item with nothing to say renders
+ * nothing.
+ *
+ * @type {Array<{id: string, feature?: string,
+ *   Component: import("react").ComponentType<{workspaceId: string, api: object}>}>}
+ */
+export const headerItems = [];
+
+/**
+ * Notes on the quiet line under each finished answer in the Ask panel, beside Copy, for every
+ * agent the panel talks to (the Library chat and the brand chat): what an answer cost, say, for a
+ * deployment that meters usage. Not rendered while an answer is still being written, nor under one
+ * that failed before it had a run. A note with nothing to say renders nothing.
+ *
+ * `runId` is the run that produced the answer. `model` is the model that answered, as the AI call
+ * log names it: the one that answered the latest of the run's reasoning calls to come back, which
+ * is the model the provider fell back to when it did; null when none came back. `costUsd` is what
+ * the run's model calls cost at list price in US dollars, the sum of the `costUsd` on its
+ * `ai_calls` rows (every turn of its tool loop, and the embeddings of its searches); 0 when none
+ * was priced. Both are null for a reader whose role does not read the AI call log.
+ *
+ * @type {Array<{id: string, feature?: string,
+ *   Component: import("react").ComponentType<{workspaceId: string, api: object, runId: string,
+ *   model: string|null, costUsd: number|null}>}>}
+ */
+export const answerNotes = [];
+
+/**
  * Agents a deployment's server extension added (`host.addAgentDefinitions`), given a place in the
  * web app: a row in the Agents overview and the workspace's agent lists, with this name and icon,
  * linking to `/workspaces/:id/agents/<slug>`. With a `Component`, that page is the extension's;

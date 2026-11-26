@@ -983,6 +983,18 @@ turn as `changes`; the panel lists them under **Changed in your Library**, each 
 where the thing now is, and re-reads every cached read of the workspace so the Library on screen
 shows the change.
 
+**What it cost is read from the AI call log.** In the same fold the service reads the run's rows
+in `ai_calls` (`totalsForRuns` in `backend/src/repositories/aiCallRepository.js`, one aggregate on
+the `runId` index; every call of a run is recorded before the run ends) and stores on the turn
+`costUsd`, the sum of their `costUsd` at list price, every turn of the tool loop and the
+embeddings of its searches included (0 when none was priced), and `model`, the model that answered
+the latest of its reasoning calls to come back, as the log names it: the model the provider fell
+back to when it did, or null when no call came back. A turn folded in before these were kept is
+given them the next time its conversation is read. They are returned to a reader whose role reads
+the AI call log (`AI_CALL_LOG_ROLE`, read-only and up, so everyone who can open a conversation) and
+are null otherwise; core shows neither, and a web extension's `answerNotes` are handed both
+([extensions.md](extensions.md#web-extensions)).
+
 **A question is an agent run.** The `library-chat` definition (v3, capability `reasoning`) is dispatched by the same dispatcher, executes in
 the same worker, emits the same progress events, and lands in the same run history as every other
 agent. Chat could have had a direct streaming path of its own; it would have meant a second

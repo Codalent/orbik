@@ -25,6 +25,8 @@ const railItems = list("railItems");
 const pages = record("pages");
 const settingsSections = list("settingsSections");
 const banners = list("banners");
+const headerItems = list("headerItems");
+const answerNotes = list("answerNotes");
 const agentPages = record("agentPages");
 const accountPages = record("accountPages");
 const userMenuItems = list("userMenuItems");
@@ -67,6 +69,10 @@ export function useExtensionSlots() {
     railItems: railItems.filter(shown),
     settingsSections: settingsSections.filter(shown),
     banners: banners.filter(shown),
+    /** Compact controls in the workspace header, before the account menu. */
+    headerItems: headerItems.filter(shown),
+    /** Notes on the line under each finished Ask answer that has a run. */
+    answerNotes: answerNotes.filter(shown),
     userMenuItems: userMenuItems.filter(shown),
     workspaceCreateNotices: workspaceCreateNotices.filter(shown),
     /** Where more crawl pages are got, as `{ label, path }`, or null when the install offers none. */

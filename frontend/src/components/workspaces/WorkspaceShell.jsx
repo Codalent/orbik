@@ -70,7 +70,8 @@ function WorkspaceChrome({ children }) {
   // it itself: most pages have no sidebar, so no monitor, and an agent that started while one of
   // them was open went without its dot until the person moved to Agents or Sources.
   const { activity } = useLiveActivity();
-  // What an installed extension adds: rail items, banners and agents. Empty in the open-source edition.
+  // What an installed extension adds: rail items, banners, header items and agents. Empty in the
+  // open-source edition.
   const extensionSlots = useExtensionSlots();
 
   const knowledge = selectedWorkspaceId ? buildKnowledgeRows(selectedWorkspaceId, activity) : [];
@@ -192,6 +193,15 @@ function WorkspaceChrome({ children }) {
                 )}
                 {/* The theme sits in the bar rather than the account menu, where it was not found. */}
                 <ThemeSwitch />
+                {/* An extension's compact controls, before the account menu. Each sits in a box the
+                    controls' height that never shrinks, so the bar keeps its own height and, on a
+                    phone, the workspace's name gives way first; one that renders nothing leaves no
+                    gap. */}
+                {panelWorkspaceId && extensionSlots.headerItems.map(({ id, Component }) => (
+                  <div key={id} className="flex h-8 shrink-0 items-center empty:hidden">
+                    <Component workspaceId={panelWorkspaceId} api={extensionApi} />
+                  </div>
+                ))}
                 <UserMenu email={auth.user?.email} onSignOut={signOut} disabled={busy} />
               </div>
             </header>

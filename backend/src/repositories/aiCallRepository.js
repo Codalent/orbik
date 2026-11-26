@@ -119,6 +119,46 @@ export function createAiCallRepository(collections) {
       };
     },
 
+    /**
+     * What each of a set of runs' model calls came to, in one pass over the `runId` index.
+     *
+     * `costUsd` is the sum of every call's recorded cost at list price, embeddings included (a
+     * search inside a run carries the run), and 0 for a run with no priced call. `model` is the
+     * model that answered the run's latest reasoning call to come back, as the log names it (the
+     * one a fallback answered on, when one did), or null when none came back. A run made one call
+     * per turn of its tool loop; a call that failed or never finished is priced at nothing.
+     *
+     * @param {ObjectId[]} runIds
+     * @returns {Promise<Map<string, {model: string|null, costUsd: number}>>} by run, as a hex string
+     */
+    async totalsForRuns(runIds) {
+      if (runIds.length === 0) return new Map();
+      const rows = await calls.aggregate([
+        { $match: { runId: { $in: runIds } } },
+        { $sort: { startedAt: 1, _id: 1 } },
+        {
+          $group: {
+            _id: "$runId",
+            costUsd: { $sum: { $ifNull: ["$costUsd", 0] } },
+            // Oldest first, as sorted; null for a call that did not answer as a reasoning call.
+            answered: {
+              $push: {
+                $cond: [
+                  { $and: [{ $ne: ["$purpose", "embedding"] }, { $eq: ["$status", "succeeded"] }] },
+                  { $ifNull: ["$model.used", "$model.requested"] },
+                  null,
+                ],
+              },
+            },
+          },
+        },
+      ]).toArray();
+      return new Map(rows.map((row) => [
+        row._id.toHexString(),
+        { model: row.answered.filter(Boolean).at(-1) ?? null, costUsd: row.costUsd },
+      ]));
+    },
+
     /** Calls that have started and not yet finished, across workspaces, oldest first. */
     async listRunning(workspaceIds) {
       if (!workspaceIds.length) return [];

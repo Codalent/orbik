@@ -7,7 +7,7 @@ import { BRAND_ASSET_ORIGINS } from "@orbik/core";
 import { AppError } from "../errors/appError.js";
 import { toConversation, toConversationSummary } from "../repositories/conversationRepository.js";
 import { toChangeView } from "./brandService.js";
-import { createWorkspaceAccessCheck, hasRole } from "./workspaceAccess.js";
+import { AI_CALL_LOG_ROLE, createWorkspaceAccessCheck, hasRole } from "./workspaceAccess.js";
 
 /** The agent that answers a question from the retrieval index, and saves and rearranges the Library. */
 export const CHAT_AGENT_SLUG = "library-chat";
@@ -93,6 +93,8 @@ export const MAX_QUESTION = 1_000;
  * @param {object} dependencies.runService creates runs; chat does not invent a second way
  * @param {object} [dependencies.brandRepository] the brand's files and change log, for files sent
  *   with a message and for the changes a brand turn made
+ * @param {object} [dependencies.aiCallRepository] the AI call log, for the model that answered a
+ *   turn and what its run's model calls cost
  */
 export function createConversationService({
   workspaceRepository,
@@ -100,6 +102,7 @@ export function createConversationService({
   runRepository,
   runService,
   brandRepository = null,
+  aiCallRepository = null,
 }) {
   const requireWorkspaceAccess = createWorkspaceAccessCheck(workspaceRepository);
 
@@ -127,25 +130,48 @@ export function createConversationService({
    * Returns the conversation as it now stands, whether or not anything moved, so every read goes
    * through one path. A run that is still going leaves its turn alone — the interface polls the
    * run's events for that, exactly as it does for any other agent.
+   *
+   * The model that answered and what the run's model calls cost are read from the AI call log as
+   * the run is folded in, once: every call of a run is recorded before the run ends. A turn folded
+   * in before they were kept is given them the first time its conversation is read again, all such
+   * turns in one read of the log.
    */
   async function reconcile(workspaceId, conversation) {
     let current = conversation;
+    const uncosted = [];
     for (const message of conversation.messages ?? []) {
       if (message.role !== "assistant" || !message.runId) continue;
-      if (message.status && isTerminalRunStatus(message.status)) continue;
+      if (message.status && isTerminalRunStatus(message.status)) {
+        if (typeof message.costUsd !== "number") uncosted.push(message);
+        continue;
+      }
 
       const run = await runRepository.findInWorkspace(workspaceId, String(message.runId));
       if (!run || !isTerminalRunStatus(run.status)) continue;
 
       const changes = await changesOf(run._id);
       const brandChanges = brandRepository ? await brandRepository.listChangesForRuns({ workspaceId, runIds: [run._id] }) : [];
+      const totals = aiCallRepository ? await aiCallRepository.totalsForRuns([run._id]) : null;
       const updated = await conversationRepository.replaceMessage({
         workspaceId,
         conversationId: conversation._id.toHexString(),
         messageId: message.id,
-        message: { ...message, ...answerFrom(run), changes, brandChanges: brandChanges.map(toChangeView) },
+        message: { ...message, ...answerFrom(run), changes, brandChanges: brandChanges.map(toChangeView), ...costOf(totals, run._id) },
       });
       if (updated) current = updated;
+    }
+
+    if (aiCallRepository && uncosted.length) {
+      const totals = await aiCallRepository.totalsForRuns(uncosted.map((message) => toObjectId(message.runId)));
+      for (const message of uncosted) {
+        const updated = await conversationRepository.replaceMessage({
+          workspaceId,
+          conversationId: conversation._id.toHexString(),
+          messageId: message.id,
+          message: { ...message, ...costOf(totals, message.runId) },
+        });
+        if (updated) current = updated;
+      }
     }
     return current;
   }
@@ -228,7 +254,7 @@ export function createConversationService({
           error: { code: error.code ?? "RUN_NOT_CREATED", message: error.message },
         },
       });
-      return { conversation: toConversation(failed ?? stored), runId: null };
+      return { conversation: toConversation(failed ?? stored, { cost: seesCost(workspace) }), runId: null };
     }
 
     stored = await conversationRepository.replaceMessage({
@@ -238,7 +264,7 @@ export function createConversationService({
       message: { ...assistantMessage, runId: run._id, status: run.status },
     }) ?? stored;
 
-    return { conversation: toConversation(stored), runId: run._id.toHexString() };
+    return { conversation: toConversation(stored, { cost: seesCost(workspace) }), runId: run._id.toHexString() };
   }
 
   /**
@@ -302,13 +328,13 @@ export function createConversationService({
         includeUnattributed: workspace.role === "owner",
         limit,
       });
-      return { items: rows.map(toConversationSummary) };
+      return { items: rows.map((row) => toConversationSummary(row, { cost: seesCost(workspace) })) };
     },
 
     /** One conversation, with any finished answers folded in. */
     async getConversation({ userId, workspaceId, conversationId }) {
       const { workspace, conversation } = await requireConversation(userId, workspaceId, conversationId);
-      return { conversation: toConversation(await reconcile(workspace._id, conversation)) };
+      return { conversation: toConversation(await reconcile(workspace._id, conversation), { cost: seesCost(workspace) }) };
     },
 
     /** Starts a conversation with its first question. */
@@ -373,6 +399,29 @@ function answerFrom(run) {
     leftOut: Array.isArray(result.leftOut) ? result.leftOut.slice(0, 30).map(leftOutItem).filter(Boolean) : [],
     error: null,
   };
+}
+
+/**
+ * The model and cost a turn keeps for its run, from the AI call log's totals: a cost of 0 and no
+ * model for a run the log holds no call of. Nothing without the log, so a later read can still
+ * fill them in.
+ *
+ * @param {Map<string, {model: string|null, costUsd: number}>|null} totals by run, as a hex string
+ * @param {import("mongodb").ObjectId|string} runId
+ */
+function costOf(totals, runId) {
+  if (!totals) return {};
+  const total = totals.get(String(runId));
+  return { model: total?.model ?? null, costUsd: total?.costUsd ?? 0 };
+}
+
+/**
+ * Whether a reader is shown each turn's model and cost: only with the role that reads the AI call
+ * log, where the same figures are, call by call. Today that is every role that can open a
+ * conversation at all.
+ */
+function seesCost(workspace) {
+  return hasRole(workspace.role, AI_CALL_LOG_ROLE);
 }
 
 /**

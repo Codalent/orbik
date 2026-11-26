@@ -13,6 +13,14 @@ export const WORKSPACE_ROLES = Object.freeze(["read-only", "member", "admin", "o
  */
 export const MEMBER_ROLES = Object.freeze(["admin", "member", "read-only"]);
 
+/**
+ * The least role that reads a workspace's AI call log: every model call made for it, with the
+ * model that answered and what it cost at list price. Anything else that shows those figures, such
+ * as an Ask answer's model and cost, is held to the same role, so it never tells a person more
+ * than the log already does.
+ */
+export const AI_CALL_LOG_ROLE = "read-only";
+
 /** True when `role` is at or above `minimum`; false for an unknown or missing role. */
 export function hasRole(role, minimum) {
   const held = WORKSPACE_ROLES.indexOf(role);
